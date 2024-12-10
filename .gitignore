@@ -1,4 +1,6 @@
 __pycache__/
+windows/__pycache__/
+utils/__pycache__/
 *.log
 .env
 LABeCO2_env/
