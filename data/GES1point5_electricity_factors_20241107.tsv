@@ -1,0 +1,16 @@
+category	subcategory	subsubcategory	unit	name	year	co2	ch4	n2o	other	total	uncertainty	ef.unit
+Électricité	FR		kWh	Electricité France continentale	2022	0	0	0	0	0.052	0.1	kg eCO2/kWh
+Électricité	FR.94		kWh	Electricité Corse	2014	0	0	0	0	0.5937	0.15	kg eCO2/kWh
+Électricité	PM		kWh	Electricité St Pierre et Miquelon	2017	0	0	0	0	0.9438	0.15	kg eCO2/kWh
+Électricité	WF		kWh	Electricité Wallis-et-Futuna (identique à St Pierre et Miquelon)	2017	0	0	0	0	0.9438	0.15	kg eCO2/kWh
+Électricité	TF		kWh	Electricité Terres australes françaises (identique à St Pierre et Miquelon)	2017	0	0	0	0	0.9438	0.15	kg eCO2/kWh
+Électricité	MF		kWh	Electricité St Martin	2017	0	0	0	0	0.8195	0.15	kg eCO2/kWh
+Électricité	BL		kWh	Electricité St Barthélémy	2018	0	0	0	0	0.8591	0.15	kg eCO2/kWh
+Électricité	RE		kWh	Electricité Réunion	2014	0	0	0	0	0.78	0.15	kg eCO2/kWh
+Électricité	YT		kWh	Electricité Mayotte	2014	0	0	0	0	0.7795	0.15	kg eCO2/kWh
+Électricité	GP		kWh	Electricité Guadeloupe	2014	0	0	0	0	0.7021	0.15	kg eCO2/kWh
+Électricité	NC		kWh	Electricité Nouvelle-Calédonie (identique à Guadeloupe)	2014	0	0	0	0	0.7021	0.15	kg eCO2/kWh
+Électricité	MQ		kWh	Electricité Martinique	2014	0	0	0	0	0.8395	0.15	kg eCO2/kWh
+Électricité	GF		kWh	Electricité Guyane	2020	0	0	0	0	0.9566	0.15	kg eCO2/kWh
+Électricité	PF		kWh	Electricité Polynésie hors Tahiti	2021	0	0	0	0	1.0934	0.15	kg eCO2/kWh
+Électricité	PF.01		kWh	Electricité Tahiti	2021	0	0	0	0	0.5432	0.15	kg eCO2/kWh

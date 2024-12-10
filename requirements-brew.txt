@@ -1,0 +1,5 @@
+# requirements-brew.txt
+matplotlib
+pandas
+pyinstaller
+adjustText

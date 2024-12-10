@@ -1,0 +1,17 @@
+category	subcategory	subsubcategory	unit	name	year	co2	ch4	n2o	other	total	uncertainty	ef.unit
+Transports	Avion	Court courrier (< 1000 km)	km	Avion court courrier, avec traînées	2022	0	0	0	0	0.2586	0.37	kg eCO2/km
+Transports	Avion	Moyen courrier (< 1001 - 3500km)	km	Avion moyen courrier, avec traînées	2022	0	0	0	0	0.1875	0.37	kg eCO2/km
+Transports	Avion	Long courrier (> 3500 km)	km	Avion long courrier, avec traînées	2022	0	0	0	0	0.152	0.37	kg eCO2/km
+Transports	Ferroviaire	TGV > 200 km	km	TGV	2021	0	0	0	0	0.0033	0.2	kg eCO2/km
+Transports	Ferroviaire	Train < 200 km	km	Non disponible	2019	0	0	0	0	0.018	0.6	kg eCO2/km
+Transports	Ferroviaire	Train international	km	Non disponible	2019	0	0	0	0	0.037	0.6	kg eCO2/km
+Transports	Ferroviaire	Train mixte France et international	km	Non disponible	2019	0	0	0	0	0.016	0.6	kg eCO2/km
+Transports	Ferroviaire	rer	km	RER Transilien	2021	0	0	0	0	0.0094	0.2	kg eCO2/km
+Transports	Ferroviaire	Tramway =< 250 000 habitants	km	Métro, tramway, trolleybus, autres villes - Agglomération de 100 000 à 250 000 habitants	2018	0	0	0	0	0.005	0.6	kg eCO2/km
+Transports	Ferroviaire	Tramway > 250 000 habitants	km	Métro, tramway, trolleybus, autres villes - Agglomération > 250 000 habitants	2018	0	0	0	0	0.0033	0.6	kg eCO2/km
+Transports	Ferroviaire	Métro	km	Métro Ile de France	2021	0	0	0	0	0.004	0.2	kg eCO2/km
+Transports	Bus	bus.intercity	km	Autocar - trajets intercités	2021	0	0	0	0	0.0306	0.6	kg eCO2/km
+Transports	Bus	Bus > 250 000 habitants	km	Autobus moyen - Agglomération de plus de 250 000 habitants	2021	0	0	0	0	0.129	0.6	kg eCO2/km
+Transports	Bus	Bus 100 000 - 250 000 habitants	km	Autobus moyen - Agglomération de 100 000 à 250 000 habitants	2021	0	0	0	0	0.137	0.6	kg eCO2/km
+Transports	Bus	Bus < 100 000 habitants	km	Autobus moyen - Agglomération moins de 100 000 habitants	2021	0	0	0	0	0.146	0.6	kg eCO2/km
+Transports	Bateau	Ferry	km	Ferry de jour	2019	0	0	0	0	0.979	0.6	kg eCO2/km

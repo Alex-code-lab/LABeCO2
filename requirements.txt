@@ -1,0 +1,5 @@
+pandas==1.5.3
+PyQt5==5.15.7
+matplotlib==3.7.1
+numpy==1.23.5
+adjustText==0.8

@@ -1,0 +1,23 @@
+category	subcategory	subsubcategory	unit	name	year	co2	ch4	n2o	other	total	uncertainty	ef.unit
+Véhicules	Voiture	Essence	km	Voiture particulière, moyenne parc, motorisation essence	2018	0	0	0	0	0.2234	0.6	kg eCO2/km
+Véhicules	Voiture	Diesel	km	Voiture particulière , moyenne parc, motorisation gazole	2018	0	0	0	0	0.2121	0.6	kg eCO2/km
+Véhicules	Voiture	Motorisation inconnue	km	Voiture particulière, moyenne parc, motorisation moyenne	2018	0	0	0	0	0.2156	0.6	kg eCO2/km
+Véhicules	Voiture	GPL	km	Voiture particulière, moyenne parc, motorisation GPL	2018	0	0	0	0	0.2174	0.6	kg eCO2/km
+Véhicules	Voiture	GNV	km	Voiture particulière, moyenne parc, motorisation GNV	2018	0	0	0	0	0.2218	0.6	kg eCO2/km
+Véhicules	Voiture	E85	km	Voiture particulière, moyenne parc, motorisation E85	2018	0	0	0	0	0.1467	0.6	kg eCO2/km
+Véhicules	Voiture	Hybride	km	Voiture particulière - Coeur de gamme - Véhicule compact - Hybride full P2	2020	0	0	0	0	0.1828	0.7	kg eCO2/km
+Véhicules	Voiture	Électrique	km	Voiture particulière - Coeur de gamme - Véhicule compact - Electrique	2020	0	0	0	0	0.1034	0.7	kg eCO2/km
+Véhicules	Moto	Essence	km	Moto >= 250 cm3 mixte	2018	0	0	0	0	0.1913	0.6	kg eCO2/km
+Véhicules	Vélo	Musculaire	km	Non disponible	2019	0	0	0	0	0.005	0.7	kg eCO2/km
+Véhicules	Vélo	Électrique	km	VAE, bicyclette a assistance électrique	2020	0	0	0	0	0.0109	0.5	kg eCO2/km
+Véhicules	Trottinette	Électrique	km	Trotinette electrique	2020	0	0	0	0	0.0249	0.5	kg eCO2/km
+Véhicules	Aéronef	Avion à hélices (pistons)	litre	Essence aviation (AvGas) France continentale	2014	2.96	0.0513	0	0	3.0113	0.05	kg eCO2/litre
+Véhicules	Aéronef	Hélicoptère (pistons)	litre	Essence aviation (AvGas) France continentale	2014	2.96	0.0513	0	0	3.0113	0.05	kg eCO2/litre
+Véhicules	Aéronef	Avion à hélices (turbines)	litre	Kérosène Jet A1 ou A France continentale	2018	3.019	0.0545	0.0056	0	3.0791	0.05	kg eCO2/litre
+Véhicules	Aéronef	Hélicoptère (turbines)	litre	Kérosène Jet A1 ou A France continentale	2018	3.019	0.0545	0.0056	0	3.0791	0.05	kg eCO2/litre
+Véhicules	Bateau	Essence	litre	Essence - Supercarburant sans plomb (95, 95-E10, 98)	2021	6.083	0.1636	0.2585	0	6.5051	0.1	kg eCO2/litre
+Véhicules	Bateau	Fioul lourd HFO	litre	HFO (Heavy Fuel Oil) - ISO 8217 classes RME à RMK	2014	2.893	0.0399	0	0	2.9329	0.05	kg eCO2/litre
+Véhicules	Bateau	Fioul léger HFO	litre	LFO (Light Fuel Oil) - ISO 8217 classes RMA à RMD (maritime)	2014	2.999	0.0516	0	0	3.0506	0.05	kg eCO2/litre
+Véhicules	Bateau	Diesel	litre	MDO (Marine Diesel Oil) - ISO 8217 classes DMX à DMC	2014	2.999	0.0516	0	0	3.0506	0.05	kg eCO2/litre
+Véhicules	Bateau	Campagnes en mer	jours mer	Bateau oceanographique avec couchage à bord - Non disponible dans base ademe	2019	0	0	0	0	910	0.6	kg eCO2/jours mer
+Véhicules	Bateau	Campagnes côtières	heure.mer	Bateau oceanographique local sans couchage à bord - Non disponible dans base ademe	2019	0	0	0	0	7.6	0.6	kg eCO2/heure.mer
