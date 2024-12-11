@@ -13,6 +13,8 @@ a = Analysis(
     datas=[
         ('data_base_GES1point5/data_base_GES1point5.hdf5', 'data_base_GES1point5'),
         ('images/Logo.png', 'images'),
+        ('images/icon.icns', 'images'),  # Inclusion de l'icône
+        ('styles/styles.qss', 'styles'),  # Inclusion du fichier QSS
     ],
     hiddenimports=[
         'tables',
@@ -43,7 +45,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='main',
+    name='LABeCO2',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -60,7 +62,7 @@ exe = EXE(
 
 app = BUNDLE(
     exe,
-    name='main.app',           # Le nom de votre application
+    name='LABeCO2.app',           # Le nom de votre application
     icon='images/icon.icns',   # Votre icône au format ICNS
     bundle_identifier='com.labeco2.main', # Un identifiant unique
     codesign_identity='LABeCO2_perso',    # Si vous voulez signer avec votre certificat

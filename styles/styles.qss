@@ -1,0 +1,184 @@
+/* styles.qss */
+
+/* Style général de l'application */
+QMainWindow {
+    background-color: #f6ffffff; /* Gris très clair similaire au fond macOS */
+}
+
+/* Style des QLabel */
+QLabel {
+    color: #333333; /* Texte gris foncé pour une bonne lisibilité */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système pour une apparence native */
+    font-size: 14px; /* Taille de police standard */
+}
+
+/* Style des QLineEdit */
+QLineEdit {
+    background-color: #FFFFFF; /* Fond blanc pour les champs de texte */
+    border: 1px solid #C0C0C0; /* Bordure grise claire */
+    border-radius: 4px; /* Coins légèrement arrondis */
+    padding: 4px 8px; /* Espacement interne pour un meilleur confort de saisie */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #000000; /* Texte noir pour la lisibilité */
+}
+
+QLineEdit:disabled {
+    background-color: #E0E0E0; /* Fond gris pour indiquer que le champ est désactivé */
+    color: #A0A0A0; /* Texte gris clair pour les champs désactivés */
+}
+
+/* Style des QPushButton */
+QPushButton {
+    background-color: #FFFFFF; /* Fond blanc pour les boutons */
+    color: #000000; /* Texte noir pour les boutons */
+    border: 1px solid #C0C0C0; /* Bordure grise claire */
+    border-radius: 4px; /* Coins légèrement arrondis */
+    padding: 6px 12px; /* Espacement interne pour une meilleure ergonomie */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+}
+
+QPushButton:hover {
+    background-color: #E8E8E8; /* Fond légèrement gris lors du survol */
+    border: 1px solid #A0A0A0; /* Bordure légèrement plus foncée lors du survol */
+}
+
+QPushButton:pressed {
+    background-color: #D0D0D0; /* Fond plus foncé lorsqu'on clique sur le bouton */
+    border: 1px solid #808080; /* Bordure encore plus foncée lorsqu'on clique */
+}
+
+QPushButton:disabled {
+    background-color: #F8F8F8; /* Fond très clair pour les boutons désactivés */
+    color: #A0A0A0; /* Texte gris clair pour les boutons désactivés */
+    border: 1px solid #D0D0D0; /* Bordure plus claire pour les boutons désactivés */
+}
+
+/* Style des QComboBox */
+QComboBox {
+    background-color: #FFFFFF; /* Fond blanc pour les boîtes combinées */
+    border: 1px solid #C0C0C0; /* Bordure grise claire */
+    border-radius: 4px; /* Coins légèrement arrondis */
+    padding: 4px 8px; /* Espacement interne */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #000000; /* Texte noir */
+}
+
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF; /* Fond blanc pour la liste déroulante */
+    selection-background-color: #B0D0FF; /* Couleur de fond lors de la sélection d'un élément */
+    selection-color: #000000; /* Couleur du texte lors de la sélection */
+}
+
+/* Style des QListWidget */
+QListWidget {
+    background-color: #FFFFFF; /* Fond blanc pour les listes */
+    border: 1px solid #C0C0C0; /* Bordure grise claire */
+    border-radius: 4px; /* Coins légèrement arrondis */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #000000; /* Texte noir */
+}
+
+QListWidget::item:selected {
+    background-color: #B0D0FF; /* Fond bleu clair pour l'élément sélectionné */
+    color: #000000; /* Texte noir pour l'élément sélectionné */
+}
+
+/* Style des QScrollArea */
+QScrollArea {
+    background-color: #c0baba; /* Fond gris très clair pour les zones de défilement */
+}
+
+/* Style des QScrollBar Verticaux */
+QScrollBar:vertical {
+    background: #F0F0F0; /* Couleur de fond de la scrollbar */
+    width: 12px; /* Largeur de la scrollbar */
+    margin: 0px 0px 0px 0px; /* Marges autour de la scrollbar */
+}
+
+QScrollBar::handle:vertical {
+    background: #C0C0C0; /* Couleur de la poignée */
+    min-height: 20px; /* Hauteur minimale de la poignée */
+    border-radius: 6px; /* Coins arrondis de la poignée */
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: #A0A0A0; /* Couleur des boutons add et sub */
+    height: 0px; /* Hauteur des boutons (0px les rend invisibles) */
+    subcontrol-position: top; /* Position des boutons */
+    subcontrol-origin: margin;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none; /* Pas de couleur pour les zones add-page et sub-page */
+}
+
+/* Style des QScrollBar Horizontaux */
+QScrollBar:horizontal {
+    background: #F0F0F0; /* Couleur de fond de la scrollbar */
+    height: 12px; /* Hauteur de la scrollbar */
+    margin: 0px 0px 0px 0px; /* Marges autour de la scrollbar */
+}
+
+QScrollBar::handle:horizontal {
+    background: #C0C0C0; /* Couleur de la poignée */
+    min-width: 20px; /* Largeur minimale de la poignée */
+    border-radius: 6px; /* Coins arrondis de la poignée */
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    background: #A0A0A0; /* Couleur des boutons add et sub */
+    width: 0px; /* Largeur des boutons (0px les rend invisibles) */
+    subcontrol-position: left; /* Position des boutons */
+    subcontrol-origin: margin;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none; /* Pas de couleur pour les zones add-page et sub-page */
+}
+
+/* Style des QMessageBox */
+QMessageBox {
+    background-color: #FFFFFF; /* Fond blanc pour les boîtes de dialogue */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #333333; /* Texte gris foncé */
+}
+
+/* Style des QDialog */
+QDialog {
+    background-color: #FFFFFF; /* Fond blanc pour les boîtes de dialogue */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #333333; /* Texte gris foncé */
+}
+
+/* Style des QToolTip */
+QToolTip {
+    background-color: #FFFFE0; /* Fond jaune pâle pour les infobulles */
+    color: #000000; /* Texte noir */
+    border: 1px solid #C0C0C0; /* Bordure grise claire */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 12px; /* Taille de police plus petite pour les infobulles */
+}
+
+/* Style des QInputDialog */
+QInputDialog {
+    background-color: #FFFFFF; /* Fond blanc pour les boîtes de saisie */
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système */
+    font-size: 14px; /* Taille de police standard */
+    color: #333333; /* Texte gris foncé */
+}
+
+/* Style des QFormLayout */
+QFormLayout {
+    spacing: 10px; /* Espacement entre les éléments du formulaire */
+}
+
+/* Style des QWidget */
+QWidget {
+    background-color: #F0F0F0; /* Fond gris très clair pour tous les widgets génériques */
+}
