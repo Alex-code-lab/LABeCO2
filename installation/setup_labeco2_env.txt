@@ -1,0 +1,164 @@
+
+# Configuration de l'environnement virtuel LABeCO2
+
+## Objectif
+Ce guide explique comment configurer un environnement virtuel (venv) pour votre projet LABeCO2 avec les dépendances et bibliothèques nécessaires, conformément aux configurations suivantes.
+
+---
+
+## 1. Prérequis
+- **macOS** avec Homebrew installé.
+- **Python 3.11** installé via Homebrew :
+    ```bash
+    brew install python@3.11
+    ```
+- Homebrew déjà configuré sur votre système. Si ce n'est pas le cas, installez-le avec :
+    ```bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```
+
+---
+
+## 2. Création de l'environnement virtuel
+1. Créez un nouvel environnement virtuel dans votre projet :
+    ```bash
+    python3 -m venv LABeCO2_env
+    ```
+2. Activez l'environnement :
+    ```bash
+    source LABeCO2_env/bin/activate
+    ```
+
+---
+
+## 3. Installation des dépendances Python
+Une fois dans l'environnement virtuel, mettez à jour `pip` et installez les bibliothèques requises :
+```bash
+pip install --upgrade pip
+pip install PySide6 pyinstaller pandas tables matplotlib scipy pillow adjustText
+```
+
+Vérifiez que toutes les bibliothèques sont bien installées :
+```bash
+pip list
+```
+
+Vous devez obtenir une liste similaire à celle-ci :
+- adjustText==0.8
+- matplotlib==3.7.2
+- numpy==1.25.2
+- pandas==2.2.3
+- PySide6==6.5.2
+- tables==3.10.1
+- etc.
+
+---
+
+## 4. Installation des dépendances système via Homebrew
+Certaines bibliothèques nécessitent des dépendances système. Installez-les avec Homebrew :
+```bash
+brew install c-blosc c-blosc2 hdf5 qt
+```
+
+Vérifiez les installations avec :
+```bash
+brew list
+```
+
+---
+
+## 5. Inclusion des fichiers dans le projet
+Assurez-vous que votre projet suit cette structure :
+```
+LABeCO2/
+├── main.py
+├── main_app_labeco2.spec
+├── styles/
+│   └── styles.qss
+├── images/
+│   ├── Logo.png
+│   └── icon.icns
+├── windows/
+│   ├── main_window.py
+├── utils/
+│   └── data_loader.py
+└── data_base_GES1point5/
+    └── data_base_GES1point5.hdf5
+```
+
+---
+
+## 6. Configuration du fichier `.spec` pour PyInstaller
+Voici un exemple du fichier `.spec` :
+```python
+# -*- mode: python ; coding: utf-8 -*-
+
+block_cipher = None
+
+a = Analysis(
+    ['main.py'],
+    pathex=['.', './windows', './utils'],
+    binaries=[
+        ('/opt/homebrew/Cellar/python@3.11/3.11.11/Frameworks/Python.framework/Versions/3.11/Python', '.'),
+        ('/opt/homebrew/lib/libhdf5.dylib', '.'), 
+        ('/opt/homebrew/lib/libhdf5_hl.dylib', '.')
+    ],
+    datas=[
+        ('data_base_GES1point5/data_base_GES1point5.hdf5', 'data_base_GES1point5'),
+        ('images/Logo.png', 'images'),
+        ('images/icon.icns', 'images'),
+        ('styles/styles.qss', 'styles'),
+    ],
+    hiddenimports=[
+        'tables', 
+        'tables._comp_bzip2', 
+        'tables._comp_lzo', 
+        'pandas.io.pytables'
+    ],
+    cipher=block_cipher,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='LABeCO2',
+    console=False,
+)
+
+app = BUNDLE(
+    exe,
+    name='LABeCO2.app',
+    icon='images/icon.icns',
+    bundle_identifier='com.labeco2.main',
+    codesign_identity='LABeCO2_perso',
+)
+```
+
+---
+
+## 7. Empaquetage de l'application
+1. Nettoyez les anciens dossiers :
+    ```bash
+    rm -rf build dist
+    ```
+2. Lancez PyInstaller avec le fichier `.spec` :
+    ```bash
+    export HDF5_DIR=/usr/local
+    pyinstaller main_app_labeco2.spec
+    ```
+
+---
+
+## 8. Résolution des problèmes courants
+- Si des modules manquent, ajoutez-les dans `hiddenimports` du fichier `.spec`.
+- Si une bibliothèque système manque, installez-la via Homebrew.
+
+---
+
+Ce protocole garantit un environnement reproductible pour votre projet LABeCO2.

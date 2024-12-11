@@ -1,0 +1,124 @@
+
+# Installation et utilisation d'Anaconda
+
+## Installation d'Anaconda
+1. Rendez-vous sur le site officiel d'Anaconda : https://www.anaconda.com/products/distribution
+2. Téléchargez le programme d'installation pour votre système d'exploitation (macOS, Windows, Linux).
+3. Ouvrez le terminal et exécutez le script d'installation téléchargé. Par exemple, pour macOS :
+   ```bash
+   bash Anaconda3-<version>-MacOSX-x86_64.sh
+   ```
+4. Suivez les instructions affichées à l'écran.
+5. Une fois installé, ajoutez Anaconda à votre `PATH` en exécutant :
+   ```bash
+   conda init
+   ```
+6. Redémarrez votre terminal.
+
+## Utilisation d'Anaconda
+### Mettre à jour Anaconda
+1. Mettez à jour conda :
+   ```bash
+   conda update conda
+   ```
+2. Mettez à jour l'ensemble d'Anaconda :
+   ```bash
+   conda update anaconda
+   ```
+
+### Créer des environnements conda
+1. Créez un nouvel environnement avec un nom spécifique et une version de Python :
+   ```bash
+   conda create -n nom_environnement python=3.9
+   ```
+2. Activez l'environnement :
+   ```bash
+   conda activate nom_environnement
+   ```
+3. Installez des bibliothèques spécifiques dans cet environnement :
+   ```bash
+   conda install nom_du_paquet
+   ```
+4. Désactivez l'environnement :
+   ```bash
+   conda deactivate
+   ```
+### Créer un environnements conda avec un fichier yml
+1. Pour recréer un environnement à partir d'une sauvegarde yml. 
+   ```bash
+   conda env create -f tracking_analyse_env.yml
+   ```
+	•	conda env : La sous-commande pour gérer les environnements.
+	•	create : Crée un nouvel environnement.
+	•	-f tracking_analyse_env.yml : Spécifie le fichier YAML contenant les spécifications de l’environnement.
+
+2. Si besoin de vérifier le fichier yml:
+   ```bash
+   cat tracking_analyse_env.yml
+   ``
+Réponse du type : 
+name: tracking_analyse_env
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - pip
+  - pip:
+      - some-pip-package
+Ajouter des dépendances s'il en manque.
+
+### Supprimer un environnement conda
+Pour supprimer un environnement :
+```bash
+conda remove --name nom_environnement --all
+```
+
+### Lister les environnements conda
+Pour voir tous les environnements disponibles :
+```bash
+conda env list
+```
+
+### Installer et utiliser pip dans un environnement conda
+
+#### Étape 1 : Vérifiez si `pip` est déjà installé
+1. Activez votre environnement conda :
+   ```bash
+   conda activate nom_environnement
+   ```
+2. Vérifiez si `pip` est disponible :
+   ```bash
+   pip --version
+   ```
+   - Si une version de pip s'affiche, il est déjà installé.
+   - Si ce n'est pas le cas, passez à l'étape suivante.
+
+#### Étape 2 : Installer `pip` dans l’environnement conda
+Si `pip` n'est pas installé, installez-le directement via conda :
+```bash
+conda install pip
+```
+
+#### Étape 3 : Utiliser `pip` dans l’environnement conda
+Une fois `pip` installé, vous pouvez l'utiliser pour installer des packages qui ne sont pas disponibles dans conda :
+```bash
+pip install nom_du_paquet
+```
+
+#### Étape 4 : Priorité entre conda et pip
+- **Privilégiez toujours** `conda install` pour installer les packages disponibles via conda, car cela garantit une compatibilité optimale des dépendances.
+- Utilisez `pip` uniquement si le package dont vous avez besoin n’est pas disponible dans conda.
+
+#### Étape 5 : Vérifiez la cohérence des dépendances
+Après avoir utilisé `pip`, vous pouvez vérifier que l’environnement reste cohérent avec :
+```bash
+conda list
+```
+Cela vous montre une liste de tous les packages installés, y compris ceux ajoutés via `pip`.
+
+En résumé :
+1. Activez l’environnement conda.
+2. Installez `pip` avec `conda install pip` si nécessaire.
+3. Utilisez `pip` pour les packages indisponibles sur conda.
+4. Priorisez `conda install` autant que possible pour éviter des problèmes de compatibilité.
