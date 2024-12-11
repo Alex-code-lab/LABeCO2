@@ -18,7 +18,7 @@ from PySide6.QtGui import  QPixmap #QAction QIcon,
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from utils.data_loader import load_data
+from utils.data_loader import load_data, load_logo
 from windows.pie_chart import PieChartWindow  # Importez la classe MainWindow
 from windows.bar_chart import BarChartWindow  # Importez la classe MainWindow
 from windows.proportional_bar_chart import ProportionalBarChartWindow
@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
             base_path = os.path.abspath(".")
 
         # Charge les données à partir du fichier HDF5
-        data_file_path = os.path.join(base_path, 'data', 'data_base_GES1point5.hdf5')
+        data_file_path = os.path.join(base_path, 'data_base_GES1point5', 'data_base_GES1point5.hdf5')
         # if not os.path.exists(data_file_path):
         #     QMessageBox.critical(self, 'Erreur', f"Le fichier de données n'a pas été trouvé : {data_file_path}")
         #     sys.exit(1)
@@ -60,7 +60,8 @@ class MainWindow(QMainWindow):
         # except Exception as e:
         #     QMessageBox.critical(self, 'Erreur', f"Impossible de charger les données : {e}")
         #     sys.exit(1)
-        self.data = load_data(data_file_path)
+        # self.data = load_data(data_file_path)
+        self.data = load_data()
 
         # Initialisation de variables
         self.calculs = []
@@ -458,12 +459,25 @@ class MainWindow(QMainWindow):
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
         self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
 
+    # def add_logo(self):
+    #     """
+    #     Charge et affiche le logo dans un QLabel.
+    #     """
+    #     script_dir = os.getcwd()
+    #     logo_path = os.path.join(script_dir, 'images', 'Logo.png')
+    #     self.logo_label = QLabel()
+    #     pixmap = QPixmap(logo_path)
+    #     if pixmap.isNull():
+    #         QMessageBox.warning(self, 'Erreur', f"Impossible de charger l'image : {logo_path}")
+    #     else:
+    #         resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    #         self.logo_label.setPixmap(resized_pixmap)
+    #         self.logo_label.setAlignment(Qt.AlignCenter)
     def add_logo(self):
         """
         Charge et affiche le logo dans un QLabel.
         """
-        script_dir = os.getcwd()
-        logo_path = os.path.join(script_dir, 'images', 'Logo.png')
+        logo_path = load_logo()  # Utilise load_logo pour obtenir le chemin correct
         self.logo_label = QLabel()
         pixmap = QPixmap(logo_path)
         if pixmap.isNull():
@@ -472,7 +486,7 @@ class MainWindow(QMainWindow):
             resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.logo_label.setPixmap(resized_pixmap)
             self.logo_label.setAlignment(Qt.AlignCenter)
-
+            
     def toggle_text_display(self):
         """
         Permet d'afficher/masquer le texte d'introduction complet 
