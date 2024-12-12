@@ -23,7 +23,7 @@ from windows.pie_chart import PieChartWindow  # Importez la classe MainWindow
 from windows.bar_chart import BarChartWindow  # Importez la classe MainWindow
 from windows.proportional_bar_chart import ProportionalBarChartWindow
 
-
+# Definition de la classe MainWindow
 class MainWindow(QMainWindow):
     """
     Fenêtre principale de l'application, permettant à l'utilisateur de :
