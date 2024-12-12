@@ -19,7 +19,6 @@ os.environ["QT_PLUGIN_PATH"] = os.path.join(os.path.dirname(sys.executable), "Py
 #     icon_path = os.path.join(script_dir, 'images', 'icon.png')  # Chemin relatif vers le logo
 #     app.setWindowIcon(QIcon(icon_path))  # Définir l'icône pour l'application entière
 
-
 #     window = MainWindow()  # Crée la fenêtre principale
 #     window.show()  # Affiche la fenêtre
 #     app.exec()  # Lance la boucle d'événements
