@@ -1,96 +1,120 @@
+import sys
 import pandas as pd
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout, QFormLayout,
+    QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
+    QWidget, QMessageBox
+)
 
-# Initialiser un DataFrame avec un exemple initial
-columns = ["Nom de l'objet", "Référence", "Masse unitaire (g)", "Matériau", "Source/Signature"]
-df = pd.DataFrame(columns=columns)
 
-# Ajouter les tubes Falcon de 15 ml avec une signature
-df = pd.concat([df, pd.DataFrame([{
-    "Nom de l'objet": "Tube Falcon 15ml",
-    "Référence": "N/A",
-    "Masse unitaire (g)": 6.7,
-    "Matériau": "Polypropylène (PP)",
-    "Source/Signature": "Alexandre Souchaud"
-}])], ignore_index=True)
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-def ajouter_objet(df):
-    """Fonction pour ajouter un nouvel objet au DataFrame."""
-    print("\nAjout d'un nouvel objet.")
-    
-    # Entrée utilisateur pour chaque champ
-    nom = input("Entrez le nom de l'objet : ").strip()
-    while not nom:
-        print("Le nom de l'objet ne peut pas être vide.")
-        nom = input("Entrez le nom de l'objet : ").strip()
-    
-    reference = input("Entrez la référence de l'objet : ").strip()
-    while not reference:
-        print("La référence de l'objet ne peut pas être vide.")
-        reference = input("Entrez la référence de l'objet : ").strip()
-    
-    while True:
-        masse_str = input("Entrez la masse unitaire (en grammes) de l'objet : ").strip()
-        masse_str = masse_str.replace(',', '.')  # Remplacer la virgule par un point
+        self.setWindowTitle("Gestion des matériaux")
+        self.setGeometry(100, 100, 600, 400)
+
+        # Initialisation des données
+        self.columns = ["Nom de l'objet", "Référence", "Masse unitaire (g)", "Matériau", "Source/Signature"]
+        self.data = pd.DataFrame(columns=self.columns)
+        self.data = pd.concat([self.data, pd.DataFrame([{
+            "Nom de l'objet": "Tube Falcon 15ml",
+            "Référence": "N/A",
+            "Masse unitaire (g)": 6.7,
+            "Matériau": "Polypropylène (PP)",
+            "Source/Signature": "Alexandre Souchaud"
+        }])], ignore_index=True)
+
+        # Initialisation des widgets
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialise l'interface utilisateur."""
+        main_layout = QVBoxLayout()
+
+        # Formulaire
+        form_layout = QFormLayout()
+        self.nom_input = QLineEdit()
+        self.ref_input = QLineEdit()
+        self.masse_input = QLineEdit()
+        self.materiau_input = QLineEdit()
+        self.source_input = QLineEdit()
+
+        form_layout.addRow("Nom de l'objet:", self.nom_input)
+        form_layout.addRow("Référence:", self.ref_input)
+        form_layout.addRow("Masse unitaire (g):", self.masse_input)
+        form_layout.addRow("Matériau:", self.materiau_input)
+        form_layout.addRow("Source/Signature:", self.source_input)
+
+        main_layout.addLayout(form_layout)
+
+        # Boutons
+        self.add_button = QPushButton("Ajouter l'objet")
+        self.add_button.clicked.connect(self.ajouter_objet)
+        main_layout.addWidget(self.add_button)
+
+        self.display_button = QPushButton("Afficher les données")
+        self.display_button.clicked.connect(self.afficher_donnees)
+        main_layout.addWidget(self.display_button)
+
+        # Tableau des données
+        self.table = QTableWidget()
+        self.table.setColumnCount(len(self.columns))
+        self.table.setHorizontalHeaderLabels(self.columns)
+        main_layout.addWidget(self.table)
+
+        # Widget principal
+        container = QWidget()
+        container.setLayout(main_layout)
+        self.setCentralWidget(container)
+
+    def ajouter_objet(self):
+        """Ajoute un objet à la base de données."""
+        nom = self.nom_input.text().strip()
+        reference = self.ref_input.text().strip()
+        masse_str = self.masse_input.text().strip().replace(',', '.')
+        materiau = self.materiau_input.text().strip()
+        source = self.source_input.text().strip()
+
+        if not nom or not reference or not materiau or not source:
+            QMessageBox.warning(self, "Erreur", "Tous les champs doivent être remplis.")
+            return
+
         try:
             masse = float(masse_str)
-            break
         except ValueError:
-            print("Erreur : La masse doit être un nombre valide. Réessayez.")
-    
-    materiau = input("Entrez le matériau de l'objet : ").strip()
-    while not materiau:
-        print("Le matériau de l'objet ne peut pas être vide.")
-        materiau = input("Entrez le matériau de l'objet : ").strip()
-    
-    source = input("Entrez la source ou signature (par exemple, votre nom ou une base de données) : ").strip()
-    while not source:
-        print("La source/signature ne peut pas être vide.")
-        source = input("Entrez la source ou signature : ").strip()
-    
-    # Ajouter au DataFrame
-    nouvel_objet = {
-        "Nom de l'objet": nom,
-        "Référence": reference,
-        "Masse unitaire (g)": masse,
-        "Matériau": materiau,
-        "Source/Signature": source
-    }
-    df = pd.concat([df, pd.DataFrame([nouvel_objet])], ignore_index=True)
-    
-    print(f"\nL'objet '{nom}' a été ajouté avec succès.")
-    return df
+            QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
+            return
 
-def sauvegarder_donnees(df, fichier="materiaux_labo.h5"):
-    """Sauvegarde les données dans un fichier HDF5."""
-    if df.empty:
-        print("Aucune donnée à sauvegarder.")
-    else:
-        df.to_hdf(fichier, key="materiaux", mode="w")
-        print(f"\nLes données ont été sauvegardées dans le fichier {fichier}.")
+        nouvel_objet = {
+            "Nom de l'objet": nom,
+            "Référence": reference,
+            "Masse unitaire (g)": masse,
+            "Matériau": materiau,
+            "Source/Signature": source
+        }
+        self.data = pd.concat([self.data, pd.DataFrame([nouvel_objet])], ignore_index=True)
 
-def afficher_donnees(df):
-    """Afficher le contenu du DataFrame."""
-    if df.empty:
-        print("\nAucune donnée disponible.")
-    else:
-        print("\nDonnées actuelles :")
-        print(df)
+        # Efface les champs du formulaire
+        self.nom_input.clear()
+        self.ref_input.clear()
+        self.masse_input.clear()
+        self.materiau_input.clear()
+        self.source_input.clear()
 
-# Menu interactif
-while True:
-    print("\n--- Menu ---")
-    print("1. Ajouter un nouvel objet")
-    print("2. Afficher les données")
-    print("3. Sauvegarder et quitter")
-    choix = input("Entrez votre choix (1/2/3) : ").strip()
-    
-    if choix == "1":
-        df = ajouter_objet(df)
-    elif choix == "2":
-        afficher_donnees(df)
-    elif choix == "3":
-        sauvegarder_donnees(df)
-        print("\nProgramme terminé. À bientôt!")
-        break
-    else:
-        print("Choix invalide, veuillez réessayer.")
+        QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
+
+    def afficher_donnees(self):
+        """Affiche les données dans le tableau."""
+        self.table.setRowCount(len(self.data))
+        for row_idx, row_data in self.data.iterrows():
+            for col_idx, col_name in enumerate(self.columns):
+                item = QTableWidgetItem(str(row_data[col_name]))
+                self.table.setItem(row_idx, col_idx, item)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
