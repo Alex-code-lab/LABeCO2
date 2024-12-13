@@ -5,14 +5,18 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QWidget, QMessageBox, QComboBox
 )
+import os
 
 
-class MainWindow(QMainWindow):
+class DataMassWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Gestion des matériaux")
         self.setGeometry(100, 100, 600, 400)
+
+        # Nom du fichier HDF5
+        self.hdf5_file = "./data_mass_eq/data_masse.hdf5"
 
         # Initialisation des colonnes
         self.columns = ["Nom de l'objet",
@@ -22,14 +26,23 @@ class MainWindow(QMainWindow):
                         "Matériau",
                         "Source/Signature"]
 
-        # Initialisation des données comme DataFrame vide
-        self.data = pd.DataFrame(columns=self.columns)
-
-        # Exemple d'ajout initial d'un objet
-        self.ajouter_initial_objet()
+        # Charger ou initialiser les données
+        self.data = self.charger_ou_initialiser_donnees()
 
         # Matériaux disponibles
-        self.materials = ["Polypropylène (PP)", "Polyéthylène (PE)", "Polystyrène (PS)", "Polycarbonate (PC)", "Acier inoxydable"]
+        self.materials = ["Polypropylène (PP)",
+                          "Polyéthylène (PE)",
+                          "Polystyrène (PS)",
+                          "Polyethylène téréphtalate (PET)",
+                          "Polychlorure de vinyle (PVC)",
+                          "Polytétrafluoroéthylène (PTFE)",
+                          "Polyméthacrylate de méthyle (PMMA)",
+                          "Polycarbonate (PC)",
+                          "Acier inoxydable",
+                          "Aluminium",
+                          "Papier",
+                          "Carton",
+                          "Verre"]
 
         # Initialisation des widgets
         self.init_ui()
@@ -37,17 +50,43 @@ class MainWindow(QMainWindow):
         # Affiche les données initiales
         self.afficher_donnees()
 
-    def ajouter_initial_objet(self):
-        """Ajoute un objet initial si nécessaire."""
-        nouveau_objet = {
-            "Nom de l'objet": "Tube Falcon 15ml",
-            "Référence": "N/A",
-            "Code Nacre": "NA634",
-            "Masse unitaire (g)": 6.7,
-            "Matériau": "Polypropylène (PP)",
-            "Source/Signature": "Alexandre Souchaud"
-        }
-        self.data = self.ajouter_objet_df(self.data, nouveau_objet)
+    def charger_ou_initialiser_donnees(self):
+        """
+        Charge les données depuis un fichier HDF5 s'il existe.
+        Sinon, crée un fichier avec une entrée initiale.
+        """
+        if os.path.exists(self.hdf5_file):
+            try:
+                return pd.read_hdf(self.hdf5_file)
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Impossible de charger le fichier HDF5 : {e}")
+                return pd.DataFrame(columns=self.columns)
+        else:
+            # Crée un DataFrame avec une entrée initiale
+            data = pd.DataFrame([{
+                "Nom de l'objet": "Tube Falcon 15ml",
+                "Référence": "N/A",
+                "Code Nacre": "NA634",
+                "Masse unitaire (g)": 6.7,
+                "Matériau": "Polypropylène (PP)",
+                "Source/Signature": "Alexandre Souchaud"
+            }], columns=self.columns)
+
+            # Sauvegarde initiale
+            self.sauvegarder_donnees(data)
+            return data
+
+    def sauvegarder_donnees(self, df=None):
+        """
+        Sauvegarde les données dans un fichier HDF5.
+        Si df est None, sauvegarde self.data.
+        """
+        if df is None:
+            df = self.data
+        try:
+            df.to_hdf(self.hdf5_file, key='data', mode='w')
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur", f"Impossible de sauvegarder le fichier HDF5 : {e}")
 
     def init_ui(self):
         """Initialise l'interface utilisateur."""
@@ -93,15 +132,15 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-    def ajouter_objet_df(self, df, objet):
-        """Ajoute un objet à un DataFrame de manière sécurisée."""
-        nouvel_objet = pd.DataFrame([objet])
-        nouvel_objet = nouvel_objet.reindex(columns=self.columns)
+    def verifier_existence_objet(self, nom, reference, code_nacre):
+        """Vérifie si un objet avec le même nom ou la même combinaison référence/code nacre existe déjà."""
+        if not self.data[self.data["Nom de l'objet"] == nom].empty:
+            return f"Un objet avec le nom '{nom}' existe déjà."
 
-        if df.empty:
-            return nouvel_objet
-        else:
-            return pd.concat([df, nouvel_objet], ignore_index=True)
+        if not self.data[(self.data["Référence"] == reference) & (self.data["Code Nacre"] == code_nacre)].empty:
+            return f"La combinaison Référence='{reference}' et Code Nacre='{code_nacre}' existe déjà."
+
+        return None
 
     def ajouter_objet_utilisateur(self):
         """Ajoute un objet à la base de données via le formulaire."""
@@ -122,6 +161,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
             return
 
+        erreur = self.verifier_existence_objet(nom, reference, nacre)
+        if erreur:
+            QMessageBox.warning(self, "Erreur", erreur)
+            return
+
         nouvel_objet = {
             "Nom de l'objet": nom,
             "Référence": reference,
@@ -132,15 +176,28 @@ class MainWindow(QMainWindow):
         }
         self.data = self.ajouter_objet_df(self.data, nouvel_objet)
 
+        # Sauvegarde des données dans le fichier HDF5
+        self.sauvegarder_donnees()
+
         # Efface les champs du formulaire
         self.nom_input.clear()
         self.ref_input.clear()
         self.nacre_input.clear()
         self.masse_input.clear()
-        self.materiau_combo.setCurrentIndex(0)  # Réinitialiser la sélection
+        self.materiau_combo.setCurrentIndex(0)
         self.source_input.clear()
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
+
+    def ajouter_objet_df(self, df, objet):
+        """Ajoute un objet à un DataFrame de manière sécurisée."""
+        nouvel_objet = pd.DataFrame([objet])
+        nouvel_objet = nouvel_objet.reindex(columns=self.columns)
+
+        if df.empty:
+            return nouvel_objet
+        else:
+            return pd.concat([df, nouvel_objet], ignore_index=True)
 
     def afficher_donnees(self):
         """Affiche les données dans le tableau."""
@@ -153,6 +210,6 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = DataMassWindow()
     window.show()
     sys.exit(app.exec())
