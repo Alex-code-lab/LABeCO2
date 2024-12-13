@@ -12,7 +12,7 @@ class DataMassWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Gestion des matériaux")
+        self.setWindowTitle("Gestion des consommables")
         self.setGeometry(100, 100, 600, 400)
 
         # Nom du fichier HDF5
@@ -21,7 +21,7 @@ class DataMassWindow(QMainWindow):
         # Initialisation des colonnes
         self.columns = ["Nom de l'objet",
                         "Référence",
-                        "Code Nacre",
+                        "Code NACRES",
                         "Masse unitaire (g)",
                         "Matériau",
                         "Source/Signature"]
@@ -66,7 +66,7 @@ class DataMassWindow(QMainWindow):
             data = pd.DataFrame([{
                 "Nom de l'objet": "Tube Falcon 15ml",
                 "Référence": "N/A",
-                "Code Nacre": "NA634",
+                "Code NACRES": "NA634",
                 "Masse unitaire (g)": 6.7,
                 "Matériau": "Polypropylène (PP)",
                 "Source/Signature": "Alexandre Souchaud"
@@ -96,7 +96,7 @@ class DataMassWindow(QMainWindow):
         form_layout = QFormLayout()
         self.nom_input = QLineEdit()
         self.ref_input = QLineEdit()
-        self.nacre_input = QLineEdit()
+        self.nacres_input = QLineEdit()
         self.masse_input = QLineEdit()
         self.materiau_combo = QComboBox()
         self.materiau_combo.addItems(self.materials)  # ajout des différents matériaux à une liste défilante
@@ -104,7 +104,7 @@ class DataMassWindow(QMainWindow):
 
         form_layout.addRow("Nom de l'objet:", self.nom_input)
         form_layout.addRow("Référence:", self.ref_input)
-        form_layout.addRow("Code Nacre:", self.nacre_input)
+        form_layout.addRow("Code NACRES:", self.nacres_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
         form_layout.addRow("Matériau:", self.materiau_combo)
         form_layout.addRow("Source/Signature:", self.source_input)
@@ -132,13 +132,13 @@ class DataMassWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-    def verifier_existence_objet(self, nom, reference, code_nacre):
+    def verifier_existence_objet(self, nom, reference, code_nacres):
         """Vérifie si un objet avec le même nom ou la même combinaison référence/code nacre existe déjà."""
         if not self.data[self.data["Nom de l'objet"] == nom].empty:
             return f"Un objet avec le nom '{nom}' existe déjà."
 
-        if not self.data[(self.data["Référence"] == reference) & (self.data["Code Nacre"] == code_nacre)].empty:
-            return f"La combinaison Référence='{reference}' et Code Nacre='{code_nacre}' existe déjà."
+        if not self.data[(self.data["Référence"] == reference) & (self.data["Code NACRES"] == code_nacres)].empty:
+            return f"La combinaison Référence='{reference}' et Code NACRES='{code_nacres}' existe déjà."
 
         return None
 
@@ -146,12 +146,12 @@ class DataMassWindow(QMainWindow):
         """Ajoute un objet à la base de données via le formulaire."""
         nom = self.nom_input.text().strip()
         reference = self.ref_input.text().strip()
-        nacre = self.nacre_input.text().strip()
+        nacres = self.nacres_input.text().strip()
         masse_str = self.masse_input.text().strip().replace(',', '.')
         materiau = self.materiau_combo.currentText()
         source = self.source_input.text().strip()
 
-        if not nom or not reference or not materiau or not source or not nacre:
+        if not nom or not reference or not materiau or not source or not nacres:
             QMessageBox.warning(self, "Erreur", "Tous les champs doivent être remplis.")
             return
 
@@ -161,7 +161,7 @@ class DataMassWindow(QMainWindow):
             QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
             return
 
-        erreur = self.verifier_existence_objet(nom, reference, nacre)
+        erreur = self.verifier_existence_objet(nom, reference, nacres)
         if erreur:
             QMessageBox.warning(self, "Erreur", erreur)
             return
@@ -169,7 +169,7 @@ class DataMassWindow(QMainWindow):
         nouvel_objet = {
             "Nom de l'objet": nom,
             "Référence": reference,
-            "Code Nacre": nacre,
+            "Code NACRES": nacres,
             "Masse unitaire (g)": masse,
             "Matériau": materiau,
             "Source/Signature": source
@@ -182,7 +182,7 @@ class DataMassWindow(QMainWindow):
         # Efface les champs du formulaire
         self.nom_input.clear()
         self.ref_input.clear()
-        self.nacre_input.clear()
+        self.nacres_input.clear()
         self.masse_input.clear()
         self.materiau_combo.setCurrentIndex(0)
         self.source_input.clear()
