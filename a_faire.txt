@@ -2,7 +2,7 @@
 ------- Les choses à faire -------
 ----------------------------------
 
-1. faire en sorte de vérifier que l'entrée n'existe pas déjà. 
-2. Faire en sorte que lorsqu'on entre une nouvelle entrée, si elle n'existe pas
-alors on fait en sorte que un nouveau tableau soit enregistré (.hdf5)
-3. Toujours afficher le tableau déjà pré-rempli par ordre de code Nacre (ordre alphabétique)
+1. Pourquoi le style QPushButton est pas le même dans la partie MainWindow et le style défini
+si j'enleve la partie dansMainWindows, ça perd de son intéret et je sais pas Pourquoi
+
+2. Ajout des choix à partir des codes NACRES

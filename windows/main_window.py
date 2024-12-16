@@ -1,40 +1,28 @@
+# windows/main_window.py
+
 import sys
 import os
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches
-from adjustText import adjust_text
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
     QInputDialog, QFormLayout, QFileDialog,
-     QListWidgetItem, QScrollArea, 
+    QListWidgetItem, QScrollArea
 )
-#  QToolBar,QStyle,QToolTip,QDialog, 
-# from PySide6.QtCore import Qt, pyqtSignal
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import  QPixmap #QAction QIcon,
+from PySide6.QtGui import QPixmap
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from utils.data_loader import load_data, load_logo
-from windows.pie_chart import PieChartWindow  # Importez la classe MainWindow
-from windows.bar_chart import BarChartWindow  # Importez la classe MainWindow
+from utils.data_loader import load_data, load_logo, resource_path
+from windows.pie_chart import PieChartWindow
+from windows.bar_chart import BarChartWindow
 from windows.proportional_bar_chart import ProportionalBarChartWindow
+from windows.data_mass_window import DataMassWindow  # Import de DataMassWindow
 
-# Definition de la classe MainWindow
 class MainWindow(QMainWindow):
     """
-    Fenêtre principale de l'application, permettant à l'utilisateur de :
-    - Sélectionner une catégorie, sous-catégorie, sous-sous-catégorie, année et valeur.
-    - Calculer les émissions correspondantes.
-    - Gérer un historique des calculs (supprimer, modifier, exporter, importer).
-    - Afficher des graphiques de synthèse (camembert, barres empilées).
-    - Ajouter des machines personnalisées.
-
-    Emet un signal data_changed à chaque modification des données pour 
-    informer les fenêtres de graphiques.
+    Fenêtre principale de l'application LABeCO₂.
     """
 
     data_changed = Signal()
@@ -49,19 +37,18 @@ class MainWindow(QMainWindow):
         else:
             base_path = os.path.abspath(".")
 
-        # Charge les données à partir du fichier HDF5
-        data_file_path = os.path.join(base_path, 'data_base_GES1point5', 'data_base_GES1point5.hdf5')
-        # if not os.path.exists(data_file_path):
-        #     QMessageBox.critical(self, 'Erreur', f"Le fichier de données n'a pas été trouvé : {data_file_path}")
-        #     sys.exit(1)
-
-        # try:
-        #     self.data = pd.read_hdf(data_file_path)
-        # except Exception as e:
-        #     QMessageBox.critical(self, 'Erreur', f"Impossible de charger les données : {e}")
-        #     sys.exit(1)
-        # self.data = load_data(data_file_path)
+        # Charge les données à partir du fichier HDF5 principal
         self.data = load_data()
+
+        # Charger les données massiques eCO2
+        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5')
+        if not os.path.exists(data_masse_path):
+            QMessageBox.critical(self, "Erreur", f"Fichier {data_masse_path} introuvable.")
+            sys.exit(1)
+        self.data_masse = pd.read_hdf(data_masse_path)
+        if 'Code NACRES' not in self.data_masse.columns:
+            QMessageBox.critical(self, "Erreur", f"La colonne 'Code NACRES' est introuvable dans {data_masse_path}.")
+            sys.exit(1)
 
         # Initialisation de variables
         self.calculs = []
@@ -69,10 +56,11 @@ class MainWindow(QMainWindow):
         self.current_unit = None
         self.total_emissions = 0.0
 
-        # Fenêtres de graphiques
+        # Fenêtres complémentaires
         self.pie_chart_window = None
         self.bar_chart_window = None
         self.proportional_bar_chart_window = None
+        self.data_mass_window = None  # Important: initialisation à None
 
         # Widgets principaux
         self.category_combo = None
@@ -89,7 +77,6 @@ class MainWindow(QMainWindow):
         self.header_label = None
         self.input_label = None
         self.days_label = None
-
 
         self.setStyleSheet("""
                     QPushButton {
@@ -111,18 +98,10 @@ class MainWindow(QMainWindow):
         # Appel de l'initialisation de l'UI
         self.initUI()
 
-    # Méthode pour initialiser l'interface utilisateur
-    # Nous la découpons en plusieurs méthodes pour plus de clarté.
     def initUI(self):
         """
-        Initialise l'interface : 
-        - Appelle des méthodes distinctes pour configurer chaque section de l'interface
-        - Configuration du layout principal
-        - Ajout d'une QScrollArea pour rendre l'interface défilable
-        - Connexion des signaux/slots dans une méthode dédiée
+        Initialise l'interface utilisateur.
         """
-
-        # Layout principal vertical
         main_layout = QVBoxLayout()
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -160,6 +139,11 @@ class MainWindow(QMainWindow):
         scroll_area.setWidget(container)
         self.setCentralWidget(scroll_area)
 
+        # Connexion des signaux/slots
+        self.initUISignals()
+        # Mise à jour initiale des sous-catégories
+        self.update_subcategories()
+
         # Définition des tailles de la fenêtre
         self.resize(600, 700)
         screen = QApplication.primaryScreen()
@@ -167,24 +151,13 @@ class MainWindow(QMainWindow):
         self.setMaximumSize(screen_size.width(), screen_size.height())
         self.setMinimumSize(600, 700)
 
-        # 7. Connexion des signaux/slots dans une méthode dédiée
-        self.initUISignals()
-
-        # Mise à jour initiale des sous-catégories
-        self.update_subcategories()
-
     def initUIHeader(self, main_layout):
         """
-        Initialise la partie haute de l'interface :
-        - Logo
-        - Texte d'introduction (avec "Voir plus / Voir moins")
+        Initialise la partie haute de l'interface.
         """
-
-        # Ajout du logo
         self.add_logo()
         main_layout.addWidget(self.logo_label)
 
-        # Texte d'introduction
         self.full_text = '''
         <p>
             Dans un contexte où le respect des <span style="font-weight:bold; color:#2196F3;">Accords de Paris</span> 
@@ -220,7 +193,7 @@ class MainWindow(QMainWindow):
             <a href="#" style="color:#1fa543; text-decoration:none;">Voir moins</a>
         </p>
         '''
-        # Texte abrégé
+
         self.collapsed_text = '''
         <p>
             Dans un contexte où le respect des <span style="font-weight:bold; color:#2196F3;">Accords de Paris</span> 
@@ -236,19 +209,15 @@ class MainWindow(QMainWindow):
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignTop)
         self.header_label.setOpenExternalLinks(False)
-        # Le lien sera géré par linkActivated
         main_layout.addWidget(self.header_label)
 
     def initUICategorySelectors(self, main_layout):
         """
         Initialise la partie sélection de catégorie, sous-catégorie, etc.
-        Ainsi que la zone d'entrée de valeur, et le bouton de calcul.
         """
-
         self.category_label = QLabel('Catégorie:')
         self.category_combo = QComboBox()
 
-        # Chargement des catégories, sauf 'Électricité', puis ajout de 'Machine'
         categories = self.data['category'].dropna().unique().tolist()
         categories = [cat for cat in categories if cat != 'Électricité']
         categories.append('Machine')
@@ -277,26 +246,7 @@ class MainWindow(QMainWindow):
         self.days_field.setVisible(False)
 
         self.calculate_button = QPushButton('Calculer le Bilan Carbone')
-        # self.calculate_button.setStyleSheet("""
-        #                                 QPushButton {
-        #                                     background-color: #3af321;
-        #                                     color: white;
-        #                                     border-radius: 4px;
-        #                                     padding: 6px;
-        #                                     font-weight: bold;
-        #                                     border: none;
-        #                                 }
 
-        #                                 QPushButton:hover {
-        #                                     background-color: #1e88e5;
-        #                                 }
-
-        #                                 QPushButton:pressed {
-        #                                     background-color: #1976D2;
-        #                                     transform: scale(0.98);
-        #                                 }
-        #                                 """)
-        # Layout pour la sélection
         existing_layout = QVBoxLayout()
         existing_layout.setSpacing(5)
         existing_layout.addWidget(self.category_label)
@@ -309,6 +259,32 @@ class MainWindow(QMainWindow):
         existing_layout.addWidget(self.subsub_name_combo)
         existing_layout.addWidget(self.year_label)
         existing_layout.addWidget(self.year_combo)
+
+        # NACRES filtré
+        self.nacres_filtered_label = QLabel("Code NACRES Filtré :")
+        self.nacres_filtered_combo = QComboBox()
+        self.nacres_filtered_label.setVisible(False)
+        self.nacres_filtered_combo.setVisible(False)
+        existing_layout.addWidget(self.nacres_filtered_label)
+        existing_layout.addWidget(self.nacres_filtered_combo)
+
+        # Bouton Gestion des Consommables
+        self.manage_consumables_button = QPushButton("Gestion des Consommables")
+        self.manage_consumables_button.setStyleSheet("""
+            QPushButton {
+                text-decoration: underline; 
+                color: blue; 
+                background: none; 
+                border: none;
+                padding: 0;
+            }
+            QPushButton:hover { 
+                color: darkblue; 
+            }
+        """)
+        self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
+        existing_layout.addWidget(self.manage_consumables_button)
+
         existing_layout.addWidget(self.input_label)
         existing_layout.addWidget(self.input_field)
         existing_layout.addWidget(self.days_label)
@@ -322,9 +298,7 @@ class MainWindow(QMainWindow):
     def initUIMachineSection(self, main_layout):
         """
         Initialise la partie spécifique pour l'ajout d'une "Machine"
-        avec puissance, temps d'utilisation, etc.
         """
-
         self.machine_name_label = QLabel('Nom de la machine:')
         self.machine_name_field = QLineEdit()
         self.power_label = QLabel('Puissance de la machine (kW):')
@@ -356,10 +330,8 @@ class MainWindow(QMainWindow):
 
     def initUIHistory(self, main_layout):
         """
-        Initialise la partie Historique des calculs, 
-        avec les boutons pour supprimer, modifier et exporter/importer.
+        Initialise la partie Historique des calculs
         """
-
         self.history_label = QLabel('Historique des calculs:')
         main_layout.addWidget(self.history_label)
 
@@ -396,15 +368,12 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(buttons_group_layout)
         main_layout.addSpacing(5)
 
-        # Label pour résultat total des émissions
         self.result_area = QLabel("Total des émissions : 0.0000 kg CO₂e")
 
     def initUIGraphButtons(self, main_layout):
         """
-        Initialise la zone avec les boutons pour générer 
-        les différents graphiques (pie chart, bar chart, etc.).
+        Initialise la zone avec les boutons pour générer les graphiques.
         """
-
         graph_summary_label = QLabel("Générer des résumés graphiques :")
         main_layout.addWidget(graph_summary_label)
 
@@ -426,58 +395,34 @@ class MainWindow(QMainWindow):
 
     def initUISignals(self):
         """
-        Centralise la connexion des signaux/slots pour plus de clarté.
-        Tous les signaux sont connectés ici, permettant de voir d'un coup d'œil
-        la logique de réaction de l'interface.
+        Connexion des signaux/slots
         """
-
-        # Signal pour le texte cliquable dans le header
         self.header_label.linkActivated.connect(self.toggle_text_display)
 
-        # Signaux pour la sélection de catégories
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
         self.search_field.textChanged.connect(self.update_subsubcategory_names)
+
         self.subsub_name_combo.currentIndexChanged.connect(self.update_years)
         self.year_combo.currentIndexChanged.connect(self.update_unit)
+        self.year_combo.currentIndexChanged.connect(self.update_nacres_filtered_combo)
 
-        # Signaux pour les actions de calcul et machines
         self.calculate_button.clicked.connect(self.calculate_emission)
         self.add_machine_button.clicked.connect(self.add_machine)
 
-        # Signaux pour l'historique
         self.history_list.itemDoubleClicked.connect(self.modify_calculation)
         self.delete_button.clicked.connect(self.delete_selected_calculation)
         self.modify_button.clicked.connect(self.modify_selected_calculation)
 
-        # Signaux pour Import/Export
         self.export_button.clicked.connect(self.export_data)
         self.import_button.clicked.connect(self.import_data)
 
-        # Signaux pour les boutons graphiques
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
         self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
 
-    # def add_logo(self):
-    #     """
-    #     Charge et affiche le logo dans un QLabel.
-    #     """
-    #     script_dir = os.getcwd()
-    #     logo_path = os.path.join(script_dir, 'images', 'Logo.png')
-    #     self.logo_label = QLabel()
-    #     pixmap = QPixmap(logo_path)
-    #     if pixmap.isNull():
-    #         QMessageBox.warning(self, 'Erreur', f"Impossible de charger l'image : {logo_path}")
-    #     else:
-    #         resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-    #         self.logo_label.setPixmap(resized_pixmap)
-    #         self.logo_label.setAlignment(Qt.AlignCenter)
     def add_logo(self):
-        """
-        Charge et affiche le logo dans un QLabel.
-        """
-        logo_path = load_logo()  # Utilise load_logo pour obtenir le chemin correct
+        logo_path = load_logo()
         self.logo_label = QLabel()
         pixmap = QPixmap(logo_path)
         if pixmap.isNull():
@@ -488,23 +433,14 @@ class MainWindow(QMainWindow):
             self.logo_label.setAlignment(Qt.AlignCenter)
             
     def toggle_text_display(self):
-        """
-        Permet d'afficher/masquer le texte d'introduction complet 
-        en fonction du lien cliqué.
-        """
         if self.header_label.text() == self.collapsed_text:
             self.header_label.setText(self.full_text)
         else:
             self.header_label.setText(self.collapsed_text)
 
     def update_subcategories(self):
-        """
-        Met à jour la liste des sous-catégories en fonction de la catégorie sélectionnée.
-        Gère également l'affichage du formulaire "Machine".
-        """
         category = self.category_combo.currentText()
         if category == 'Machine':
-            # Masquer les champs non pertinents et afficher le formulaire Machine
             self.subcategory_label.setVisible(False)
             self.subcategory_combo.setVisible(False)
             self.search_label.setVisible(False)
@@ -519,8 +455,10 @@ class MainWindow(QMainWindow):
             self.days_field.setVisible(False)
             self.calculate_button.setVisible(False)
             self.machine_group.setVisible(True)
+
+            self.nacres_filtered_label.setVisible(False)
+            self.nacres_filtered_combo.setVisible(False)
         else:
-            # Afficher les champs
             self.subcategory_label.setVisible(True)
             self.subcategory_combo.setVisible(True)
             self.search_label.setVisible(True)
@@ -549,10 +487,6 @@ class MainWindow(QMainWindow):
                 self.days_field.setEnabled(False)
 
     def update_subsubcategory_names(self):
-        """
-        Met à jour la liste des sous-sous-catégories (nom) 
-        en fonction de la sous-catégorie et du texte de recherche.
-        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         search_text = self.search_field.text().lower()
@@ -571,9 +505,6 @@ class MainWindow(QMainWindow):
         self.update_years()
 
     def update_years(self):
-        """
-        Met à jour la liste des années disponibles en fonction du choix de sous-sous-catégorie.
-        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -591,10 +522,6 @@ class MainWindow(QMainWindow):
         self.update_unit()
 
     def update_unit(self):
-        """
-        Met à jour l'unité attendue en fonction de la ligne spécifique (catégorie, sous-cat, etc.)
-        sélectionnée.
-        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -620,11 +547,51 @@ class MainWindow(QMainWindow):
             self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
 
+    def update_nacres_filtered_combo(self):
+        category = self.category_combo.currentText()
+        subcategory = self.subcategory_combo.currentText()
+        subsub_name = self.subsub_name_combo.currentText()
+
+        if category == 'Achats' and 'Consommables' in subcategory:
+            self.nacres_filtered_label.setVisible(True)
+            self.nacres_filtered_combo.setVisible(True)
+
+            self.nacres_filtered_combo.clear()
+
+            if subsub_name:
+                subsubcategory, name = self.split_subsub_name(subsub_name)
+                code_nacres_prefix = subsubcategory[:4]
+                filtered_entries = self.data_masse[
+                    self.data_masse['Code NACRES'].str.strip().str.startswith(code_nacres_prefix, na=False)
+                ]
+
+                print("DEBUG: filtered_entries.empty =", filtered_entries.empty)
+                print("DEBUG: filtered_entries:\n", filtered_entries)
+
+                if not filtered_entries.empty:
+                    for idx, row in filtered_entries.iterrows():
+                        nom_objet_val = row["Nom de l'objet"]
+                        display_text = f"{row['Code NACRES']} - {nom_objet_val}"
+                        self.nacres_filtered_combo.addItem(display_text)
+
+            # Toujours ajouter "Aucune correspondance"
+            self.nacres_filtered_combo.addItem("Aucune correspondance")
+            self.nacres_filtered_combo.setCurrentText("Aucune correspondance")
+
+        else:
+            self.nacres_filtered_label.setVisible(False)
+            self.nacres_filtered_combo.setVisible(False)
+            self.nacres_filtered_combo.clear()
+
+    def split_subsub_name(self, subsub_name):
+        if ' - ' in subsub_name:
+            subsubcategory, name = subsub_name.split(' - ', 1)
+        else:
+            subsubcategory = ''
+            name = subsub_name
+        return subsubcategory.strip(), name.strip()
+
     def calculate_emission(self):
-        """
-        Calcule les émissions en fonction des données saisies par l'utilisateur 
-        dans le cas des catégories autres que Machine.
-        """
         category = self.category_combo.currentText()
         if category == 'Machine':
             self.add_machine()
@@ -632,6 +599,11 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
         else:
             try:
+                selected_nacres = self.nacres_filtered_combo.currentText() if self.nacres_filtered_combo.isVisible() else None
+                if self.nacres_filtered_combo.isVisible() and selected_nacres == "Aucune correspondance":
+                    QMessageBox.information(self, 'Information', 'Aucune correspondance sélectionnée. Opération annulée.')
+                    return
+
                 value = float(self.input_field.text())
                 days = int(self.days_field.text()) if self.days_field.isEnabled() and self.days_field.text() else 1
                 total_value = value * days
@@ -678,10 +650,6 @@ class MainWindow(QMainWindow):
         self.data_changed.emit()
 
     def update_total_emissions(self):
-        """
-        Met à jour l'affichage du total des émissions 
-        en parcourant l'historique.
-        """
         total_emissions = 0.0
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
@@ -693,9 +661,6 @@ class MainWindow(QMainWindow):
         self.result_area.setText(f'Total des émissions : {total_emissions:.4f} kg CO₂e')
 
     def delete_selected_calculation(self):
-        """
-        Supprime le calcul sélectionné dans l'historique.
-        """
         selected_row = self.history_list.currentRow()
         if selected_row >= 0:
             self.history_list.takeItem(selected_row)
@@ -703,31 +668,13 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
 
     def modify_selected_calculation(self):
-        """
-        Permet de modifier le calcul sélectionné.
-        """
         selected_item = self.history_list.currentItem()
         if selected_item:
             self.modify_calculation(selected_item)
         else:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
 
-    def split_subsub_name(self, subsub_name):
-        """
-        Sépare la chaîne combinée "subsubcategory - name" 
-        en deux parties distinctes.
-        """
-        if ' - ' in subsub_name:
-            subsubcategory, name = subsub_name.split(' - ', 1)
-        else:
-            subsubcategory = ''
-            name = subsub_name
-        return subsubcategory.strip(), name.strip()
-
     def generate_pie_chart(self):
-        """
-        Ouvre ou rafraîchit la fenêtre du diagramme en secteurs.
-        """
         if self.pie_chart_window is None:
             self.pie_chart_window = PieChartWindow(self)
             self.pie_chart_window.finished.connect(self.on_pie_chart_window_closed)
@@ -739,9 +686,6 @@ class MainWindow(QMainWindow):
         self.pie_chart_window.activateWindow()
 
     def generate_bar_chart(self):
-        """
-        Ouvre ou rafraîchit la fenêtre du graphique à barres empilées à 100%.
-        """
         if self.bar_chart_window is None:
             self.bar_chart_window = BarChartWindow(self)
             self.bar_chart_window.finished.connect(self.on_bar_chart_window_closed)
@@ -753,9 +697,6 @@ class MainWindow(QMainWindow):
         self.bar_chart_window.activateWindow()
 
     def generate_proportional_bar_chart(self):
-        """
-        Ouvre ou rafraîchit la fenêtre du graphique à barres proportionnelles.
-        """
         if self.proportional_bar_chart_window is None:
             self.proportional_bar_chart_window = ProportionalBarChartWindow(self)
             self.proportional_bar_chart_window.finished.connect(self.on_proportional_bar_chart_window_closed)
@@ -776,10 +717,6 @@ class MainWindow(QMainWindow):
         self.proportional_bar_chart_window = None
 
     def add_machine(self):
-        """
-        Ajoute une machine personnalisée à l'historique 
-        en fonction des paramètres saisis.
-        """
         try:
             machine_name = self.machine_name_field.text()
             power = float(self.power_field.text())
@@ -821,10 +758,6 @@ class MainWindow(QMainWindow):
         self.data_changed.emit()
 
     def modify_calculation(self, item):
-        """
-        Permet de modifier un calcul existant dans l'historique.
-        Une boîte de dialogue demande les nouvelles valeurs.
-        """
         selected_row = self.history_list.row(item)
         if selected_row < 0:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
@@ -844,18 +777,15 @@ class MainWindow(QMainWindow):
         emissions = data.get('emissions', 0)
         days = data.get('days', 1)  # Par défaut, 1 si non défini
 
-        # Créer le résumé des catégories
         summary = f"{category}\n{subcategory}\n{subsubcategory}\n{name}"
         QMessageBox.information(self, 'Modifier le Calcul', f"Résumé des Catégories :\n\n{summary}")
 
-        # Demander la nouvelle valeur avec 5 décimales
         new_value, ok = QInputDialog.getDouble(
             self,
             'Nouvelle Valeur',
             f'Entrez la nouvelle valeur en {unit}:',
             value=current_value,
             decimals=5,
-            # minimum=0
         )
         if ok and new_value < 0:
             QMessageBox.warning(self, "Valeur invalide", "La valeur doit être positive.")
@@ -864,18 +794,14 @@ class MainWindow(QMainWindow):
         if not ok:
             return
 
-        # Demander le nouveau nombre de jours si applicable
         if category in ['Véhicules', 'Machine', 'Activités agricoles', 'Infra. de recherche']:
             new_days, ok_days = QInputDialog.getInt(
                 self,
                 'Nombre de Jours',
                 'Entrez le nouveau nombre de jours d\'utilisation:',
-
-                decimals=0,
                 value=days,
-                # min=0
             )
-            if ok and new_days < 0:
+            if ok_days and new_days < 0:
                 QMessageBox.warning(self, "Valeur invalide", "La valeur doit être positive.")
                 return
 
@@ -884,12 +810,8 @@ class MainWindow(QMainWindow):
         else:
             new_days = days
 
-        # Recalculer les émissions en fonction de la catégorie
-        # Pour simplifier, on reprend la logique du calcul initial.
+        # Recalculer les émissions
         if category == 'Machine':
-            # Logique machine : total_value = new_value * new_days peut être adaptée si besoin
-            # Ici on suppose que new_value correspond à la puissance * temps (il faudrait clarifier cette logique)
-            # On va supposer new_value = puissance * temps, on multiplie par new_days pour total
             total_value = new_value * new_days
             electricity_type = self.electricity_combo.currentText()
             mask = (self.data['category'] == 'Électricité') & (self.data['name'] == electricity_type)
@@ -902,12 +824,8 @@ class MainWindow(QMainWindow):
             new_emissions = total_value * emission_factor
 
         elif category == 'Véhicules':
-            # Pour les véhicules, total_value = new_value * new_days (km * jours)
             total_value = new_value * new_days
-            mask = (
-                (self.data['category'] == 'Véhicules') &
-                (self.data['subcategory'] == subcategory)
-            )
+            mask = (self.data['category'] == 'Véhicules') & (self.data['subcategory'] == subcategory)
             filtered_data = self.data[mask]
             if not filtered_data.empty:
                 emission_factor = filtered_data['total'].values[0]
@@ -917,7 +835,6 @@ class MainWindow(QMainWindow):
             new_emissions = total_value * emission_factor
 
         elif category == 'Achats':
-            # Pour les achats, total_value = new_value
             total_value = new_value
             mask = (
                 (self.data['category'] == 'Achats') &
@@ -934,7 +851,6 @@ class MainWindow(QMainWindow):
             new_emissions = total_value * emission_factor
 
         elif category == 'Activités agricoles':
-            # Pour les activités agricoles, total_value = new_value * new_days
             total_value = new_value * new_days
             mask = (
                 (self.data['category'] == 'Activités agricoles') &
@@ -951,7 +867,6 @@ class MainWindow(QMainWindow):
             new_emissions = total_value * emission_factor
 
         elif category == 'Infra. de recherche':
-            # Pour Infra. de recherche, total_value = new_value * new_days
             total_value = new_value * new_days
             mask = (
                 (self.data['category'] == 'Infra. de recherche') &
@@ -968,10 +883,9 @@ class MainWindow(QMainWindow):
             new_emissions = total_value * emission_factor
 
         else:
-            QMessageBox.warning(self, 'Erreur', f'Catégorie non gérée pour la modification : {category}')
+            QMessageBox.warning(self, 'Erreur', f'Catégorie non gérée : {category}')
             return
 
-        # Mise à jour des données
         data['value'] = new_value
         data['emissions'] = new_emissions
         if category in ['Véhicules', 'Machine', 'Activités agricoles', 'Infra. de recherche']:
@@ -979,7 +893,6 @@ class MainWindow(QMainWindow):
 
         item.setData(Qt.UserRole, data)
 
-        # Mise à jour du texte de l'item
         if category == 'Machine':
             item_text = f'Machine - {subcategory} - {total_value:.2f} kWh : {new_emissions:.4f} kg CO₂e'
         elif category == 'Véhicules':
@@ -995,16 +908,12 @@ class MainWindow(QMainWindow):
 
         item.setText(item_text)
 
-        # Mise à jour du total des émissions et signal
         self.update_total_emissions()
         self.data_changed.emit()
 
         QMessageBox.information(self, 'Succès', 'Calcul modifié avec succès.')
 
     def export_data(self):
-        """
-        Exporte les données calculées dans un fichier CSV.
-        """
         if self.history_list.count() == 0:
             QMessageBox.information(self, 'Information', 'Aucune donnée à exporter.')
             return
@@ -1048,20 +957,16 @@ class MainWindow(QMainWindow):
                 df.to_csv(file_name, index=False, encoding='utf-8-sig')
                 QMessageBox.information(self, 'Succès', f'Données exportées avec succès dans {file_name}')
             except Exception as e:
-                QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'exportation : {e}')
+                QMessageBox.warning(self, 'Erreur', f'Erreur lors de l\'exportation : {e}')
         else:
             QMessageBox.information(self, 'Annulation', 'Exportation annulée.')
 
     def import_data(self):
-        """
-        Importe des données depuis un fichier CSV.
-        """
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(self, "Importer les données", "", "Fichiers CSV (*.csv);;Tous les fichiers (*)", options=options)
         if file_name:
             try:
                 df = pd.read_csv(file_name)
-
                 required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)'}
                 if not required_columns.issubset(df.columns):
                     QMessageBox.warning(self, 'Erreur', 'Le fichier CSV ne contient pas les colonnes nécessaires.')
@@ -1098,4 +1003,28 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
                 self.data_changed.emit()
             except Exception as e:
-                QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'importation : {e}')
+                QMessageBox.warning(self, 'Erreur', f'Erreur lors de l\'importation : {e}')
+
+    def open_data_mass_window(self):
+        """
+        Ouvre la fenêtre de gestion des consommables.
+        """
+        if self.data_mass_window is None or not self.data_mass_window.isVisible():
+            self.data_mass_window = DataMassWindow()
+            self.data_mass_window.data_added.connect(self.reload_data_masse)
+            self.data_mass_window.show()
+        else:
+            self.data_mass_window.raise_()
+            self.data_mass_window.activateWindow()
+
+    def reload_data_masse(self):
+        """
+        Recharge les données massiques après l'ajout d'un nouveau consommable.
+        """
+        data_masse_path = os.path.join(resource_path('data_masse_eCO2'), 'data_eCO2_masse_consommable.hdf5')
+        try:
+            self.data_masse = pd.read_hdf(data_masse_path)
+            QMessageBox.information(self, "Succès", "Données massiques rechargées avec succès.")
+            self.update_nacres_filtered_combo()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")

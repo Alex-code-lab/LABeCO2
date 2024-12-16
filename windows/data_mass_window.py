@@ -1,14 +1,18 @@
-import sys
+# windows/data_mass_window.py
+
+import os
 import pandas as pd
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QMessageBox, QComboBox
+    QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
+    QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
+    QWidget, QComboBox
 )
-import os
-
+from PySide6.QtCore import Signal
 
 class DataMassWindow(QMainWindow):
+    # Définition du signal data_added
+    data_added = Signal()
+
     def __init__(self):
         super().__init__()
 
@@ -16,7 +20,7 @@ class DataMassWindow(QMainWindow):
         self.setGeometry(100, 100, 600, 400)
 
         # Nom du fichier HDF5
-        self.hdf5_file = "./data_mass_eq/data_masse.hdf5"
+        self.hdf5_file = "./data_masse_eCO2/data_eCO2_masse_consommable.hdf5"
 
         # Initialisation des colonnes
         self.columns = ["Nom de l'objet",
@@ -30,31 +34,26 @@ class DataMassWindow(QMainWindow):
         self.data = self.charger_ou_initialiser_donnees()
 
         # Matériaux disponibles
-        self.materials = ["Polypropylène (PP)",
-                          "Polyéthylène (PE)",
-                          "Polystyrène (PS)",
-                          "Polyethylène téréphtalate (PET)",
-                          "Polychlorure de vinyle (PVC)",
-                          "Polytétrafluoroéthylène (PTFE)",
-                          "Polyméthacrylate de méthyle (PMMA)",
-                          "Polycarbonate (PC)",
-                          "Acier inoxydable",
-                          "Aluminium",
-                          "Papier",
-                          "Carton",
-                          "Verre"]
+        self.materials = [
+            "Polypropylène (PP)",
+            "Polyéthylène (PE)",
+            "Polystyrène (PS)",
+            "Polyethylène téréphtalate (PET)",
+            "Polychlorure de vinyle (PVC)",
+            "Polytétrafluoroéthylène (PTFE)",
+            "Polyméthacrylate de méthyle (PMMA)",
+            "Polycarbonate (PC)",
+            "Acier inoxydable",
+            "Aluminium",
+            "Papier",
+            "Carton",
+            "Verre"
+        ]
 
-        # Initialisation des widgets
         self.init_ui()
-
-        # Affiche les données initiales
         self.afficher_donnees()
 
     def charger_ou_initialiser_donnees(self):
-        """
-        Charge les données depuis un fichier HDF5 s'il existe.
-        Sinon, crée un fichier avec une entrée initiale.
-        """
         if os.path.exists(self.hdf5_file):
             try:
                 return pd.read_hdf(self.hdf5_file)
@@ -62,34 +61,32 @@ class DataMassWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", f"Impossible de charger le fichier HDF5 : {e}")
                 return pd.DataFrame(columns=self.columns)
         else:
-            # Crée un DataFrame avec une entrée initiale
             data = pd.DataFrame([{
                 "Nom de l'objet": "Tube Falcon 15ml",
                 "Référence": "N/A",
-                "Code NACRES": "NA634",
+                "Code NACRES": "NB13",
                 "Masse unitaire (g)": 6.7,
                 "Matériau": "Polypropylène (PP)",
                 "Source/Signature": "Alexandre Souchaud"
             }], columns=self.columns)
 
-            # Sauvegarde initiale
             self.sauvegarder_donnees(data)
             return data
 
     def sauvegarder_donnees(self, df=None):
-        """
-        Sauvegarde les données dans un fichier HDF5.
-        Si df est None, sauvegarde self.data.
-        """
         if df is None:
             df = self.data
+
+        directory = os.path.dirname(self.hdf5_file)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
         try:
             df.to_hdf(self.hdf5_file, key='data', mode='w')
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Impossible de sauvegarder le fichier HDF5 : {e}")
 
     def init_ui(self):
-        """Initialise l'interface utilisateur."""
         main_layout = QVBoxLayout()
 
         # Formulaire
@@ -99,7 +96,7 @@ class DataMassWindow(QMainWindow):
         self.nacres_input = QLineEdit()
         self.masse_input = QLineEdit()
         self.materiau_combo = QComboBox()
-        self.materiau_combo.addItems(self.materials)  # ajout des différents matériaux à une liste défilante
+        self.materiau_combo.addItems(self.materials)
         self.source_input = QLineEdit()
 
         form_layout.addRow("Nom de l'objet:", self.nom_input)
@@ -111,29 +108,24 @@ class DataMassWindow(QMainWindow):
 
         main_layout.addLayout(form_layout)
 
-        # Boutons
         self.add_button = QPushButton("Ajouter l'objet")
         self.add_button.clicked.connect(self.ajouter_objet_utilisateur)
         main_layout.addWidget(self.add_button)
 
-        # Modification du texte du bouton "Afficher les données"
         self.display_button = QPushButton("Actualiser les données")
         self.display_button.clicked.connect(self.afficher_donnees)
         main_layout.addWidget(self.display_button)
 
-        # Tableau des données
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
         main_layout.addWidget(self.table)
 
-        # Widget principal
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
     def verifier_existence_objet(self, nom, reference, code_nacres):
-        """Vérifie si un objet avec le même nom ou la même combinaison référence/code nacre existe déjà."""
         if not self.data[self.data["Nom de l'objet"] == nom].empty:
             return f"Un objet avec le nom '{nom}' existe déjà."
 
@@ -143,7 +135,6 @@ class DataMassWindow(QMainWindow):
         return None
 
     def ajouter_objet_utilisateur(self):
-        """Ajoute un objet à la base de données via le formulaire."""
         nom = self.nom_input.text().strip()
         reference = self.ref_input.text().strip()
         nacres = self.nacres_input.text().strip()
@@ -176,10 +167,8 @@ class DataMassWindow(QMainWindow):
         }
         self.data = self.ajouter_objet_df(self.data, nouvel_objet)
 
-        # Sauvegarde des données dans le fichier HDF5
         self.sauvegarder_donnees()
 
-        # Efface les champs du formulaire
         self.nom_input.clear()
         self.ref_input.clear()
         self.nacres_input.clear()
@@ -189,8 +178,10 @@ class DataMassWindow(QMainWindow):
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
 
+        # Émission du signal data_added après l'ajout
+        self.data_added.emit()
+
     def ajouter_objet_df(self, df, objet):
-        """Ajoute un objet à un DataFrame de manière sécurisée."""
         nouvel_objet = pd.DataFrame([objet])
         nouvel_objet = nouvel_objet.reindex(columns=self.columns)
 
@@ -200,16 +191,8 @@ class DataMassWindow(QMainWindow):
             return pd.concat([df, nouvel_objet], ignore_index=True)
 
     def afficher_donnees(self):
-        """Affiche les données dans le tableau."""
         self.table.setRowCount(len(self.data))
         for row_idx, row_data in self.data.iterrows():
             for col_idx, col_name in enumerate(self.columns):
                 item = QTableWidgetItem(str(row_data[col_name]))
                 self.table.setItem(row_idx, col_idx, item)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = DataMassWindow()
-    window.show()
-    sys.exit(app.exec())
