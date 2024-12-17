@@ -3,7 +3,7 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QMessageBox
+    QWidget, QMessageBox, QComboBox
 )
 
 
@@ -15,15 +15,28 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 600, 400)
 
         # Initialisation des données
-        self.columns = ["Nom de l'objet", "Référence", "Masse unitaire (g)", "Matériau", "Source/Signature"]
+        self.columns = ["Nom de l'objet",
+                        "Référence",
+                        "Code Nacre",
+                        "Masse unitaire (g)",
+                        "Matériau",
+                        "Source/Signature"]
         self.data = pd.DataFrame(columns=self.columns)
         self.data = pd.concat([self.data, pd.DataFrame([{
             "Nom de l'objet": "Tube Falcon 15ml",
             "Référence": "N/A",
+            "Code Nacre": "NA634",
             "Masse unitaire (g)": 6.7,
             "Matériau": "Polypropylène (PP)",
             "Source/Signature": "Alexandre Souchaud"
-        }])], ignore_index=True)
+        }], columns=self.columns)], ignore_index=True)
+
+        # Matériaux disponibles
+        self.materials = ["Polypropylène (PP)",
+                          "Polyéthylène (PE)",
+                          "Polystyrène (PS)",
+                          "Polycarbonate (PC)",
+                          "Acier inoxydable"]
 
         # Initialisation des widgets
         self.init_ui()
@@ -36,14 +49,17 @@ class MainWindow(QMainWindow):
         form_layout = QFormLayout()
         self.nom_input = QLineEdit()
         self.ref_input = QLineEdit()
+        self.nacre_input = QLineEdit()
         self.masse_input = QLineEdit()
-        self.materiau_input = QLineEdit()
+        self.materiau_combo = QComboBox()
+        self.materiau_combo.addItems(self.materials)
         self.source_input = QLineEdit()
 
         form_layout.addRow("Nom de l'objet:", self.nom_input)
         form_layout.addRow("Référence:", self.ref_input)
+        form_layout.addRow("Code Nacre:", self.nacre_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
-        form_layout.addRow("Matériau:", self.materiau_input)
+        form_layout.addRow("Matériau:", self.materiau_combo)
         form_layout.addRow("Source/Signature:", self.source_input)
 
         main_layout.addLayout(form_layout)
@@ -72,11 +88,12 @@ class MainWindow(QMainWindow):
         """Ajoute un objet à la base de données."""
         nom = self.nom_input.text().strip()
         reference = self.ref_input.text().strip()
+        nacre = self.nacre_input.text().strip()
         masse_str = self.masse_input.text().strip().replace(',', '.')
-        materiau = self.materiau_input.text().strip()
+        materiau = self.materiau_combo.currentText()
         source = self.source_input.text().strip()
 
-        if not nom or not reference or not materiau or not source:
+        if not nom or not reference or not materiau or not source or not nacre:
             QMessageBox.warning(self, "Erreur", "Tous les champs doivent être remplis.")
             return
 
@@ -89,6 +106,7 @@ class MainWindow(QMainWindow):
         nouvel_objet = {
             "Nom de l'objet": nom,
             "Référence": reference,
+            "Code Nacre": nacre,
             "Masse unitaire (g)": masse,
             "Matériau": materiau,
             "Source/Signature": source
@@ -98,8 +116,9 @@ class MainWindow(QMainWindow):
         # Efface les champs du formulaire
         self.nom_input.clear()
         self.ref_input.clear()
+        self.nacre_input.clear()
         self.masse_input.clear()
-        self.materiau_input.clear()
+        self.materiau_combo.setCurrentIndex(0)
         self.source_input.clear()
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")

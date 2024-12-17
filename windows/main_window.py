@@ -50,6 +50,14 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur", f"La colonne 'Code NACRES' est introuvable dans {data_masse_path}.")
             sys.exit(1)
 
+         # Chargement des données matériaux
+        data_materials_path = os.path.join(base_path, 'data_masse_eCO2', 'empreinte_carbone_materiaux.h5')
+        if not os.path.exists(data_materials_path):
+            QMessageBox.critical(self, "Erreur", f"Fichier {data_materials_path} introuvable.")
+            sys.exit(1)
+        self.data_materials = pd.read_hdf(data_materials_path)
+        # On suppose que data_materials contient 'Materiau' et 'eCO2_kg'
+
         # Initialisation de variables
         self.calculs = []
         self.calcul_data = []
@@ -267,6 +275,22 @@ class MainWindow(QMainWindow):
         self.nacres_filtered_combo.setVisible(False)
         existing_layout.addWidget(self.nacres_filtered_label)
         existing_layout.addWidget(self.nacres_filtered_combo)
+
+        # Champ quantité
+        self.quantity_label = QLabel("Quantité:")
+        self.quantity_input = QLineEdit()
+        self.quantity_label.setVisible(False)
+        self.quantity_input.setVisible(False)
+
+        # Bouton Calcul eCO₂ via masse
+        self.calculate_mass_button = QPushButton("Calculer eCO₂ via masse")
+        self.calculate_mass_button.setVisible(False)
+        self.calculate_mass_button.setEnabled(False)
+        self.calculate_mass_button.clicked.connect(self.calculer_eCO2_via_masse)
+
+        existing_layout.addWidget(self.quantity_label)
+        existing_layout.addWidget(self.quantity_input)
+        existing_layout.addWidget(self.calculate_mass_button)
 
         # Bouton Gestion des Consommables
         self.manage_consumables_button = QPushButton("Gestion des Consommables")
@@ -601,8 +625,8 @@ class MainWindow(QMainWindow):
             try:
                 selected_nacres = self.nacres_filtered_combo.currentText() if self.nacres_filtered_combo.isVisible() else None
                 if self.nacres_filtered_combo.isVisible() and selected_nacres == "Aucune correspondance":
-                    QMessageBox.information(self, 'Information', 'Aucune correspondance sélectionnée. Opération annulée.')
-                    return
+                    # On informe l'utilisateur, mais on ne return pas
+                    QMessageBox.information(self, 'Information', 'Vous avez sélectionné "Aucune correspondance", le calcul se fera quand même.')
 
                 value = float(self.input_field.text())
                 days = int(self.days_field.text()) if self.days_field.isEnabled() and self.days_field.text() else 1
@@ -645,6 +669,7 @@ class MainWindow(QMainWindow):
                     self.result_area.setText('Aucune donnée disponible pour cette sélection.')
             except ValueError:
                 QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique valide.')
+        # print(update_total_emissions)
         self.update_total_emissions()
         self.input_field.clear()
         self.data_changed.emit()
@@ -1010,7 +1035,8 @@ class MainWindow(QMainWindow):
         Ouvre la fenêtre de gestion des consommables.
         """
         if self.data_mass_window is None or not self.data_mass_window.isVisible():
-            self.data_mass_window = DataMassWindow()
+            # On passe data_materials à DataMassWindow
+            self.data_mass_window = DataMassWindow(parent=self, data_materials=self.data_materials)
             self.data_mass_window.data_added.connect(self.reload_data_masse)
             self.data_mass_window.show()
         else:
@@ -1028,3 +1054,118 @@ class MainWindow(QMainWindow):
             self.update_nacres_filtered_combo()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")
+
+    def update_nacres_filtered_combo(self):
+        category = self.category_combo.currentText()
+        subcategory = self.subcategory_combo.currentText()
+        subsub_name = self.subsub_name_combo.currentText()
+
+        if category == 'Achats' and 'Consommables' in subcategory:
+            self.nacres_filtered_label.setVisible(True)
+            self.nacres_filtered_combo.setVisible(True)
+            self.nacres_filtered_combo.clear()
+
+            if subsub_name:
+                subsubcategory, name = self.split_subsub_name(subsub_name)
+                code_nacres_prefix = subsubcategory[:4]
+                filtered_entries = self.data_masse[
+                    self.data_masse['Code NACRES'].str.strip().str.startswith(code_nacres_prefix, na=False)
+                ]
+
+                if not filtered_entries.empty:
+                    for idx, row in filtered_entries.iterrows():
+                        nom_objet_val = row["Nom de l'objet"]
+                        display_text = f"{row['Code NACRES']} - {nom_objet_val}"
+                        self.nacres_filtered_combo.addItem(display_text)
+
+            # Toujours ajouter "Aucune correspondance"
+            self.nacres_filtered_combo.addItem("Aucune correspondance")
+            self.nacres_filtered_combo.setCurrentText("Aucune correspondance")
+
+            # Connecter un signal pour détecter le changement de sélection
+            self.nacres_filtered_combo.currentIndexChanged.connect(self.on_nacres_filtered_changed)
+
+        else:
+            self.nacres_filtered_label.setVisible(False)
+            self.nacres_filtered_combo.setVisible(False)
+            self.nacres_filtered_combo.clear()
+            # Masquer quantité et bouton car pas pertinent ici
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+            self.calculate_mass_button.setVisible(False)
+
+    def on_nacres_filtered_changed(self):
+        selected_text = self.nacres_filtered_combo.currentText()
+        if selected_text == "Aucune correspondance":
+            # Désactiver quantité et bouton
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+            self.calculate_mass_button.setVisible(False)
+            self.calculate_mass_button.setEnabled(False)
+        else:
+            # Activer quantité et bouton
+            self.quantity_label.setVisible(True)
+            self.quantity_input.setVisible(True)
+            self.calculate_mass_button.setVisible(True)
+            self.calculate_mass_button.setEnabled(True)
+
+    def calculer_eCO2_via_masse(self):
+        # Vérifier si nacres_filtered_combo est sur "Aucune correspondance"
+        if self.nacres_filtered_combo.currentText() == "Aucune correspondance":
+            # On pourrait soit ne pas calculer, soit calculer quand même selon le besoin
+            QMessageBox.information(self, 'Information', 
+                                    'Vous avez sélectionné "Aucune correspondance", le calcul se fera quand même.')
+            # Si vous voulez calculer quand même, poursuivez. Sinon return.
+
+        # Récupérer la quantité
+        try:
+            quantite = int(self.quantity_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
+            return
+
+        if quantite <= 0:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
+            return
+
+        # Récupérer les infos sur le consommable depuis nacres_filtered_combo
+        # Par exemple, si le texte est "NB13 - Tube Falcon 15ml"
+        selected_text = self.nacres_filtered_combo.currentText()
+        if " - " in selected_text:
+            code_nacres, objet_nom = selected_text.split(" - ", 1)
+        else:
+            # Si aucun tiret, peut-être "Aucune correspondance"
+            code_nacres = selected_text
+            objet_nom = "Inconnu"
+
+        # Trouver l'entrée correspondante dans data_masse
+        matching = self.data_masse[self.data_masse['Code NACRES'].str.strip() == code_nacres.strip()]
+        if matching.empty:
+            QMessageBox.warning(self, "Erreur", "Aucun consommable trouvé pour ce code NACRES.")
+            return
+
+        last_obj = matching.iloc[0]
+        masse_g = last_obj["Masse unitaire (g)"]
+        materiau = last_obj["Matériau"]
+
+        if self.data_materials is None:
+            QMessageBox.warning(self, "Erreur", "Les données matériaux ne sont pas chargées.")
+            return
+
+        masse_kg = masse_g / 1000.0
+        mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
+        if mat_filter.empty:
+            QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans data_materials.")
+            return
+
+        eCO2_par_kg = mat_filter['eCO2_kg'].values[0]
+        eCO2_total = quantite * masse_kg * eCO2_par_kg
+
+        QMessageBox.information(self, "Calcul eCO₂ via masse",
+                                f"Consommable: {objet_nom}\n"
+                                f"Quantité: {quantite}\n"
+                                f"Masse unitaire: {masse_g} g ({masse_kg:.4f} kg)\n"
+                                f"Matériau: {materiau}\n"
+                                f"eCO₂ par kg matériau: {eCO2_par_kg:.4f} kg CO₂e/kg\n"
+                                f"eCO₂ total: {eCO2_total:.4f} kg CO₂e"
+                            )

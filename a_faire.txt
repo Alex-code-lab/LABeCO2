@@ -6,3 +6,25 @@
 si j'enleve la partie dansMainWindows, ça perd de son intéret et je sais pas Pourquoi
 
 2. Ajout des choix à partir des codes NACRES
+
+
+Lors de l'ajout d'un consommable, je veux que ça soit ./data_masse_eCO2/empreinte_carbone_materiaux.h5 qui soit utilisé notammement avec sa colonne Materiaux, ou l'on doit récupéré la liste. 
+Le fichier reste important pour tout le reste, et notamment pour la suite. Peut être serait il utile de le charger directement, car nous nous en servirons pour divers calculs.
+En effet, l'objectif est de, lorsque je choisi un consommable dans la liste "Code NACRES filtré", que je puisse calculer 
+son coût en eCO2 d'une seconde manière. En effet, dans mon code je le calcul déjà grâce au prix. Maintenant je veux le calculer
+grâce à sa masse. Ainsi, on connait le consommable, sa masse unitaire et on peut également extraire son matériaux. On connait ainsi le coût par kg du matériaux (grâce au fichier empreinte_corbone_materiaux.h5).
+L'utilisateur doit alors ajouter le nombre de ce consommable utilisé. On peut alors calculer son coût eCO2.
+
+
+l-656 de mainwindow essayé de comprendre update_total_emissions
+
+
+Le calcul de Quantité pour calcul eCO2 via masse, doit être fait dans main_window.
+En gros, si l'utilisateur choisi un consommable dans la liste code NACRES filtré, alors on peut faire ce calcul. 
+
+
+Le problème étant que actuellement, on me demande la quantité pour calcul eCO2 via masse dans la fenêtre de gestion des consommables. 
+Moi je veux que cette partie soit dans la fenêtr eprincipale et que àça puisse être rempli si, et seulement si, la case Code NACRES filtré n'est pas vide (donc autre que "aucune correspondance"). 
+Et donc enlevé cette partie de la fenêtre de gestion des consommables, qui existe juste pour ajouter éventuellement de nouvelles entrées. 
+
+Merci mon meilleur ami de toujorus. 

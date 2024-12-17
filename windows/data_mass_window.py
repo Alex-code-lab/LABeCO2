@@ -5,16 +5,15 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QComboBox
+    QWidget, QComboBox, QHBoxLayout, QLabel
 )
 from PySide6.QtCore import Signal
 
 class DataMassWindow(QMainWindow):
-    # Définition du signal data_added
     data_added = Signal()
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None, data_materials=None):
+        super().__init__(parent)
 
         self.setWindowTitle("Gestion des consommables")
         self.setGeometry(100, 100, 600, 400)
@@ -22,7 +21,6 @@ class DataMassWindow(QMainWindow):
         # Nom du fichier HDF5
         self.hdf5_file = "./data_masse_eCO2/data_eCO2_masse_consommable.hdf5"
 
-        # Initialisation des colonnes
         self.columns = ["Nom de l'objet",
                         "Référence",
                         "Code NACRES",
@@ -33,22 +31,9 @@ class DataMassWindow(QMainWindow):
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
 
-        # Matériaux disponibles
-        self.materials = [
-            "Polypropylène (PP)",
-            "Polyéthylène (PE)",
-            "Polystyrène (PS)",
-            "Polyethylène téréphtalate (PET)",
-            "Polychlorure de vinyle (PVC)",
-            "Polytétrafluoroéthylène (PTFE)",
-            "Polyméthacrylate de méthyle (PMMA)",
-            "Polycarbonate (PC)",
-            "Acier inoxydable",
-            "Aluminium",
-            "Papier",
-            "Carton",
-            "Verre"
-        ]
+        # data_materials transmis par MainWindow
+        # data_materials doit contenir 'Materiau' et 'eCO2_kg'
+        self.data_materials = data_materials
 
         self.init_ui()
         self.afficher_donnees()
@@ -89,14 +74,21 @@ class DataMassWindow(QMainWindow):
     def init_ui(self):
         main_layout = QVBoxLayout()
 
-        # Formulaire
         form_layout = QFormLayout()
         self.nom_input = QLineEdit()
         self.ref_input = QLineEdit()
         self.nacres_input = QLineEdit()
         self.masse_input = QLineEdit()
+
+        # Peupler la liste des matériaux depuis data_materials
         self.materiau_combo = QComboBox()
-        self.materiau_combo.addItems(self.materials)
+        if self.data_materials is not None:
+            mats = self.data_materials['Materiau'].dropna().unique().tolist()
+            self.materiau_combo.addItems(mats)
+        else:
+            # Liste statique de secours
+            self.materiau_combo.addItems(["Polypropylène (PP)", "Polyéthylène (PE)"])
+
         self.source_input = QLineEdit()
 
         form_layout.addRow("Nom de l'objet:", self.nom_input)
@@ -116,6 +108,8 @@ class DataMassWindow(QMainWindow):
         self.display_button.clicked.connect(self.afficher_donnees)
         main_layout.addWidget(self.display_button)
 
+
+        # Tableau des données
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
@@ -167,8 +161,10 @@ class DataMassWindow(QMainWindow):
         }
         self.data = self.ajouter_objet_df(self.data, nouvel_objet)
 
+        # Sauvegarde des données
         self.sauvegarder_donnees()
 
+        # Efface les champs
         self.nom_input.clear()
         self.ref_input.clear()
         self.nacres_input.clear()
@@ -177,8 +173,6 @@ class DataMassWindow(QMainWindow):
         self.source_input.clear()
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
-
-        # Émission du signal data_added après l'ajout
         self.data_added.emit()
 
     def ajouter_objet_df(self, df, objet):
@@ -196,3 +190,62 @@ class DataMassWindow(QMainWindow):
             for col_idx, col_name in enumerate(self.columns):
                 item = QTableWidgetItem(str(row_data[col_name]))
                 self.table.setItem(row_idx, col_idx, item)
+
+    def calculer_eCO2_via_masse(self):
+        """
+        Calculer l'eCO₂ via masse:
+        On utilise la dernière ligne sélectionnée dans le tableau, ou par exemple
+        le Code NACRES et le matériau pour retrouver masse et matériau.
+
+        Pour simplifier, on va prendre le dernier objet ajouté ou un objet spécifique.
+        Ici, comme exemple, on va calculer pour le dernier objet du tableau.
+        """
+
+        if self.data.empty:
+            QMessageBox.warning(self, "Erreur", "Aucun consommable disponible.")
+            return
+
+        # Récupérer le dernier objet ou la sélection
+        # Ici, on prend le dernier objet pour l'exemple
+        last_obj = self.data.iloc[-1]
+
+        try:
+            quantite_str = self.qty_input.text().strip()
+            quantite = int(quantite_str)
+        except ValueError:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
+            return
+
+        if quantite <= 0:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
+            return
+
+        masse_g = last_obj["Masse unitaire (g)"]
+        materiau = last_obj["Matériau"]
+
+        if self.data_materials is None:
+            QMessageBox.warning(self, "Erreur", "Les données matériaux ne sont pas chargées.")
+            return
+
+        # Convertir la masse en kg
+        masse_kg = masse_g / 1000.0
+
+        # Récupérer l'eCO2 par kg du matériau
+        mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
+        if mat_filter.empty:
+            QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans data_materials.")
+            return
+
+        eCO2_par_kg = mat_filter['eCO2_kg'].values[0]
+
+        # Calcul de l'eCO2 total
+        eCO2_total = quantite * masse_kg * eCO2_par_kg
+
+        QMessageBox.information(self, "Calcul eCO₂ via masse",
+                        f"Consommable: {last_obj['Nom de lobjet']}\n"
+                        f"Quantité: {quantite}\n"
+                        f"Masse unitaire: {masse_g} g ({masse_kg:.4f} kg)\n"
+                        f"Matériau: {materiau}\n"
+                        f"eCO₂ par kg matériau: {eCO2_par_kg:.4f} kg CO₂e/kg\n"
+                        f"eCO₂ total: {eCO2_total:.4f} kg CO₂e"
+                        )
