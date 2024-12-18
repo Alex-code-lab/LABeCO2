@@ -328,8 +328,8 @@ class MainWindow(QMainWindow):
         existing_group.setLayout(existing_layout)
         main_layout.addWidget(existing_group)
         # Ajout du spacer pour équilibrer le layout
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        main_layout.addItem(spacer)
+        # spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        # main_layout.addItem(spacer)
 
     def initUIMachineSection(self, main_layout):
         """
@@ -398,9 +398,9 @@ class MainWindow(QMainWindow):
         calc_buttons_layout.addWidget(self.modify_button)
 
         self.export_button = QPushButton('Exporter les données')
-        self.export_button.clicked.connect(self.export_data)
+        # self.export_button.clicked.connect(self.export_data)
         self.import_button = QPushButton('Importer les données')
-        self.import_button.clicked.connect(self.import_data)
+        # self.import_button.clicked.connect(self.import_data)
 
         export_import_layout = QHBoxLayout()
         export_import_layout.setSpacing(0)
@@ -986,21 +986,32 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Information', 'Aucune donnée valide à exporter.')
             return
 
-        default_file_name = os.path.join(os.getcwd(), 'bilan_carbone_export.csv')
+        default_file_name = os.path.join(os.getcwd(), 'bilan_carbone_export')
         options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getSaveFileName(
+        file_name, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Exporter les données",
             default_file_name,
-            "Fichiers CSV (*.csv);;Tous les fichiers (*)",
+            "Fichiers CSV (*.csv);;Fichiers Excel (*.xlsx);;Fichiers HDF5 (*.h5);;Tous les fichiers (*)",
             options=options
         )
 
         if file_name:
-            if not file_name.endswith('.csv'):
+            # Ajoutez l'extension appropriée si nécessaire
+            if selected_filter == "Fichiers CSV (*.csv)" and not file_name.endswith('.csv'):
                 file_name += '.csv'
+            elif selected_filter == "Fichiers Excel (*.xlsx)" and not file_name.endswith('.xlsx'):
+                file_name += '.xlsx'
+            elif selected_filter == "Fichiers HDF5 (*.h5)" and not file_name.endswith('.h5'):
+                file_name += '.h5'
+
             try:
-                df.to_csv(file_name, index=False, encoding='utf-8-sig')
+                if file_name.endswith('.csv'):
+                    df.to_csv(file_name, index=False, encoding='utf-8-sig')
+                elif file_name.endswith('.xlsx'):
+                    df.to_excel(file_name, index=False, engine='openpyxl')
+                elif file_name.endswith('.h5'):
+                    df.to_hdf(file_name, key='bilan_carbone', mode='w')
                 QMessageBox.information(self, 'Succès', f'Données exportées avec succès dans {file_name}')
             except Exception as e:
                 QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'exportation : {e}')
@@ -1008,49 +1019,78 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Annulation', 'Exportation annulée.')
 
     def import_data(self):
+        print("Début de la méthode d'importation")  # Pour vérifier combien de fois la méthode est appelée
+
+        # Options pour le fichier
         options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Importer les données", "", "Fichiers CSV (*.csv);;Tous les fichiers (*)", options=options)
-        if file_name:
-            try:
+
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Importer les données",
+            "",
+            "Fichiers supportés (*.csv *.xlsx *.h5);;Tous les fichiers (*)",
+            options=options
+        )
+
+        if not file_name:  # Si aucun fichier sélectionné
+            print("Aucun fichier sélectionné")
+            return
+
+        try:
+            if file_name.endswith('.csv'):
                 df = pd.read_csv(file_name)
-                required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)'}
-                if not required_columns.issubset(df.columns):
-                    QMessageBox.warning(self, 'Erreur', 'Le fichier CSV ne contient pas les colonnes nécessaires.')
-                    return
+            elif file_name.endswith('.xlsx'):
+                df = pd.read_excel(file_name, engine='openpyxl')
+            elif file_name.endswith('.h5'):
+                df = pd.read_hdf(file_name, key='bilan_carbone')
+            else:
+                QMessageBox.warning(self, 'Erreur', 'Type de fichier non pris en charge.')
+                return
+            
+             # Vérifiez si les colonnes nécessaires sont présentes
+            required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)'}
+            if not required_columns.issubset(df.columns):
+                QMessageBox.warning(self, 'Erreur', 'Le fichier importé ne contient pas les colonnes nécessaires.')
+                return
 
-                for index, row in df.iterrows():
-                    category = row.get('Catégorie', '')
-                    subcategory = row.get('Sous-catégorie', '')
-                    subsubcategory = row.get('Sous-sous-catégorie', '')
-                    name = row.get('Nom', '')
-                    value = row.get('Valeur', 0)
-                    unit = row.get('Unité', '')
-                    emissions = row.get('Émissions (kg CO₂e)', 0)
+            # Ajoutez les données importées dans l'interface
+            for index, row in df.iterrows():
+                category = row.get('Catégorie', '')
+                subcategory = row.get('Sous-catégorie', '')
+                subsubcategory = row.get('Sous-sous-catégorie', '')
+                name = row.get('Nom', '')
+                value = row.get('Valeur', 0)
+                unit = row.get('Unité', '')
+                emissions = row.get('Émissions (kg CO₂e)', 0)
 
-                    if category == 'Machine':
-                        item_text = f'Machine - {subcategory} - {value:.2f} {unit} : {emissions:.4f} kg CO₂e'
-                    else:
-                        subsub_name = f'{subsubcategory} - {name}' if subsubcategory else name
-                        item_text = f'{category} - {subcategory} - {subsub_name} - {value} {unit} : {emissions:.4f} kg CO₂e'
+                if category == 'Machine':
+                    item_text = f'Machine - {subcategory} - {value:.2f} {unit} : {emissions:.4f} kg CO₂e'
+                else:
+                    subsub_name = f'{subsubcategory} - {name}' if subsubcategory else name
+                    item_text = f'{category} - {subcategory} - {subsub_name} - {value} {unit} : {emissions:.4f} kg CO₂e'
 
-                    item = QListWidgetItem(item_text)
-                    item.setData(Qt.UserRole, {
-                        'category': category,
-                        'subcategory': subcategory,
-                        'subsubcategory': subsubcategory,
-                        'name': name,
-                        'value': value,
-                        'unit': unit,
-                        'emissions': emissions
-                    })
-                    self.history_list.addItem(item)
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, {
+                    'category': category,
+                    'subcategory': subcategory,
+                    'subsubcategory': subsubcategory,
+                    'name': name,
+                    'value': value,
+                    'unit': unit,
+                    'emissions': emissions
+                })
+                self.history_list.addItem(item)
 
-                self.update_total_emissions()
-                QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
-                self.data_changed.emit()
-            except Exception as e:
-                QMessageBox.warning(self, 'Erreur', f'Erreur lors de l\'importation : {e}')
+            self.update_total_emissions()
+            print("Fin de l'importation")  # Pour confirmer que tout s'est bien passé
+            QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
+            self.data_changed.emit()
 
+
+            print(f"Fichier importé avec succès : {file_name}")
+        except Exception as e:
+            QMessageBox.warning(self, 'Erreur', f'Erreur lors de la lecture du fichier : {e}')
+            
     def add_machine(self):
         try:
             machine_name = self.machine_name_field.text()

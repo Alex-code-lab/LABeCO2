@@ -1,8 +1,7 @@
 ----------------------------------
 ------- Les choses à faire -------
 ----------------------------------
-0. Fnêtre change de taille avec Machine, pourquoi???
 1. Sur Machine, si je mets plus que 24h par jour, il me mets un warning mais fait un calcul quand même : à réparer. 
 2. Il faut ajouter le calcul massique : dans calcul emission. Il y'a aussi déjà une fonction calculer calculer_eCO2_via_masse qui a été écrite mais dont on ne se sert pas. Peut être peut elle servir. 
-
+3- ajouté le code NACRES dans l'history pour se retrouver. 
 l-656 de mainwindow essayé de comprendre update_total_emissions

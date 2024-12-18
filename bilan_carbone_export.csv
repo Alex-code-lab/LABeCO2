@@ -1,0 +1,15 @@
+﻿Catégorie,Sous-catégorie,Sous-sous-catégorie,Nom,Valeur,Unité,Émissions (kg CO₂e)
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NA25,"Produits biochimiques courants (tampons, bsa, etc.)",150.0,euro,67.5
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NA71,Serums et autres milieux pour culture de cellules animales,180.0,euro,81.0
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NA73,Milieux pour culture de petits organismes vivants,200.0,euro,90.0
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB13,Culture cellulaire eucaryote : consommables en plastique specifiques,780.0,euro,327.59999999999997
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB02,Pointes (cones) pour micropipettes mono-canal et multi-canaux,50.0,euro,24.5
+Véhicules,Voiture,Diesel,"Voiture particulière , moyenne parc, motorisation gazole",3515.0,km,745.5315
+Véhicules,ferroviaire,TGV > 200 km,TGV,111000.0,km,366.3
+Machine,Incubateur,,,2627.9999999999995,kWh,1560.2435999999998
+Machine,centrifugeuse,,,180.0,kWh,106.866
+Machine,Autoclave,,,150.0,kWh,7.8
+Machine,Microscope,,,1920.0,kWh,99.84
+Activités agricoles,Utilisation d'engrais,minerals,Epandage d'engrais minéraux,10.0,kg d'azote,57.3
+Infra. de recherche,Astronomie,AAT,Anglo-Australian Telescope,1e-05,% utilisation infra.,335.5180000000001
+Infra. de recherche,Calcul GENCI,GPU puissant,GPU,1000.0,heures.GPU,333.7
