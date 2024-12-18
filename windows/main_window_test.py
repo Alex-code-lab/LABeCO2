@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
     QInputDialog, QFormLayout, QFileDialog,
-    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem, QSizePolicy
+    QListWidgetItem, QScrollArea, QStackedLayout
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
@@ -127,14 +127,27 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(10, 10, 10, 10)
 
-         # 1. Configuration du header (logo + texte d'intro)
+        # 1. Configuration du header (logo + texte d'intro)
         self.initUIHeader(main_layout)
 
         # 2. Configuration de la sélection de catégories / sous-catégories
+        #   Ne pas oublier que initUICategorySelectors ne fait plus addWidget sur main_layout directement
         self.initUICategorySelectors(main_layout)
 
         # 3. Configuration de la section "Machine"
+        #   Ici non plus, on ne l'ajoute pas directement. On va utiliser un QStackedLayout.
         self.initUIMachineSection(main_layout)
+
+        # Création du QStackedLayout pour alterner entre la vue "normale" et "machine"
+        self.stacked_layout = QStackedLayout()
+        # Ajout des deux "vues" au QStackedLayout :
+        # - Vue normale (avec catégories, sous-cat, etc.)
+        # - Vue machine
+        self.stacked_layout.addWidget(self.normal_widget)
+        self.stacked_layout.addWidget(self.machine_group)
+
+        # Ajout du stacked_layout au main_layout
+        main_layout.addLayout(self.stacked_layout)
 
         # 4. Configuration de l'historique et des boutons Export/Import
         self.initUIHistory(main_layout)
@@ -144,7 +157,6 @@ class MainWindow(QMainWindow):
 
         # 6. Affichage du total des émissions et source
         main_layout.addWidget(self.result_area)
-
 
         self.source_label = QLabel(
             'Les données utilisées ici sont issues de la base de données fournie par <a href="https://labos1point5.org/" style="color:blue; text-decoration:none;">Labo 1point5</a>'
@@ -269,7 +281,7 @@ class MainWindow(QMainWindow):
 
         self.calculate_button = QPushButton('Calculer le Bilan Carbone')
         self.calculate_button.setToolTip("Calcule le bilan carbone sélectionné et tente également le calcul via la masse si possible.")
-        # self.calculate_button.clicked.connect(self.calculate_emission)
+        # Ne pas connecter ici, car déjà connecté dans initUISignals()
 
         existing_layout = QVBoxLayout()
         existing_layout.setSpacing(5)
@@ -297,11 +309,10 @@ class MainWindow(QMainWindow):
         self.quantity_input = QLineEdit()
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
-
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
 
-         # Bouton Gestion des Consommables
+        # Bouton Gestion des Consommables
         self.manage_consumables_button = QPushButton("Gestion des Consommables")
         self.manage_consumables_button.setStyleSheet("""
             QPushButton {
@@ -324,12 +335,12 @@ class MainWindow(QMainWindow):
         existing_layout.addWidget(self.days_field)
         existing_layout.addWidget(self.calculate_button)
 
-        existing_group = QWidget()
-        existing_group.setLayout(existing_layout)
-        main_layout.addWidget(existing_group)
-        # Ajout du spacer pour équilibrer le layout
-        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        main_layout.addItem(spacer)
+        # Au lieu d'ajouter directement existing_group au main_layout, 
+        # on va juste le stocker pour l'utiliser dans le QStackedLayout.
+        self.normal_widget = QWidget()
+        self.normal_widget.setLayout(existing_layout)
+        # Ne pas faire ici : main_layout.addWidget(self.normal_widget)
+        # On le fera dans initUI via le QStackedLayout
 
     def initUIMachineSection(self, main_layout):
         """
@@ -337,19 +348,14 @@ class MainWindow(QMainWindow):
         """
         self.machine_name_label = QLabel('Nom de la machine:')
         self.machine_name_field = QLineEdit()
-        self.machine_name_field.setMaximumWidth(200)
         self.power_label = QLabel('Puissance de la machine (kW):')
         self.power_field = QLineEdit()
-        self.power_field.setMaximumWidth(200)
         self.usage_time_label = QLabel("Temps d'utilisation par jour (heures):")
         self.usage_time_field = QLineEdit()
-        self.usage_time_field.setMaximumWidth(200)
         self.days_machine_label = QLabel("Nombre de jours d'utilisation:")
         self.days_machine_field = QLineEdit()
-        self.days_machine_field.setMaximumWidth(200)
         self.electricity_label = QLabel('Type d\'électricité:')
         self.electricity_combo = QComboBox()
-        self.electricity_combo.setMaximumWidth(200)
 
         electricity_types = self.data[self.data['category'] == 'Électricité']['name'].dropna().unique()
         self.electricity_combo.addItems(sorted(electricity_types))
@@ -367,9 +373,8 @@ class MainWindow(QMainWindow):
 
         self.machine_group = QWidget()
         self.machine_group.setLayout(self.machine_layout)
-        self.machine_group.setVisible(False)
-
-        main_layout.addWidget(self.machine_group)
+        # Ne pas faire main_layout.addWidget(self.machine_group) ici.
+        # Ce widget sera géré via le QStackedLayout dans initUI.
 
     def initUIHistory(self, main_layout):
         """
@@ -518,46 +523,12 @@ class MainWindow(QMainWindow):
     def update_subcategories(self):
         category = self.category_combo.currentText()
         if category == 'Machine':
-            self.subcategory_label.setVisible(False)
-            self.subcategory_combo.setVisible(False)
-            self.search_label.setVisible(False)
-            self.search_field.setVisible(False)
-            self.subsub_name_label.setVisible(False)
-            self.subsub_name_combo.setVisible(False)
-            self.year_label.setVisible(False)
-            self.year_combo.setVisible(False)
-            self.input_label.setVisible(False)
-            self.input_field.setVisible(False)
-            self.days_label.setVisible(False)
-            self.days_field.setVisible(False)
-            self.calculate_button.setVisible(False)
-            self.machine_group.setVisible(True)
-
-            # Ajustez la politique de taille pour empêcher le recalcul
-            self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-            self.manage_consumables_button.setVisible(False)
-
-            self.nacres_filtered_label.setVisible(False)
-            self.nacres_filtered_combo.setVisible(False)
-            self.quantity_label.setVisible(False)
-            self.quantity_input.setVisible(False)
+            # Au lieu de masquer/afficher individuellement chaque widget,
+            # on passe simplement à la "page" machine du QStackedLayout
+            self.stacked_layout.setCurrentWidget(self.machine_group)
         else:
-            self.subcategory_label.setVisible(True)
-            self.subcategory_combo.setVisible(True)
-            self.search_label.setVisible(True)
-            self.search_field.setVisible(True)
-            self.subsub_name_label.setVisible(True)
-            self.subsub_name_combo.setVisible(True)
-            self.year_label.setVisible(True)
-            self.year_combo.setVisible(True)
-            self.input_label.setVisible(True)
-            self.input_field.setVisible(True)
-            self.calculate_button.setVisible(True)
-            self.machine_group.setVisible(False)
-
-            # Ajustez la politique de taille
-            self.machine_group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-            self.manage_consumables_button.setVisible(True)
+            # Retour à la vue normale
+            self.stacked_layout.setCurrentWidget(self.normal_widget)
 
             subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
             self.subcategory_combo.clear()

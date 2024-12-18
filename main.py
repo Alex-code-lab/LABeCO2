@@ -4,7 +4,7 @@ import os
 # from PyQt5.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
-from windows.main_window_sauvegarde import MainWindow  # Importez la classe MainWindow
+from windows.main_window import MainWindow  # Importez la classe MainWindow
 from utils.data_loader import resource_path
 
 # Ajoute cette ligne pour spécifier le chemin des plugins Qt
