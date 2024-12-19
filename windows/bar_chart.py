@@ -123,7 +123,7 @@ class BarChartWindow(QDialog):
             if data:
                 categories.append(data.get('category', ''))
                 subcategories.append(data.get('subcategory', ''))
-                emissions.append(data.get('emissions', 0))
+                emissions.append(data.get('emissions_price', 0))
 
         # Agrégation des émissions par catégorie et sous-catégorie
         subcategory_emissions = {}

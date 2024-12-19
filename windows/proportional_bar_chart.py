@@ -123,7 +123,7 @@ class ProportionalBarChartWindow(QDialog):
             if data:
                 category = data.get('category', '')
                 subcategory = data.get('subcategory', '')
-                emission = data.get('emissions', 0)
+                emission = data.get('emissions_price', 0)
                 categories.append(category)
                 subcategories.append(subcategory)
                 emissions.append(emission)

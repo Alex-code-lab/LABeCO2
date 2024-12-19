@@ -125,7 +125,7 @@ class PieChartWindow(QDialog):
             if data:
                 # On récupère la catégorie et les émissions associées
                 categories.append(data.get('category', ''))
-                emissions.append(data.get('emissions', 0))
+                emissions.append(data.get('emissions_price', 0))
 
         # Agrégation des émissions par catégorie
         category_emissions = {}
