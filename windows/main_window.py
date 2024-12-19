@@ -699,7 +699,6 @@ class MainWindow(QMainWindow):
         subsub_name = self.subsub_name_combo.currentText()
         year = self.year_combo.currentText()
         subsubcategory, category_nacres = self.split_subsub_name(subsub_name)
-        print(category_nacres)
         # Cas particulier : catégorie "Machine"
         if category == 'Machine':
             self.add_machine()
@@ -732,6 +731,7 @@ class MainWindow(QMainWindow):
         # Lecture de la valeur entrée par l'utilisateur
         try:
             input_text = self.input_field.text().strip()  # Supprime les espaces superflus
+            input_text = input_text.replace(',', '.')
             print(f"Debug: Input text = '{input_text}'")  # Vérifie la valeur saisie
             value = float(input_text)
             print(f"Debug: Value = {value}")
@@ -796,7 +796,6 @@ class MainWindow(QMainWindow):
             'unit': self.current_unit,
             'emissions_price': emissions,
             'emission_mass' : emission_massique
-
         })
 
         # Vérifie que l'élément n'existe pas déjà dans l'historique (optionnel)
@@ -809,16 +808,48 @@ class MainWindow(QMainWindow):
         self.input_field.clear()
         self.data_changed.emit()
    
+    # def update_total_emissions(self):
+    #     total_emissions = 0.0
+    #     for i in range(self.history_list.count()):
+    #         item = self.history_list.item(i)
+    #         data = item.data(Qt.UserRole)
+    #         if data:
+    #             emissions = data.get('emissions', 0)
+    #             total_emissions += emissions
+    #     self.total_emissions = total_emissions
+    #     self.result_area.setText(f'Total des émissions : {total_emissions:.4f} kg CO₂e')
+
     def update_total_emissions(self):
-        total_emissions = 0.0
+        total_emissions = 0.0        # Total des émissions basées sur le prix
+        total_mass_emissions_conso = 0.0   # Total des émissions massiques
+        total_price_emissions_conso = 0.0   # Total des émissions massiques
+
+
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
             data = item.data(Qt.UserRole)
             if data:
-                emissions = data.get('emissions', 0)
-                total_emissions += emissions
+                # Émissions basées sur le prix (déjà existantes dans 'emissions_price' ou 'emissions')
+                emissions_price = data.get('emissions_price', data.get('emissions', 0))
+                total_emissions += emissions_price
+
+                # Émissions massiques
+                emission_mass = data.get('emission_mass', 0)
+                if emission_mass is None or emission_mass == 'NA':
+                    emission_mass = 0.0  # Si pas de données massiques, on prend 0
+                else:
+                    total_price_emissions_conso += emissions_price
+                    total_mass_emissions_conso += float(emission_mass)
+
         self.total_emissions = total_emissions
-        self.result_area.setText(f'Total des émissions : {total_emissions:.4f} kg CO₂e')
+        self.total_mass_emissions_conso = total_mass_emissions_conso
+        self.total_price_emissions_conso = total_price_emissions_conso
+        # Mettre à jour l'affichage. Par exemple, afficher sur deux lignes :
+        self.result_area.setText(
+            f'Total des émissions (prix) : {total_emissions:.4f} kg CO₂e\n'
+            f'Emission des consommable par la masse : {total_mass_emissions_conso:.4f} kg CO₂e\n'
+            f'Emission des consommable par le prix : {total_price_emissions_conso:.4f} kg CO₂e'
+        )
 
     def delete_selected_calculation(self):
         selected_row = self.history_list.currentRow()
@@ -989,136 +1020,6 @@ class MainWindow(QMainWindow):
         self.data_changed.emit()
 
         QMessageBox.information(self, 'Succès', 'Calcul modifié avec succès.')
-
-    # def export_data(self):
-    #     if self.history_list.count() == 0:
-    #         QMessageBox.information(self, 'Information', 'Aucune donnée à exporter.')
-    #         return
-
-    #     data_to_export = []
-    #     for i in range(self.history_list.count()):
-    #         item = self.history_list.item(i)
-    #         data = item.data(Qt.UserRole)
-    #         if data:
-    #             data_to_export.append({
-    #                 'Catégorie': data.get('category', ''),
-    #                 'Sous-catégorie': data.get('subcategory', ''),
-    #                 'Sous-sous-catégorie': data.get('subsubcategory', ''),
-    #                 'Nom': data.get('name', ''),
-    #                 'Valeur': data.get('value', 0),
-    #                 'Unité': data.get('unit', ''),
-    #                 'Émissions (kg CO₂e)': data.get('emissions', 0)
-    #             })
-
-    #     df = pd.DataFrame(data_to_export)
-    #     if df.empty:
-    #         QMessageBox.information(self, 'Information', 'Aucune donnée valide à exporter.')
-    #         return
-
-    #     default_file_name = os.path.join(os.getcwd(), 'bilan_carbone_export')
-    #     options = QFileDialog.Options()
-    #     file_name, selected_filter = QFileDialog.getSaveFileName(
-    #         self,
-    #         "Exporter les données",
-    #         default_file_name,
-    #         "Fichiers CSV (*.csv);;Fichiers Excel (*.xlsx);;Fichiers HDF5 (*.h5);;Tous les fichiers (*)",
-    #         options=options
-    #     )
-
-    #     if file_name:
-    #         # Ajoutez l'extension appropriée si nécessaire
-    #         if selected_filter == "Fichiers CSV (*.csv)" and not file_name.endswith('.csv'):
-    #             file_name += '.csv'
-    #         elif selected_filter == "Fichiers Excel (*.xlsx)" and not file_name.endswith('.xlsx'):
-    #             file_name += '.xlsx'
-    #         elif selected_filter == "Fichiers HDF5 (*.h5)" and not file_name.endswith('.h5'):
-    #             file_name += '.h5'
-
-    #         try:
-    #             if file_name.endswith('.csv'):
-    #                 df.to_csv(file_name, index=False, encoding='utf-8-sig')
-    #             elif file_name.endswith('.xlsx'):
-    #                 df.to_excel(file_name, index=False, engine='openpyxl')
-    #             elif file_name.endswith('.h5'):
-    #                 df.to_hdf(file_name, key='bilan_carbone', mode='w')
-    #             QMessageBox.information(self, 'Succès', f'Données exportées avec succès dans {file_name}')
-    #         except Exception as e:
-    #             QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'exportation : {e}')
-    #     else:
-    #         QMessageBox.information(self, 'Annulation', 'Exportation annulée.')
-
-    # def import_data(self):
-    #     print("Début de la méthode d'importation")  # Pour vérifier combien de fois la méthode est appelée
-
-    #     # Options pour le fichier
-    #     options = QFileDialog.Options()
-
-    #     file_name, _ = QFileDialog.getOpenFileName(
-    #         self,
-    #         "Importer les données",
-    #         "",
-    #         "Fichiers supportés (*.csv *.xlsx *.h5);;Tous les fichiers (*)",
-    #         options=options
-    #     )
-
-    #     if not file_name:  # Si aucun fichier sélectionné
-    #         print("Aucun fichier sélectionné")
-    #         return
-
-    #     try:
-    #         if file_name.endswith('.csv'):
-    #             df = pd.read_csv(file_name)
-    #         elif file_name.endswith('.xlsx'):
-    #             df = pd.read_excel(file_name, engine='openpyxl')
-    #         elif file_name.endswith('.h5'):
-    #             df = pd.read_hdf(file_name, key='bilan_carbone')
-    #         else:
-    #             QMessageBox.warning(self, 'Erreur', 'Type de fichier non pris en charge.')
-    #             return
-            
-    #          # Vérifiez si les colonnes nécessaires sont présentes
-    #         required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)'}
-    #         if not required_columns.issubset(df.columns):
-    #             QMessageBox.warning(self, 'Erreur', 'Le fichier importé ne contient pas les colonnes nécessaires.')
-    #             return
-
-    #         # Ajoutez les données importées dans l'interface
-    #         for index, row in df.iterrows():
-    #             category = row.get('Catégorie', '')
-    #             subcategory = row.get('Sous-catégorie', '')
-    #             subsubcategory = row.get('Sous-sous-catégorie', '')
-    #             name = row.get('Nom', '')
-    #             value = row.get('Valeur', 0)
-    #             unit = row.get('Unité', '')
-    #             emissions = row.get('Émissions (kg CO₂e)', 0)
-
-    #             if category == 'Machine':
-    #                 item_text = f'Machine - {subcategory} - {value:.2f} {unit} : {emissions:.4f} kg CO₂e'
-    #             else:
-    #                 subsub_name = f'{subsubcategory} - {name}' if subsubcategory else name
-    #                 item_text = f'{category} - {subcategory} - {subsub_name} - {value} {unit} : {emissions:.4f} kg CO₂e'
-
-    #             item = QListWidgetItem(item_text)
-    #             item.setData(Qt.UserRole, {
-    #                 'category': category,
-    #                 'subcategory': subcategory,
-    #                 'subsubcategory': subsubcategory,
-    #                 'name': name,
-    #                 'value': value,
-    #                 'unit': unit,
-    #                 'emissions': emissions
-    #             })
-    #             self.history_list.addItem(item)
-
-    #         self.update_total_emissions()
-    #         print("Fin de l'importation")  # Pour confirmer que tout s'est bien passé
-    #         QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
-    #         self.data_changed.emit()
-
-
-    #         print(f"Fichier importé avec succès : {file_name}")
-    #     except Exception as e:
-    #         QMessageBox.warning(self, 'Erreur', f'Erreur lors de la lecture du fichier : {e}')
 
     def export_data(self):
         """
@@ -1371,31 +1272,34 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")
 
     def calculate_mass_based_emissions(self, code_nacres):
-        """
-        Calcule les émissions eCO₂ basées sur la masse du consommable correspondant au code_nacres.
-        Utilise self.data_masse et self.data_materials.
-
-        Retourne les émissions massiques en kg CO₂e ou None si un problème survient.
-        """
-
-        # Récupération de la quantité saisie par l'utilisateur
         quantite_text = self.quantity_input.text().strip()
         if not quantite_text.isdigit():
             QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
-            return None
+            return None, None
 
         quantite = int(quantite_text)
         if quantite <= 0:
             QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
-            return None
+            return None, None
 
-        # Recherche du consommable dans data_masse
-        matching = self.data_masse[self.data_masse['Code NACRES'].str.strip() == code_nacres.strip()]
+        # Récupération du code_nacres et du nom de l'objet depuis selected_nacres
+        selected_nacres = self.nacres_filtered_combo.currentText()
+        if " - " in selected_nacres:
+            code_nacres, objet_nom = selected_nacres.split(" - ", 1)
+        else:
+            code_nacres = selected_nacres
+            objet_nom = ""
+
+        # Filtrage plus précis
+        matching = self.data_masse[
+            (self.data_masse['Code NACRES'].str.strip() == code_nacres.strip()) &
+            (self.data_masse["Nom de l'objet"].str.strip() == objet_nom.strip())
+        ]
+
         if matching.empty:
-            QMessageBox.warning(self, "Erreur", f"Aucun consommable trouvé pour le code NACRES: {code_nacres}")
-            return None
+            QMessageBox.warning(self, "Erreur", f"Aucun consommable trouvé pour le code NACRES: {code_nacres} et l'objet: {objet_nom}")
+            return None, None
 
-        # On prend le premier match (ou vous pouvez ajouter une logique de sélection)
         consommable_row = matching.iloc[0]
         masse_g = consommable_row["Masse unitaire (g)"]
         materiau = consommable_row["Matériau"]
@@ -1404,11 +1308,10 @@ class MainWindow(QMainWindow):
         masse_kg_unitaire = masse_g / 1000.0
         masse_totale_kg = masse_kg_unitaire * quantite
 
-        # Recherche du facteur eCO₂ pour le matériau
         mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
         if mat_filter.empty:
             QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans data_materials.")
-            return None
+            return None, None
 
         eCO2_par_kg = float(mat_filter.iloc[0]["Equivalent CO₂ (kg eCO₂/kg)"])
         eCO2_total = masse_totale_kg * eCO2_par_kg
