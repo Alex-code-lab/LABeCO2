@@ -469,7 +469,7 @@ class MainWindow(QMainWindow):
         self.year_combo.currentIndexChanged.connect(self.update_nacres_filtered_combo)
 
         # Ouvre l'interface pour modifier un calcul lorsqu'un élément de l'historique est double-cliqué.
-        self.history_list.itemDoubleClicked.connect(self.modify_calculation)
+        self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
 
         # Lance le calcul des émissions lorsqu'on clique sur le bouton "Calculer".
         self.calculate_button.clicked.connect(self.calculate_emission)
@@ -693,13 +693,15 @@ class MainWindow(QMainWindow):
         Ajoute également les informations NACRES (si disponibles) dans l'historique.
         """
         print("calculate_emission appelé")
+        
+        # Récupération des données sélectionnées par l'utilisateur
         category = self.category_combo.currentText()
-        # Récupération des informations sélectionnées
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
         year = self.year_combo.currentText()
         subsubcategory, category_nacres = self.split_subsub_name(subsub_name)
-        # Cas particulier : catégorie "Machine"
+
+        # Gestion spéciale pour la catégorie "Machine"
         if category == 'Machine':
             self.add_machine()
             self.input_field.clear()
@@ -707,48 +709,40 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
             return
 
-        # Extraction automatique du Code NACRES pour les "Achats"
+        # Initialisation des variables spécifiques à la gestion des consommables
         code_nacres = 'NA'
         consommable = 'NA'
         if category == 'Achats' and subsubcategory:
-            code_nacres = subsubcategory[:4]  # Les 4 premiers caractères de la sous-sous-catégorie
-            # consommable = category_nacres if category_nacres else 'Inconnu'
+            code_nacres = subsubcategory[:4]
 
-        # Récupération de la sélection "Code NACRES filtré"
-        selected_nacres = self.nacres_filtered_combo.currentText() if self.nacres_filtered_combo.isVisible() else None
-        # Vérifie si une correspondance NACRES est sélectionnée
-        has_nacres_match = (selected_nacres and selected_nacres != "Aucune correspondance")
-        # code_nacres = None
-        # consommable = None
+        selected_nacres = (
+            self.nacres_filtered_combo.currentText()
+            if self.nacres_filtered_combo.isVisible()
+            else None
+        )
+        has_nacres_match = selected_nacres and selected_nacres != "Aucune correspondance"
 
         if has_nacres_match:
-            # Extraction du Code NACRES et du consommable
             if " - " in selected_nacres:
                 code_nacres, consommable = selected_nacres.split(" - ", 1)
-            else:
-                code_nacres = code_nacres
 
-        # Lecture de la valeur entrée par l'utilisateur
+        # Validation de la valeur saisie par l'utilisateur
         try:
-            input_text = self.input_field.text().strip()  # Supprime les espaces superflus
-            input_text = input_text.replace(',', '.')
-            print(f"Debug: Input text = '{input_text}'")  # Vérifie la valeur saisie
+            input_text = self.input_field.text().strip().replace(',', '.')
+            print(f"Debug: Input text = '{input_text}'")
             value = float(input_text)
-            print(f"Debug: Value = {value}")
             if value < 0:
-                QMessageBox.warning(self, 'Erreur', 'La valeur doit être positive.')
-                return
+                raise ValueError("La valeur doit être positive.")
         except ValueError as e:
             print(f"Debug: ValueError - {e}")
             QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique positive valide.')
             return
 
-        # Gestion des jours (si applicable, par exemple pour les véhicules)
+        # Gestion des jours (utile pour certaines catégories comme les véhicules)
         days = int(self.days_field.text()) if self.days_field.isEnabled() and self.days_field.text() else 1
         total_value = value * days
 
-        
-        # Filtrage des données pour le calcul principal
+        # Filtrage des données pour obtenir le facteur d'émission
         mask = (
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
@@ -761,69 +755,50 @@ class MainWindow(QMainWindow):
             self.result_area.setText('Aucune donnée disponible pour cette sélection.')
             return
 
-        # Calcul des émissions basées sur la valeur
         total_emission_factor = filtered_data['total'].values[0]
         emissions = total_value * total_emission_factor
-        
-        # Construction du texte pour l'historique
-        # item_text = f'{category} - {subcategory} - {subsub_name} - {total_value} {self.current_unit} : {emissions:.4f} kg CO₂e'
-        item_text = f'{category} - {subcategory[:12]} - {code_nacres} - {category_nacres} - Dépense: {total_value} {self.current_unit} : {emissions:.4f} kg CO₂e'
 
-        # Gestion de la partie "masse" avec NACRES
+        # Gestion des émissions massiques avec NACRES si applicable
+        emission_massique, total_mass = None, None
         if has_nacres_match:
             emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres)
+
+        # Construction de l'historique
+        item_text = f'{category} - {subcategory[:12]} - {code_nacres} - {category_nacres} - Dépense: {total_value} {self.current_unit} : {emissions:.4f} kg CO₂e'
+        if has_nacres_match:
             if emission_massique is not None:
-                # Afficher l'émission massique à côté de l'émission basée sur la valeur
-                item_text += f" - Consommable: {consommable} - Masse {total_mass} kg : {emission_massique:.4f} kg eCO₂ "
+                item_text += f" - Consommable: {consommable} - Masse {total_mass:.4f} kg : {emission_massique:.4f} kg eCO₂"
             else:
-                # Si pas de calcul massique possible, on n'ajoute rien de plus
                 item_text += f" - Consommable: {consommable}"
         else:
-            total_mass = 'NA'
-            emission_massique = 'NA'
             item_text += " - Pas de précisions."
 
-        # Ajout dans l'historique
-        item = QListWidgetItem(item_text)
-        item.setData(Qt.UserRole, {
-            'category': category,
-            'subcategory': subcategory,
-            'code_nacres': code_nacres,
-            'category_nacres': category_nacres,
-            'consommable': consommable,
-            'value': total_value,
-            'total_mass' : total_mass,
-            'unit': self.current_unit,
-            'emissions_price': emissions,
-            'emission_mass' : emission_massique
-        })
-
-        # Vérifie que l'élément n'existe pas déjà dans l'historique (optionnel)
-        existing_items = [self.history_list.item(i).text() for i in range(self.history_list.count())]
-        if item_text not in existing_items:
+        # Ajout à l'historique
+        if not any(item_text == self.history_list.item(i).text() for i in range(self.history_list.count())):
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, {
+                'category': category,
+                'subcategory': subcategory,
+                'code_nacres': code_nacres,
+                'category_nacres': category_nacres,
+                'consommable': consommable,
+                'value': total_value,
+                'total_mass': total_mass if total_mass is not None else 'NA',
+                'unit': self.current_unit,
+                'emissions_price': emissions,
+                'emission_mass': emission_massique if emission_massique is not None else 'NA',
+            })
             self.history_list.addItem(item)
 
-        # Mise à jour des totaux et réinitialisation des champs
+        # Mise à jour de l'interface
         self.update_total_emissions()
         self.input_field.clear()
         self.data_changed.emit()
    
-    # def update_total_emissions(self):
-    #     total_emissions = 0.0
-    #     for i in range(self.history_list.count()):
-    #         item = self.history_list.item(i)
-    #         data = item.data(Qt.UserRole)
-    #         if data:
-    #             emissions = data.get('emissions', 0)
-    #             total_emissions += emissions
-    #     self.total_emissions = total_emissions
-    #     self.result_area.setText(f'Total des émissions : {total_emissions:.4f} kg CO₂e')
-
     def update_total_emissions(self):
         total_emissions = 0.0        # Total des émissions basées sur le prix
         total_mass_emissions_conso = 0.0   # Total des émissions massiques
         total_price_emissions_conso = 0.0   # Total des émissions massiques
-
 
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
@@ -858,133 +833,422 @@ class MainWindow(QMainWindow):
             self.update_total_emissions()
             self.data_changed.emit()
 
+    # def modify_selected_calculation(self):
+    #     selected_item = self.history_list.currentItem()
+    #     if selected_item:
+    #         self.modify_calculation(selected_item)
+    #     else:
+    #         QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
     def modify_selected_calculation(self):
+        """
+        Modifie un calcul sélectionné dans l'historique.
+        Ouvre une fenêtre de dialogue pour modifier les valeurs et met à jour les émissions.
+        """
         selected_item = self.history_list.currentItem()
-        if selected_item:
-            self.modify_calculation(selected_item)
-        else:
+        if not selected_item:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
-
-    def modify_calculation(self, item):
-        # Récupération des données stockées dans l'élément
-        data = item.data(Qt.UserRole)
-        if not data:
-            QMessageBox.warning(self, 'Erreur', 'Aucune donnée à modifier pour cet élément.')
             return
 
-        # Création d'un QDialog pour modifier les données
+        # Récupération des données existantes de l'élément sélectionné
+        data = selected_item.data(Qt.UserRole)
+        if not data:
+            QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
+            return
+
+        # Création de la fenêtre de modification
         dialog = QDialog(self)
         dialog.setWindowTitle("Modifier le calcul")
 
         layout = QVBoxLayout(dialog)
 
-        # On récupère les informations existantes
-        category = data.get('category', '')
-        subcategory = data.get('subcategory', '')
-        code_nacres = data.get('code_nacres', 'NA')
-        category_nacres = data.get('category_nacres', '')
-        consommable = data.get('consommable', 'NA')
-        value = data.get('value', 0)
-        unit = data.get('unit', '')
-        emissions_price = data.get('emissions_price', data.get('emissions', 0))
-        emission_mass = data.get('emission_mass', 'NA')
-        total_mass = data.get('total_mass', 'NA')
-
+        # Champs modifiables
         form_layout = QFormLayout()
 
-        # Champs d'édition (modifiables)
-        category_edit = QLineEdit(category)
-        subcategory_edit = QLineEdit(subcategory)
-        code_nacres_edit = QLineEdit(code_nacres)
-        category_nacres_edit = QLineEdit(category_nacres)
-        consommable_edit = QLineEdit(consommable)
-        value_edit = QLineEdit(str(value))
-        unit_edit = QLineEdit(unit)
+        # Liste déroulante pour la catégorie
+        category_edit = QComboBox()
+        categories = self.data['category'].dropna().unique().tolist()
+        categories.append('Machine')
+        category_edit.addItems(sorted(categories))
+        category_edit.setCurrentText(data.get('category', ''))
 
-        # Champs affichés mais non modifiables
-        emissions_price_edit = QLineEdit(str(emissions_price))
-        emission_mass_edit = QLineEdit(str(emission_mass))
-        total_mass_edit = QLineEdit(str(total_mass))
+        # Liste déroulante pour la sous-catégorie
+        subcategory_edit = QComboBox()
+        self.update_subcategory_combo(category_edit.currentText(), subcategory_edit)
+        subcategory_edit.setCurrentText(data.get('subcategory', ''))
 
-        emissions_price_edit.setReadOnly(True)
-        emission_mass_edit.setReadOnly(True)
-        total_mass_edit.setReadOnly(True)
+        # Liste déroulante pour la sous-sous-catégorie
+        subsub_name_edit = QComboBox()
+        self.update_subsubcategory_combo_for_dialog(
+            subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()
+        )
+        subsub_name_edit.setCurrentText(f"{data.get('category_nacres', '')} - {data.get('consommable', '')}")
 
+        # Champ de saisie pour la valeur
+        value_edit = QLineEdit(str(data.get('value', 0)))
+
+        # Unité
+        unit_edit = QLineEdit(data.get('unit', ''))
+
+        # Ajout des champs au formulaire
         form_layout.addRow("Catégorie:", category_edit)
         form_layout.addRow("Sous-catégorie:", subcategory_edit)
-        form_layout.addRow("Code NACRES:", code_nacres_edit)
-        form_layout.addRow("Sous-sous-catégorie/Nom:", category_nacres_edit)
-        form_layout.addRow("Consommable:", consommable_edit)
+        form_layout.addRow("Sous-sous-catégorie:", subsub_name_edit)
         form_layout.addRow("Valeur:", value_edit)
         form_layout.addRow("Unité:", unit_edit)
 
-        # Champs calculés, non modifiables
-        form_layout.addRow("Émissions (prix) kg CO₂e:", emissions_price_edit)
-        form_layout.addRow("Émissions (masse) kg CO₂e:", emission_mass_edit)
-        form_layout.addRow("Masse totale (kg):", total_mass_edit)
-
         layout.addLayout(form_layout)
 
-        # Boutons OK / Annuler
+        # Boutons OK/Annuler
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         layout.addWidget(button_box)
 
         button_box.accepted.connect(dialog.accept)
         button_box.rejected.connect(dialog.reject)
 
-        # Afficher le dialogue et traiter le résultat
+        # Connexions pour mettre à jour dynamiquement les sous-catégories et sous-sous-catégories
+        category_edit.currentIndexChanged.connect(
+            lambda: self.update_subcategory_combo(category_edit.currentText(), subcategory_edit)
+        )
+        subcategory_edit.currentIndexChanged.connect(
+            lambda: self.update_subsubcategory_combo_for_dialog(
+                subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()
+            )
+        )
+
+        # Affichage du dialogue et traitement des résultats
         if dialog.exec() == QDialog.Accepted:
-            # Récupérer les nouvelles valeurs
-            new_category = category_edit.text()
-            new_subcategory = subcategory_edit.text()
-            new_code_nacres = code_nacres_edit.text()
-            new_category_nacres = category_nacres_edit.text()
-            new_consommable = consommable_edit.text()
-
-            # Validation et conversion
-            try:
-                new_value = float(value_edit.text())
-            except ValueError:
-                QMessageBox.warning(self, "Erreur", "La valeur doit être un nombre.")
-                return
-
+            # Récupération des nouvelles valeurs
+            new_category = category_edit.currentText()
+            new_subcategory = subcategory_edit.currentText()
+            new_subsub_name = subsub_name_edit.currentText()
+            new_value = float(value_edit.text()) if value_edit.text().strip() else 0
             new_unit = unit_edit.text()
 
-            # On ne modifie pas emissions_price, emission_mass, total_mass car ce sont des données calculées.
-            # On conserve les anciennes valeurs.
-            new_emissions_price = emissions_price
-            new_emission_mass = emission_mass
-            new_total_mass = total_mass
-
-            # Mettre à jour les données de l'élément
+            # Mise à jour des données de l'élément
+            subsubcategory, name = self.split_subsub_name(new_subsub_name)
             new_data = {
                 'category': new_category,
                 'subcategory': new_subcategory,
-                'code_nacres': new_code_nacres,
-                'category_nacres': new_category_nacres,
-                'consommable': new_consommable,
+                'subsubcategory': subsubcategory,
+                'name': name,
                 'value': new_value,
-                'unit': new_unit,
-                'emissions_price': new_emissions_price,
-                'emission_mass': new_emission_mass,
-                'total_mass': new_total_mass
+                'unit': new_unit
             }
 
-            # Mettre à jour l'élément dans la liste
-            # Reconstruire le texte affiché dans l'historique
-            item_text = f'{new_category} - {new_subcategory[:12]} - {new_code_nacres} - {new_category_nacres} - Dépense: {new_value} {new_unit} : {new_emissions_price:.4f} kg CO₂e'
+            # Recalcul des émissions
+            emissions, emission_massique, total_mass = self.recalculate_emissions(new_data)
+            if emissions is None:
+                return  # Si le recalcul échoue, arrêtez ici
 
-            if new_consommable != 'NA':
-                item_text += f" - Consommable: {new_consommable}"
-            if new_emission_mass != 'NA' and new_total_mass != 'NA':
-                item_text += f" - Masse {new_total_mass} kg : {new_emission_mass:.4f} kg eCO₂"
+            new_data.update({
+                'emissions_price': emissions,
+                'emission_mass': emission_massique if emission_massique else 'NA',
+                'total_mass': total_mass if total_mass else 'NA'
+            })
 
-            item.setText(item_text)
-            item.setData(Qt.UserRole, new_data)
+            # Mettre à jour l'élément dans l'historique
+            # item_text = f'{category} - {subcategory[:12]} - {code_nacres} - {category_nacres} - Dépense: {total_value} {self.current_unit} : {emissions:.4f} kg CO₂e'
 
-            # Mettre à jour le total des émissions après la modification
+            item_text = f'{new_category} - {new_subcategory[:12]} - {subsubcategory} - {new_value} {new_unit} : {emissions:.4f} kg CO₂e'
+            if emission_massique is not None and total_mass is not None:
+                item_text += f" - Masse {total_mass:.4f} kg : {emission_massique:.4f} kg eCO₂"
+            selected_item.setText(item_text)
+            selected_item.setData(Qt.UserRole, new_data)
+
+            # Mettre à jour les totaux
             self.update_total_emissions()
             self.data_changed.emit()
+
+    def update_subcategory_combo(self, category, subcategory_combo):
+        """
+        Met à jour les sous-catégories disponibles pour la catégorie donnée.
+        """
+        subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
+        subcategory_combo.clear()
+        subcategory_combo.addItems(sorted(subcategories.astype(str)))
+
+    def update_subsubcategory_combo_for_dialog(self, subsub_name_combo, category, subcategory):
+        """
+        Met à jour les sous-sous-catégories disponibles pour la catégorie et la sous-catégorie données.
+        """
+        if not category or not subcategory:
+            subsub_name_combo.clear()
+            return
+
+        mask = (self.data['category'] == category) & (self.data['subcategory'] == subcategory)
+        filtered_data = self.data[mask]
+        subsub_names = (
+            (filtered_data['subsubcategory'].fillna('') + ' - ' + filtered_data['name'].fillna(''))
+            .str.strip(' - ')
+            .unique()
+        )
+
+        subsub_name_combo.clear()
+        subsub_name_combo.addItems(sorted(subsub_names))
+
+    def recalculate_emissions(self, data):
+        """
+        Recalcule les émissions carbone en fonction des données fournies.
+        
+        Parameters:
+            data (dict): Dictionnaire contenant les informations nécessaires pour le calcul, 
+                        telles que la catégorie, la sous-catégorie, la valeur, l'année, etc.
+
+        Returns:
+            tuple: (emissions, emission_massique, total_mass)
+                - emissions: Émissions basées sur la valeur monétaire ou l'utilisation (float)
+                - emission_massique: Émissions basées sur la masse (float ou None si non applicable)
+                - total_mass: Masse totale en kg (float ou None si non applicable)
+        """
+        print("Recalcul des émissions avec les données :", data)
+
+        # Extraction des données depuis le dictionnaire
+        category = data.get('category', '')
+        subcategory = data.get('subcategory', '')
+        subsub_name = data.get('subsubcategory', '')
+        year = data.get('year', '')
+        value = data.get('value', 0)
+        unit = data.get('unit', '')
+
+        # Filtrage des données principales pour le calcul des émissions basées sur la valeur
+        print(f"Debug: Vérification des données utilisées dans le masque :")
+        print(f"Category: {category}")
+        print(f"Subcategory: {subcategory}")
+        print(f"Subsubcategory: {subsub_name}")
+        print(f"Year: {year}")
+
+        mask = (
+            (self.data['category'] == category) &
+            (self.data['subcategory'] == subcategory) &
+            (self.data['subsubcategory'].fillna('') == subsub_name) &
+            (self.data['unit'].astype(str) == unit)
+        )
+
+        filtered_data = self.data[mask]
+
+        if filtered_data.empty:
+            QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
+            return None, None, None
+
+        # Extraction du facteur d'émission
+        total_emission_factor = filtered_data['total'].values[0]
+        emissions = value * total_emission_factor
+
+        # Calcul des émissions massiques si applicable
+        code_nacres = data.get('code_nacres', 'NA')
+        if category == 'Achats' and code_nacres != 'NA':
+            emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres)
+        else:
+            emission_massique, total_mass = None, None
+
+        print(f"Émissions recalculées: {emissions} kg CO₂e, "
+            f"Émissions massiques: {emission_massique}, "
+            f"Masse totale: {total_mass}")
+
+        return emissions, emission_massique, total_mass
+
+    # def recalculate_emissions(self, data):
+    #     """
+    #     Recalcule les émissions basées sur les données fournies.
+    #     Retourne les émissions recalculées et éventuellement d'autres informations pertinentes.
+    #     """
+    #     print("Recalcul des émissions avec les données :", data)
+    #     category = data.get('category', '')
+    #     subcategory = data.get('subcategory', '')
+    #     subsub_name = f"{data.get('category_nacres', '')} - {data.get('consommable', '')}"
+    #     year = self.year_combo.currentText()
+    #     unit = data.get('unit', '')
+    #     value = data.get('value', 0)
+
+    #     # Filtrage des données pour le calcul principal
+    #     mask = (
+    #         (self.data['category'] == category) &
+    #         (self.data['subcategory'] == subcategory) &
+    #         (self.data['subsubcategory'].fillna('') == data.get('category_nacres', '')) &
+    #         (self.data['name'].fillna('') == data.get('consommable', '')) &
+    #         (self.data['year'].astype(str) == year)
+    #     )
+    #     filtered_data = self.data[mask]
+    #     if filtered_data.empty:
+    #         QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
+    #         return None, None
+
+    #     # Calcul des émissions basées sur la valeur
+    #     total_emission_factor = filtered_data['total'].values[0]
+    #     emissions = value * total_emission_factor
+
+    #     # Gestion des émissions massiques si applicable
+    #     emission_massique, total_mass = None, None
+    #     if category == 'Achats' and data.get('code_nacres', 'NA') != 'NA':
+    #         emission_massique, total_mass = self.calculate_mass_based_emissions(data.get('code_nacres', 'NA'))
+
+    #     return emissions, emission_massique, total_mass
+
+    # def modify_calculation(self, item):
+    #     # Récupération des données stockées dans l'élément
+    #     data = item.data(Qt.UserRole)
+    #     if not data:
+    #         QMessageBox.warning(self, 'Erreur', 'Aucune donnée à modifier pour cet élément.')
+    #         return
+
+    #     # Création d'un QDialog pour modifier les données
+    #     dialog = QDialog(self)
+    #     dialog.setWindowTitle("Modifier le calcul")
+
+    #     layout = QVBoxLayout(dialog)
+
+    #     # On récupère les informations existantes
+    #     category = data.get('category', '')
+    #     subcategory = data.get('subcategory', '')
+    #     code_nacres = data.get('code_nacres', 'NA')
+    #     category_nacres = data.get('category_nacres', '')
+    #     consommable = data.get('consommable', 'NA')
+    #     value = data.get('value', 0)
+    #     unit = data.get('unit', '')
+    #     emissions_price = data.get('emissions_price', data.get('emissions', 0))
+    #     emission_mass = data.get('emission_mass', 'NA')
+    #     total_mass = data.get('total_mass', 'NA')
+
+    #     form_layout = QFormLayout()
+
+    #     # Champs d'édition (modifiables)
+    #     category_edit = QComboBox()
+    #     categories = self.data['category'].dropna().unique().tolist()
+    #     categories = [cat for cat in categories if cat != 'Électricité']
+    #     categories.append('Machine')
+    #     category_edit.addItems(sorted(categories))
+    #     category_edit.setCurrentText(category)
+
+    #     subcategory_edit = QComboBox()
+    #     subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique().tolist()
+    #     subcategory_edit.addItems(sorted(subcategories))
+    #     subcategory_edit.setCurrentText(subcategory)
+
+    #     subsub_name_edit = QComboBox()
+    #     # Remplir subsub_name_edit en fonction de category et subcategory
+    #     self.update_subsubcategory_combo_for_dialog(subsub_name_edit, category, subcategory)
+    #     subsub_name_edit.setCurrentText(f"{category_nacres} - {consommable}")
+
+    #     value_edit = QLineEdit(str(value))
+    #     unit_edit = QLineEdit(unit)
+
+    #     form_layout.addRow("Catégorie:", category_edit)
+    #     form_layout.addRow("Sous-catégorie:", subcategory_edit)
+    #     form_layout.addRow("Sous-sous-catégorie/Nom:", subsub_name_edit)
+    #     form_layout.addRow("Valeur:", value_edit)
+    #     form_layout.addRow("Unité:", unit_edit)
+
+    #     # Champs calculés, non modifiables
+    #     emissions_price_edit = QLineEdit(str(emissions_price))
+    #     emission_mass_edit = QLineEdit(str(emission_mass))
+    #     total_mass_edit = QLineEdit(str(total_mass))
+
+    #     emissions_price_edit.setReadOnly(True)
+    #     emission_mass_edit.setReadOnly(True)
+    #     total_mass_edit.setReadOnly(True)
+
+    #     form_layout.addRow("Émissions (prix) kg CO₂e:", emissions_price_edit)
+    #     form_layout.addRow("Émissions (masse) kg CO₂e:", emission_mass_edit)
+    #     form_layout.addRow("Masse totale (kg):", total_mass_edit)
+
+    #     layout.addLayout(form_layout)
+
+    #     # Boutons OK / Annuler
+    #     button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    #     layout.addWidget(button_box)
+
+    #     button_box.accepted.connect(dialog.accept)
+    #     button_box.rejected.connect(dialog.reject)
+
+    #     # Connexions pour mettre à jour les sous-catégories et sous-sous-catégories dynamiquement
+    #     category_edit.currentIndexChanged.connect(lambda: self.update_subsubcategory_combo_for_dialog(subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()))
+    #     subcategory_edit.currentIndexChanged.connect(lambda: self.update_subsubcategory_combo_for_dialog(subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()))
+
+    #     # Afficher le dialogue et traiter le résultat
+    #     if dialog.exec() == QDialog.Accepted:
+    #         # Récupérer les nouvelles valeurs
+    #         new_category = category_edit.currentText()
+    #         new_subcategory = subcategory_edit.currentText()
+    #         subsub_name = subsub_name_edit.currentText()
+    #         new_category_nacres, new_consommable = self.split_subsub_name(subsub_name)
+
+    #     # Récupérer le code NACRES à partir des données massiques
+    #     matching = self.data_masse[self.data_masse["Nom de l'objet"] == new_consommable]
+    #     if not matching.empty:
+    #         code_nacres = matching.iloc[0]['Code NACRES']
+    #     else:
+    #         code_nacres = 'NA'
+
+    #         try:
+    #             new_value = float(value_edit.text())
+    #         except ValueError:
+    #             QMessageBox.warning(self, "Erreur", "La valeur doit être un nombre.")
+    #             return
+    #         new_unit = unit_edit.text()
+
+    #         # Mettre à jour les données de l'élément
+    #         new_data = {
+    #             'category': new_category,
+    #             'subcategory': new_subcategory,
+    #             'code_nacres': code_nacres,  # Si le code_nacres doit être modifié, il faut l'ajouter ici
+    #             'category_nacres': new_category_nacres,
+    #             'consommable': new_consommable,
+    #             'value': new_value,
+    #             'unit': new_unit,
+    #             # 'emissions_price': emissions_price,  # À recalculer
+    #             # 'emission_mass': emission_mass,      # À recalculer
+    #             # 'total_mass': total_mass             # À recalculer
+    #         }
+
+    #         # Recalcul des émissions avec la nouvelle valeur
+    #         emissions, emission_massique, total_mass = self.recalculate_emissions(new_data)
+    #         if emissions is None:
+    #             return  # Si le recalcul a échoué
+
+    #         new_data.update({
+    #             'emissions_price': emissions,
+    #             'emission_mass': emission_massique or 0.0,
+    #             'total_mass': total_mass or 0.0
+    #         })
+    #         item.setData(Qt.UserRole, new_data)
+
+    #         # Reconstruire le texte affiché dans l'historique
+    #         item_text = f'{new_category} - {new_subcategory[:12]} - {code_nacres} - {new_category_nacres} - Dépense: {new_value} {new_unit} : {emissions:.4f} kg CO₂e'
+
+    #         if new_consommable != 'NA':
+    #             item_text += f" - Consommable: {new_consommable}"
+    #         # if emission_massique != 'NA' and total_mass != 'NA':
+    #         #     item_text += f" - Masse {total_mass} kg : {emission_massique:.4f} kg eCO₂"
+    #         if emission_massique is None or total_mass is None:
+    #             item_text += f" - Masse : N/A"
+    #         else:
+    #             item_text += f" - Masse {total_mass:.4f} kg : {emission_massique:.4f} kg eCO₂"
+    #         # Mettre à jour l'élément dans la liste
+    #         item.setText(item_text)
+    #         item.setData(Qt.UserRole, new_data)
+
+    #         # Mettre à jour le total des émissions après la modification
+    #         self.update_total_emissions()
+    #         self.data_changed.emit()
+
+    # # Extraction des données pour le champ subsub_name_edit
+    # def update_subsubcategory_combo_for_dialog(self, combo, category, subcategory):
+    #     """
+    #     Met à jour le combo box des sous-sous-catégories dans le dialogue de modification.
+    #     """
+    #     if not category or not subcategory:
+    #         combo.clear()
+    #         return
+
+    #     # Filtrage strict basé sur la catégorie et la sous-catégorie
+    #     mask = (self.data['category'] == category) & (self.data['subcategory'] == subcategory)
+    #     filtered_data = self.data[mask]
+    #     subsub_names = (filtered_data['subsubcategory'].fillna('') + ' - ' + filtered_data['name'].fillna('')).str.strip(' - ')
+    #     subsub_names_unique = subsub_names.unique()
+
+    #     # Recharger uniquement les options valides
+    #     combo.clear()
+    #     combo.addItems(sorted(subsub_names_unique))
             
     def export_data(self):
         """
@@ -1237,47 +1501,54 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")
 
     def calculate_mass_based_emissions(self, code_nacres):
-        quantite_text = self.quantity_input.text().strip()
-        if not quantite_text.isdigit():
-            QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
+        """
+        Calcule les émissions massiques basées sur le code NACRES et la quantité saisie.
+        """
+        try:
+            # Lecture et validation de la quantité saisie
+            quantite_text = self.quantity_input.text().strip()
+            quantite = int(quantite_text)
+            if quantite <= 0:
+                raise ValueError("La quantité doit être positive.")
+            print(f"Debug: Quantité saisie = '{quantite}'")
+        except ValueError as e:
+            QMessageBox.warning(self, "Erreur", str(e))
             return None, None
 
-        quantite = int(quantite_text)
-        if quantite <= 0:
-            QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
-            return None, None
-
-        # Récupération du code_nacres et du nom de l'objet depuis selected_nacres
+        # Récupération du code NACRES et du nom de l'objet
         selected_nacres = self.nacres_filtered_combo.currentText()
         if " - " in selected_nacres:
             code_nacres, objet_nom = selected_nacres.split(" - ", 1)
         else:
-            code_nacres = selected_nacres
+            code_nacres = selected_nacres.strip()
             objet_nom = ""
 
-        # Filtrage plus précis
+        # Filtrage des données correspondant au code NACRES et à l'objet
         matching = self.data_masse[
-            (self.data_masse['Code NACRES'].str.strip() == code_nacres.strip()) &
-            (self.data_masse["Nom de l'objet"].str.strip() == objet_nom.strip())
+            (self.data_masse['Code NACRES'].str.strip() == code_nacres) &
+            (self.data_masse["Nom de l'objet"].str.strip() == objet_nom)
         ]
 
         if matching.empty:
             QMessageBox.warning(self, "Erreur", f"Aucun consommable trouvé pour le code NACRES: {code_nacres} et l'objet: {objet_nom}")
             return None, None
 
+        # Extraction des informations du consommable
         consommable_row = matching.iloc[0]
         masse_g = consommable_row["Masse unitaire (g)"]
         materiau = consommable_row["Matériau"]
 
-        # Conversion en kg
+        # Conversion de la masse en kg
         masse_kg_unitaire = masse_g / 1000.0
         masse_totale_kg = masse_kg_unitaire * quantite
 
+        # Filtrage des données de matériaux pour obtenir l'équivalent CO₂
         mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
         if mat_filter.empty:
-            QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans data_materials.")
+            QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans les données de matériaux.")
             return None, None
 
+        # Calcul de l'équivalent CO₂ total
         eCO2_par_kg = float(mat_filter.iloc[0]["Equivalent CO₂ (kg eCO₂/kg)"])
         eCO2_total = masse_totale_kg * eCO2_par_kg
 
