@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
     QInputDialog, QFormLayout, QFileDialog, QDialog, QDialogButtonBox,
-    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem
+    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
@@ -19,7 +19,6 @@ from windows.pie_chart import PieChartWindow
 from windows.bar_chart import BarChartWindow
 from windows.proportional_bar_chart import ProportionalBarChartWindow
 from windows.data_mass_window import DataMassWindow  # Import de DataMassWindow
-from windows.edit_calculation_dialog import EditCalculationDialog  # NOUVEAU IMPORT
 
 
 class MainWindow(QMainWindow):
@@ -654,7 +653,7 @@ class MainWindow(QMainWindow):
 
                 if not filtered_entries.empty:
                     for idx, row in filtered_entries.iterrows():
-                        nom_objet_val = row["Consommable"]
+                        nom_objet_val = row["Nom de l'objet"]
                         display_text = f"{row['Code NACRES']} - {nom_objet_val}"
                         self.nacres_filtered_combo.addItem(display_text)
 
@@ -845,30 +844,93 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
             return
 
-        # Ouvrir la fenêtre EditCalculationDialog avec les données actuelles
-        dialog = EditCalculationDialog(
-            parent=self,
-            data=data,
-            main_data=self.data, 
-            data_masse=self.data_masse,
-            data_materials=self.data_materials
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Modifier le calcul")
+
+        layout = QVBoxLayout(dialog)
+        form_layout = QFormLayout()
+
+        # Catégorie
+        category_edit = QComboBox()
+        categories = self.data['category'].dropna().unique().tolist()
+        categories.append('Machine')
+        category_edit.addItems(sorted(categories))
+        category_edit.setCurrentText(data.get('category', ''))
+
+        # Sous-catégorie
+        subcategory_edit = QComboBox()
+        self.update_subcategory_combo(category_edit.currentText(), subcategory_edit)
+        subcategory_edit.setCurrentText(data.get('subcategory', ''))
+
+        # Sous-sous-catégorie
+        subsub_name_edit = QComboBox()
+        self.update_subsubcategory_combo_for_dialog(
+            subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()
         )
+        subsub_name_edit.setCurrentText(f"{data.get('subsubcategory', '')} - {data.get('name', '')}")
+
+        # Valeur
+        value_edit = QLineEdit(str(data.get('value', 0)))
+
+        # Unité
+        unit_edit = QLineEdit(data.get('unit', ''))
+
+        # Ajout des champs
+        form_layout.addRow("Catégorie:", category_edit)
+        form_layout.addRow("Sous-catégorie:", subcategory_edit)
+        form_layout.addRow("Sous-sous-catégorie:", subsub_name_edit)
+        form_layout.addRow("Valeur:", value_edit)
+        form_layout.addRow("Unité:", unit_edit)
+        layout.addLayout(form_layout)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addWidget(button_box)
+
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+
+        category_edit.currentIndexChanged.connect(
+            lambda: self.update_subcategory_combo(category_edit.currentText(), subcategory_edit)
+        )
+        subcategory_edit.currentIndexChanged.connect(
+            lambda: self.update_subsubcategory_combo_for_dialog(
+                subsub_name_edit, category_edit.currentText(), subcategory_edit.currentText()
+            )
+        )
+
         if dialog.exec() == QDialog.Accepted:
-            modified_data = dialog.modified_data
-            # Supprimer l'ancien calcul
-            self.history_list.takeItem(self.history_list.row(selected_item))
-            # Recalcul des émissions avec modified_data
-            emissions, emission_massique, total_mass = self.recalculate_emissions(modified_data)
-            modified_data.update({
+            new_category = category_edit.currentText()
+            new_subcategory = subcategory_edit.currentText()
+            new_subsub_name = subsub_name_edit.currentText()
+            new_value = float(value_edit.text()) if value_edit.text().strip() else 0
+            new_unit = unit_edit.text()
+
+            subsubcategory, name = self.split_subsub_name(new_subsub_name)
+            updated_data = {
+                'category': new_category,
+                'subcategory': new_subcategory,
+                'subsubcategory': subsubcategory,
+                'name': name,
+                'value': new_value,
+                'unit': new_unit,
+            }
+
+            # Recalcul des émissions
+            emissions, emission_massique, total_mass = self.recalculate_emissions(updated_data)
+            if emissions is None:
+                return
+
+            updated_data.update({
                 'emissions_price': emissions,
                 'emission_mass': emission_massique,
                 'total_mass': total_mass,
             })
-            # Ajouter le nouvel élément mis à jour
-            self.create_or_update_history_item(modified_data)
+
+            # Mettre à jour l'élément existant
+            self.create_or_update_history_item(updated_data, selected_item)
+
             self.update_total_emissions()
             self.data_changed.emit()
-
 
     def update_subcategory_combo(self, category, subcategory_combo):
         """
@@ -1270,7 +1332,7 @@ class MainWindow(QMainWindow):
         # Filtrage des données correspondant au code NACRES et à l'objet
         matching = self.data_masse[
             (self.data_masse['Code NACRES'].str.strip() == code_nacres) &
-            (self.data_masse["Consommable"].str.strip() == objet_nom)
+            (self.data_masse["Nom de l'objet"].str.strip() == objet_nom)
         ]
 
         if matching.empty:

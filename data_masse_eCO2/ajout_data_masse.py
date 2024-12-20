@@ -15,7 +15,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 600, 400)
 
         # Initialisation des données
-        self.columns = ["Nom de l'objet",
+        self.columns = ["Consommable",
                         "Référence",
                         "Code Nacre",
                         "Masse unitaire (g)",
@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
                         "Source/Signature"]
         self.data = pd.DataFrame(columns=self.columns)
         self.data = pd.concat([self.data, pd.DataFrame([{
-            "Nom de l'objet": "Tube Falcon 15ml",
+            "Consommable": "Tube Falcon 15ml",
             "Référence": "N/A",
             "Code Nacre": "NA634",
             "Masse unitaire (g)": 6.7,
@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         self.materiau_combo.addItems(self.materials)
         self.source_input = QLineEdit()
 
-        form_layout.addRow("Nom de l'objet:", self.nom_input)
+        form_layout.addRow("Consommable:", self.nom_input)
         form_layout.addRow("Référence:", self.ref_input)
         form_layout.addRow("Code Nacre:", self.nacre_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
             return
 
         nouvel_objet = {
-            "Nom de l'objet": nom,
+            "Consommable": nom,
             "Référence": reference,
             "Code Nacre": nacre,
             "Masse unitaire (g)": masse,
