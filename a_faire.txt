@@ -1,15 +1,6 @@
-----------------------------------
-------- Les choses à faire -------
-----------------------------------
-1. Sur Machine, si je mets plus que 24h par jour, il me mets un warning mais fait un calcul quand même : à réparer. 
-2. Il faut ajouter le calcul massique : dans calcul emission. Il y'a aussi déjà une fonction calculer calculer_eCO2_via_masse qui a été écrite mais dont on ne se sert pas. Peut être peut elle servir. 
-3- ajouté le code NACRES dans l'history pour se retrouver. 
-l-656 de mainwindow essayé de comprendre update_total_emissions
-4- Changer en Emisions selon facture (kg CO2e)
-5- ajouter Code NACRES aux enregistrement si présent sinon NA
-6- mettre le nom du consommable exacte
-5- Ajouter Emission selon masse sinon NA
-6- L'idéal serait que pour les machines le nom soit transféré de "sous-catégorie" à Nom
-7- Attention machine dit que valeur pas bonne quand tu rentres?
-8- Attention si je supprimes une ligne céhicule, ça supprime tous les véhicule...
-9- dans infra de recherche si je mets une virgule et pas un point  ça marche pas. 
+------------------------------------------------
+-------------- Les choses à faire --------------
+------------------------------------------------
+1. Faire en sorte que lorsqu'on fait une modification, tous les éléments restent.
+2. Modification de machine ne marche pas
+3. Ajouter les calcules et les diagrammes pour les consommables pour le massique.

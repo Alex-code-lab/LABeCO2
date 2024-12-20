@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel, QComboBox, QLineEdit, 
-    QPushButton, QMessageBox
+    QPushButton, QMessageBox, QWidget
 )
 from PySide6.QtCore import Qt
 
@@ -41,11 +41,11 @@ class EditCalculationDialog(QDialog):
     def initUI(self):
         """
         Initialise l'interface utilisateur de la fenêtre d'édition.
-        Cet UI reprend la structure logique du main_window : champs pour catégorie, sous-catégorie, etc.
+        Ajout de champs spécifiques pour les machines.
         """
         layout = QVBoxLayout(self)
 
-        # Champs similaires à main_window
+        # Champs pour catégories classiques
         self.category_label = QLabel('Catégorie:')
         self.category_combo = QComboBox()
 
@@ -87,6 +87,48 @@ class EditCalculationDialog(QDialog):
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
 
+        # Champs spécifiques aux machines
+        self.machine_name_label = QLabel('Nom de la machine:')
+        self.machine_name_field = QLineEdit()
+        self.power_label = QLabel('Puissance de la machine (kW):')
+        self.power_field = QLineEdit()
+        self.usage_time_label = QLabel("Temps d'utilisation par jour (heures):")
+        self.usage_time_field = QLineEdit()
+        self.days_machine_label = QLabel("Nombre de jours d'utilisation:")
+        self.days_machine_field = QLineEdit()
+        self.electricity_label = QLabel("Type d'électricité:")
+        self.electricity_combo = QComboBox()
+
+        electricity_types = self.main_data[self.main_data['category'] == 'Électricité']['name'].dropna().unique()
+        self.electricity_combo.addItems(sorted(electricity_types))
+
+        # Layout pour les catégories normales
+        self.normal_form_layout = QFormLayout()
+        self.normal_form_layout.addRow(self.category_label, self.category_combo)
+        self.normal_form_layout.addRow(self.subcategory_label, self.subcategory_combo)
+        self.normal_form_layout.addRow(self.search_label, self.search_field)
+        self.normal_form_layout.addRow(self.subsub_name_label, self.subsub_name_combo)
+        self.normal_form_layout.addRow(self.year_label, self.year_combo)
+        self.normal_form_layout.addRow(self.input_label, self.input_field)
+        self.normal_form_layout.addRow(self.days_label, self.days_field)
+        self.normal_form_layout.addRow(self.nacres_filtered_label, self.nacres_filtered_combo)
+        self.normal_form_layout.addRow(self.quantity_label, self.quantity_input)
+
+        # Layout pour les machines
+        self.machine_form_layout = QFormLayout()
+        self.machine_form_layout.addRow(self.machine_name_label, self.machine_name_field)
+        self.machine_form_layout.addRow(self.power_label, self.power_field)
+        self.machine_form_layout.addRow(self.usage_time_label, self.usage_time_field)
+        self.machine_form_layout.addRow(self.days_machine_label, self.days_machine_field)
+        self.machine_form_layout.addRow(self.electricity_label, self.electricity_combo)
+
+        # Un widget pour chaque type d'affichage
+        self.normal_widget = QWidget()
+        self.normal_widget.setLayout(self.normal_form_layout)
+
+        self.machine_widget = QWidget()
+        self.machine_widget.setLayout(self.machine_form_layout)
+
         # Boutons
         buttons_layout = QHBoxLayout()
         self.validate_button = QPushButton("Valider")
@@ -94,19 +136,9 @@ class EditCalculationDialog(QDialog):
         buttons_layout.addWidget(self.validate_button)
         buttons_layout.addWidget(self.cancel_button)
 
-        # Layout principal
-        form_layout = QFormLayout()
-        form_layout.addRow(self.category_label, self.category_combo)
-        form_layout.addRow(self.subcategory_label, self.subcategory_combo)
-        form_layout.addRow(self.search_label, self.search_field)
-        form_layout.addRow(self.subsub_name_label, self.subsub_name_combo)
-        form_layout.addRow(self.year_label, self.year_combo)
-        form_layout.addRow(self.input_label, self.input_field)
-        form_layout.addRow(self.days_label, self.days_field)
-        form_layout.addRow(self.nacres_filtered_label, self.nacres_filtered_combo)
-        form_layout.addRow(self.quantity_label, self.quantity_input)
-
-        layout.addLayout(form_layout)
+        # Ajout au layout principal
+        layout.addWidget(self.normal_widget)
+        layout.addWidget(self.machine_widget)
         layout.addLayout(buttons_layout)
 
         # Connexions signaux/slots
@@ -124,135 +156,170 @@ class EditCalculationDialog(QDialog):
     def populate_fields(self, data):
         """
         Pré-remplit les champs avec les données du calcul existant.
-        data contient par exemple :
-        {
-          'category': 'Achats',
-          'subcategory': 'Consommables',
-          'subsubcategory': 'N123', 
-          'name': 'ObjetX',
-          'code_nacres': 'N123',
-          'consommable': 'Nom consommable',
-          'value': 100,
-          'unit': 'km',
-          'days': 5,
-          'year': '2021',
-          'emissions_price': ...,
-          'emission_mass': ...,
-          'total_mass': ...
-        }
         """
-
-        # Définir la catégorie
-        self.category_combo.setCurrentText(data.get('category', ''))
+        category = data.get('category', '')
+        self.category_combo.setCurrentText(category)
         self.update_subcategories()
 
-        # Définir la sous-catégorie
-        self.subcategory_combo.setCurrentText(data.get('subcategory', ''))
-        self.update_subsubcategory_names()
+        if category == 'Machine':
+            # Afficher le widget machine, cacher le widget normal
+            self.normal_widget.setVisible(False)
+            self.machine_widget.setVisible(True)
 
-        # Reconstruire subsub_name si besoin
-        subsubcategory = data.get('subsubcategory', '')
-        name = data.get('name', '')
-        if subsubcategory and name:
-            subsub_name = f"{subsubcategory} - {name}"
+            # Pré-remplir les champs machine
+            # On suppose que lors de la création de la machine, on a stocké :
+            # 'subcategory' = nom de la machine
+            # 'value' = total_usage (kWh)
+            # 'electricity_type' = type d'électricité
+            # Pour re-calculer la puissance, usage_time et days_machine,
+            # Il faut les avoir stockés également. Si ce n'est pas le cas,
+            # il faut les stocker lors de la création initiale de la machine.
+            # Supposons que vous ayez stocké ces infos lors de la création initiale :
+            # data['machine_name'], data['power'], data['usage_time'], data['days_machine'], data['electricity_type']
+
+            self.machine_name_field.setText(data.get('subcategory', ''))
+            self.power_field.setText(str(data.get('power', '')))
+            self.usage_time_field.setText(str(data.get('usage_time', '')))
+            self.days_machine_field.setText(str(data.get('days_machine', '')))
+            electricity_type = data.get('electricity_type', '')
+            if electricity_type:
+                self.electricity_combo.setCurrentText(electricity_type)
+
         else:
-            subsub_name = name if name else subsubcategory
-        self.subsub_name_combo.setCurrentText(subsub_name)
-        self.update_years()
+            # Afficher le widget normal, cacher le widget machine
+            self.normal_widget.setVisible(True)
+            self.machine_widget.setVisible(False)
 
-        # Année
-        self.year_combo.setCurrentText(str(data.get('year', '')))
+            self.subcategory_combo.setCurrentText(data.get('subcategory', ''))
+            self.update_subsubcategory_names()
 
-        # Valeur + unité
-        val = data.get('value', 0)
-        self.input_field.setText(str(val))
-        self.current_unit = data.get('unit', '')
-        if self.current_unit:
-            self.input_label.setText(f'Entrez la valeur en {self.current_unit}:')
-            self.input_field.setEnabled(True)
+            subsubcategory = data.get('subsubcategory', '')
+            name = data.get('name', '')
+            if subsubcategory and name:
+                subsub_name = f"{subsubcategory} - {name}"
+            else:
+                subsub_name = name if name else subsubcategory
+            self.subsub_name_combo.setCurrentText(subsub_name)
+            self.update_years()
 
-        # Jours
-        if data.get('category', '') == 'Véhicules' or data.get('days', None) is not None:
-            self.days_label.setVisible(True)
-            self.days_field.setVisible(True)
-            self.days_field.setEnabled(True)
-            self.days_field.setText(str(data.get('days', 1)))
+            self.year_combo.setCurrentText(str(data.get('year', '')))
 
-        # Mise à jour NACRES si Achats/Consommables
-        if data.get('category') == 'Achats' and 'Consommables' in data.get('subcategory', ''):
-            self.update_nacres_filtered_combo()
-            code_nacres = data.get('code_nacres', '')
-            consommable = data.get('consommable', '')
-            if code_nacres and consommable:
-                nacres_text = f"{code_nacres} - {consommable}"
-                index = self.nacres_filtered_combo.findText(nacres_text)
-                if index >= 0:
-                    self.nacres_filtered_combo.setCurrentIndex(index)
-                    self.quantity_label.setVisible(True)
-                    self.quantity_input.setVisible(True)
-                    # Si vous aviez stocké la quantité dans l'ancien data, mettez-la ici
-                    # Exemple :
-                    # self.quantity_input.setText(str(data.get('quantity', 1)))
+            val = data.get('value', 0)
+            self.input_field.setText(str(val))
+            self.current_unit = data.get('unit', '')
+            if self.current_unit:
+                self.input_label.setText(f'Entrez la valeur en {self.current_unit}:')
+                self.input_field.setEnabled(True)
+
+            # Jours
+            if data.get('category', '') == 'Véhicules' or data.get('days', None) is not None:
+                self.days_label.setVisible(True)
+                self.days_field.setVisible(True)
+                self.days_field.setEnabled(True)
+                self.days_field.setText(str(data.get('days', 1)))
+            else:
+                self.days_label.setVisible(False)
+                self.days_field.setVisible(False)
+
+            # NACRES filtrés
+            if data.get('category') == 'Achats' and 'Consommables' in data.get('subcategory', ''):
+                self.update_nacres_filtered_combo()
+                code_nacres = data.get('code_nacres', '')
+                consommable = data.get('consommable', '')
+                if code_nacres and consommable:
+                    nacres_text = f"{code_nacres} - {consommable}"
+                    index = self.nacres_filtered_combo.findText(nacres_text)
+                    if index >= 0:
+                        self.nacres_filtered_combo.setCurrentIndex(index)
+                        self.quantity_label.setVisible(True)
+                        self.quantity_input.setVisible(True)
+                        # Remplir la quantité si on l'avait stockée
+                        quantity = data.get('quantity', None)
+                        if quantity is not None:
+                            self.quantity_input.setText(str(quantity))
 
     def on_validate(self):
         """
         Récupère les données modifiées et les enregistre dans self.modified_data avant de fermer le dialog.
         """
         category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
-        subsub_name = self.subsub_name_combo.currentText()
 
-        # Extraire subsubcategory et name
-        subsubcategory, name = self.split_subsub_name(subsub_name)
-
-        year = self.year_combo.currentText()
-        try:
-            value = float(self.input_field.text().strip().replace(',', '.'))
-        except ValueError:
-            QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique.')
-            return
-
-        days = 1
-        if self.days_field.isVisible() and self.days_field.text().strip():
+        if category == 'Machine':
+            # Récupération des données machine
+            machine_name = self.machine_name_field.text().strip()
             try:
-                days = int(self.days_field.text())
+                power = float(self.power_field.text().strip().replace(',', '.'))
+                usage_time = float(self.usage_time_field.text().strip().replace(',', '.'))
+                days_machine = int(self.days_machine_field.text().strip())
             except ValueError:
-                QMessageBox.warning(self, 'Erreur', 'Veuillez entrer un nombre de jours valide.')
+                QMessageBox.warning(self, 'Erreur', "Veuillez entrer des valeurs numériques valides pour la machine.")
                 return
 
-        # Code NACRES et consommable
-        selected_nacres = self.nacres_filtered_combo.currentText() if self.nacres_filtered_combo.isVisible() else None
-        code_nacres = 'NA'
-        consommable = 'NA'
-        if selected_nacres and selected_nacres != "Aucune correspondance":
-            if " - " in selected_nacres:
-                code_nacres, consommable = selected_nacres.split(" - ", 1)
-        
-        # Récupération de la quantité si visible
-        quantity = None
-        if self.quantity_input.isVisible():
+            electricity_type = self.electricity_combo.currentText()
+            total_usage = power * usage_time * days_machine
+
+            self.modified_data = {
+                'category': 'Machine',
+                'subcategory': machine_name,
+                'value': total_usage,
+                'unit': 'kWh',
+                'power': power,
+                'usage_time': usage_time,
+                'days_machine': days_machine,
+                'electricity_type': electricity_type
+            }
+
+        else:
+            # Cas normal
+            subcategory = self.subcategory_combo.currentText()
+            subsub_name = self.subsub_name_combo.currentText()
+            subsubcategory, name = self.split_subsub_name(subsub_name)
+            year = self.year_combo.currentText()
             try:
-                quantity_val = int(self.quantity_input.text())
-                if quantity_val <= 0:
-                    raise ValueError
-                quantity = quantity_val
+                value = float(self.input_field.text().strip().replace(',', '.'))
             except ValueError:
-                QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une quantité positive.')
+                QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique.')
                 return
 
-        self.modified_data = {
-            'category': category,
-            'subcategory': subcategory,
-            'subsubcategory': subsubcategory,
-            'name': name,
-            'year': year,
-            'unit': self.current_unit,
-            'value': value,
-            'days': days,
-            'code_nacres': code_nacres,
-            'consommable': consommable,
-            'quantity': quantity
-        }
+            days = 1
+            if self.days_field.isVisible() and self.days_field.text().strip():
+                try:
+                    days = int(self.days_field.text())
+                except ValueError:
+                    QMessageBox.warning(self, 'Erreur', 'Veuillez entrer un nombre de jours valide.')
+                    return
+
+            selected_nacres = self.nacres_filtered_combo.currentText() if self.nacres_filtered_combo.isVisible() else None
+            code_nacres = 'NA'
+            consommable = 'NA'
+            if selected_nacres and selected_nacres != "Aucune correspondance":
+                if " - " in selected_nacres:
+                    code_nacres, consommable = selected_nacres.split(" - ", 1)
+
+            quantity = None
+            if self.quantity_input.isVisible():
+                try:
+                    quantity_val = int(self.quantity_input.text())
+                    if quantity_val <= 0:
+                        raise ValueError
+                    quantity = quantity_val
+                except ValueError:
+                    QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une quantité positive.')
+                    return
+
+            self.modified_data = {
+                'category': category,
+                'subcategory': subcategory,
+                'subsubcategory': subsubcategory,
+                'name': name,
+                'year': year,
+                'unit': self.current_unit,
+                'value': value,
+                'days': days,
+                'code_nacres': code_nacres,
+                'consommable': consommable,
+                'quantity': quantity
+            }
 
         self.accept()
 
@@ -267,22 +334,27 @@ class EditCalculationDialog(QDialog):
     def update_subcategories(self):
         category = self.category_combo.currentText()
         if category == 'Machine':
-            # Si Machine, on pourrait désactiver certains champs si souhaité
-            pass
-        subcategories = self.main_data[self.main_data['category'] == category]['subcategory'].dropna().unique()
-        self.subcategory_combo.clear()
-        self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
-        self.update_subsubcategory_names()
-
-        # Gérer la visibilité des jours si catégorie Véhicules
-        if category == "Véhicules":
-            self.days_label.setVisible(True)
-            self.days_field.setVisible(True)
-            self.days_field.setEnabled(True)
+            # Cacher les champs "normaux" et afficher ceux de la machine
+            self.normal_widget.setVisible(False)
+            self.machine_widget.setVisible(True)
         else:
-            self.days_label.setVisible(False)
-            self.days_field.setVisible(False)
-            self.days_field.setEnabled(False)
+            # Afficher les champs normaux et cacher ceux de la machine
+            self.normal_widget.setVisible(True)
+            self.machine_widget.setVisible(False)
+            subcategories = self.main_data[self.main_data['category'] == category]['subcategory'].dropna().unique()
+            self.subcategory_combo.clear()
+            self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
+            self.update_subsubcategory_names()
+
+            # Gérer la visibilité des jours si catégorie Véhicules
+            if category == "Véhicules":
+                self.days_label.setVisible(True)
+                self.days_field.setVisible(True)
+                self.days_field.setEnabled(True)
+            else:
+                self.days_label.setVisible(False)
+                self.days_field.setVisible(False)
+                self.days_field.setEnabled(False)
 
     def update_subsubcategory_names(self):
         category = self.category_combo.currentText()

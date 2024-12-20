@@ -913,48 +913,57 @@ class MainWindow(QMainWindow):
         """
         print("Recalcul des émissions avec les données :", data)
 
-        # Extraction des données depuis le dictionnaire
         category = data.get('category', '')
+
+        # Traitement spécifique pour les machines
+        if category == 'Machine':
+            machine_name = data.get('subcategory', '')
+            total_usage = data.get('value', 0.0)  # kWh total
+            electricity_type = data.get('electricity_type', '')
+
+            if not electricity_type:
+                QMessageBox.warning(self, 'Erreur', "Type d'électricité manquant pour la machine.")
+                return None, None, None
+
+            mask = (self.data['category'] == 'Électricité') & (self.data['name'] == electricity_type)
+            filtered_data = self.data[mask]
+            if filtered_data.empty:
+                QMessageBox.warning(self, 'Erreur', "Impossible de trouver le facteur d'émission pour ce type d'électricité.")
+                return None, None, None
+
+            emission_factor = filtered_data['total'].values[0]
+            emissions = total_usage * emission_factor
+            emission_massique, total_mass = None, None
+            return emissions, emission_massique, total_mass
+
+        # Traitement pour les autres catégories
         subcategory = data.get('subcategory', '')
         subsub_name = data.get('subsubcategory', '')
+        name = data.get('name', '')
         year = data.get('year', '')
         value = data.get('value', 0)
         unit = data.get('unit', '')
-
-        # Filtrage des données principales pour le calcul des émissions basées sur la valeur
-        print(f"Debug: Vérification des données utilisées dans le masque :")
-        print(f"Category: {category}")
-        print(f"Subcategory: {subcategory}")
-        print(f"Subsubcategory: {subsub_name}")
-        print(f"unit: {unit}")
 
         mask = (
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
             (self.data['subsubcategory'].fillna('') == subsub_name) &
-            (self.data['unit'].astype(str) == unit)
+            (self.data['name'].fillna('') == name) &
+            (self.data['year'].astype(str) == str(year))
         )
 
         filtered_data = self.data[mask]
-
         if filtered_data.empty:
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
             return None, None, None
 
-        # Extraction du facteur d'émission
         total_emission_factor = filtered_data['total'].values[0]
         emissions = value * total_emission_factor
 
-        # Calcul des émissions massiques si applicable
         code_nacres = data.get('code_nacres', 'NA')
+        emission_massique, total_mass = None, None
         if category == 'Achats' and code_nacres != 'NA':
             emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres)
-        else:
-            emission_massique, total_mass = None, None
-
-        print(f"Émissions recalculées: {emissions} kg CO₂e, "
-            f"Émissions massiques: {emission_massique}, "
-            f"Masse totale: {total_mass}")
 
         return emissions, emission_massique, total_mass
 
@@ -970,24 +979,29 @@ class MainWindow(QMainWindow):
             QListWidgetItem: L'élément de l'historique mis à jour ou créé.
         """
         # Construction du texte de l'élément
-        item_text = (
-            f"{data['category']} - {data['subcategory'][:12]} - {data['subsubcategory']} - "
-            f"{data['value']} {data['unit']} : {data['emissions_price']:.4f} kg CO₂e"
-        )
-
-        if data.get("emission_mass") is not None and data.get("total_mass") is not None:
-            item_text += f" - Masse {data['total_mass']:.4f} kg : {data['emission_mass']:.4f} kg eCO₂"
-        elif data.get("consommable"):
-            item_text += f" - Consommable: {data['consommable']}"
+        if data['category'] == 'Machine':
+            # On suppose que recalculate_emissions a retourné un emissions valide.
+            emissions = data.get('emissions_price', data.get('emissions', 0))
+            if emissions is None:
+                emissions = 0.0
+            item_text = f"Machine - {data['subcategory']} - {data['value']:.2f} kWh : {emissions:.4f} kg CO₂e"
         else:
-            item_text += " - Pas de précisions."
+            item_text = (
+                f"{data['category']} - {data['subcategory'][:12]} - {data['subsubcategory']} - "
+                f"{data['value']} {data['unit']} : {data['emissions_price']:.4f} kg CO₂e"
+            )
 
-        # Si un élément existe déjà, on le met à jour
+            if data.get("emission_mass") is not None and data.get("total_mass") is not None:
+                item_text += f" - Masse {data['total_mass']:.4f} kg : {data['emission_mass']:.4f} kg eCO₂"
+            elif data.get("consommable"):
+                item_text += f" - Consommable: {data['consommable']}"
+            else:
+                item_text += " - Pas de précisions."
+
         if item:
             item.setText(item_text)
             item.setData(Qt.UserRole, data)
         else:
-            # Sinon, on crée un nouvel élément
             item = QListWidgetItem(item_text)
             item.setData(Qt.UserRole, data)
             self.history_list.addItem(item)
