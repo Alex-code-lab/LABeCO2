@@ -22,7 +22,7 @@ if __name__ == '__main__':
     else:
         print(f"Fichier QSS non trouvé à l'emplacement : {qss_path}")
 
-    # Définir l'icône de l'application pour macOS (et autres plateformes)
+    # Définir lgit 'icône de l'application pour macOS (et autres plateformes)
     icon_path = resource_path(os.path.join('images', 'icon.icns'))  # Utilisez .icns pour macOS
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))  # Définir l'icône pour l'application entière
