@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIntValidator
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
@@ -345,6 +345,7 @@ class MainWindow(QMainWindow):
         self.usage_time_label = QLabel("Temps d'utilisation par jour (heures):")
         self.usage_time_field = QLineEdit()
         self.usage_time_field.setMaximumWidth(200)
+        self.usage_time_field.setValidator(QIntValidator(1, 24, self))
         self.days_machine_label = QLabel("Nombre de jours d'utilisation:")
         self.days_machine_field = QLineEdit()
         self.days_machine_field.setMaximumWidth(200)
@@ -356,7 +357,7 @@ class MainWindow(QMainWindow):
         self.electricity_combo.addItems(sorted(electricity_types))
 
         self.add_machine_button = QPushButton('Ajouter la machine')
-        self.add_machine_button.clicked.connect(self.add_machine)
+        # self.add_machine_button.clicked.connect(self.add_machine)
 
         self.machine_layout = QFormLayout()
         self.machine_layout.addRow(self.machine_name_label, self.machine_name_field)
@@ -1163,6 +1164,12 @@ class MainWindow(QMainWindow):
             power = float(self.power_field.text())
             usage_time = float(self.usage_time_field.text())
             days = int(self.days_machine_field.text())
+
+            # Limiter le temps d'utilisation par jour à 24 heures
+            if usage_time > 24:
+                QMessageBox.warning(self, 'Erreur', "Le temps d'utilisation par jour ne peut pas dépasser 24 heures.")
+                return  # Arrêter l'exécution si la valeur est invalide
+
             total_usage = power * usage_time * days
 
             electricity_type = self.electricity_combo.currentText()

@@ -1,6 +1,12 @@
 ------------------------------------------------
 -------------- Les choses à faire --------------
 ------------------------------------------------
-1. Faire en sorte que lorsqu'on fait une modification, tous les éléments restent.
-2. Modification de machine ne marche pas
-3. Ajouter les calcules et les diagrammes pour les consommables pour le massique.
+1.  Ajouter les calcules et les diagrammes pour les consommables pour le massique.
+2. Verification de toutes les fonctionnalités :
+    -Lors de la modification d'un calcul, la liste enregistré n'est pas exactement la même, il faut normaliser ça.
+    -Dans la section machine:
+        - normaliser aussi la liste
+
+
+3. Ajout des calculs en fonction de la masse 
+4. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature
