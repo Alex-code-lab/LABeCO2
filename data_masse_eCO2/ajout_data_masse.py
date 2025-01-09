@@ -12,40 +12,57 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Gestion des matériaux")
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(100, 100, 800, 600)
 
-        # Initialisation des données
-        self.columns = ["Consommable",
-                        "Référence",
-                        "Code Nacre",
-                        "Masse unitaire (g)",
-                        "Matériau",
-                        "Source/Signature"]
-        self.data = pd.DataFrame(columns=self.columns)
-        self.data = pd.concat([self.data, pd.DataFrame([{
-            "Consommable": "Tube Falcon 15ml",
-            "Référence": "N/A",
-            "Code Nacre": "NA634",
-            "Masse unitaire (g)": 6.7,
-            "Matériau": "Polypropylène (PP)",
-            "Source/Signature": "Alexandre Souchaud"
-        }], columns=self.columns)], ignore_index=True)
+        # Chemins vers les fichiers HDF5
+        self.hdf5_data_path = './data_masse_eCO2/data_eCO2_masse_consommable.hdf5'
+        self.hdf5_materials_path = './data_masse_eCO2/empreinte_carbone_materiaux.h5'
 
-        # Matériaux disponibles
-        self.materials = ["Polypropylène (PP)",
-                          "Polyéthylène (PE)",
-                          "Polystyrène (PS)",
-                          "Polycarbonate (PC)",
-                          "Acier inoxydable"]
+        # Colonnes du tableau principal
+        self.columns = [
+            "Consommable", "Référence", "Code Nacre",
+            "Masse unitaire (g)", "Matériau", "Source/Signature"
+        ]
 
-        # Initialisation des widgets
+        # Charger les données principales et la liste des matériaux
+        self.data = self.load_main_data()
+        self.materials = self.load_materials()
+
+        # Initialisation de l'interface
         self.init_ui()
+
+    def load_main_data(self):
+        """Charge les données principales depuis le fichier HDF5."""
+        try:
+            df = pd.read_hdf(self.hdf5_data_path, key='data')
+            print(f"Tableau chargé depuis {self.hdf5_data_path}.")
+            return df
+        except FileNotFoundError:
+            print(f"Fichier {self.hdf5_data_path} introuvable. Initialisation avec un tableau vide.")
+            return pd.DataFrame(columns=self.columns)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger le fichier principal.\nErreur : {e}")
+            return pd.DataFrame(columns=self.columns)
+
+    def load_materials(self):
+        """Charge la liste des matériaux depuis le fichier HDF5."""
+        try:
+            df = pd.read_hdf(self.hdf5_materials_path, key='data')
+            materials = df['Materiau'].drop_duplicates().sort_values().tolist()
+            print(f"Matériaux chargés depuis {self.hdf5_materials_path}.")
+            return materials
+        except FileNotFoundError:
+            print(f"Fichier {self.hdf5_materials_path} introuvable. Liste des matériaux vide.")
+            return []
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger la liste des matériaux.\nErreur : {e}")
+            return []
 
     def init_ui(self):
         """Initialise l'interface utilisateur."""
         main_layout = QVBoxLayout()
 
-        # Formulaire
+        # Formulaire d'ajout
         form_layout = QFormLayout()
         self.nom_input = QLineEdit()
         self.ref_input = QLineEdit()
@@ -79,13 +96,16 @@ class MainWindow(QMainWindow):
         self.table.setHorizontalHeaderLabels(self.columns)
         main_layout.addWidget(self.table)
 
-        # Widget principal
+        # Conteneur principal
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        # Afficher les données initiales
+        self.afficher_donnees()
+
     def ajouter_objet(self):
-        """Ajoute un objet à la base de données."""
+        """Ajoute un objet à la base de données et met à jour le fichier HDF5."""
         nom = self.nom_input.text().strip()
         reference = self.ref_input.text().strip()
         nacre = self.nacre_input.text().strip()
@@ -111,9 +131,19 @@ class MainWindow(QMainWindow):
             "Matériau": materiau,
             "Source/Signature": source
         }
+
+        # Ajouter le nouvel objet aux données existantes
         self.data = pd.concat([self.data, pd.DataFrame([nouvel_objet])], ignore_index=True)
 
-        # Efface les champs du formulaire
+        # Sauvegarder les données dans le fichier principal HDF5
+        try:
+            self.data.to_hdf(self.hdf5_data_path, key='data', mode='w')
+            QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès et sauvegardé.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement des données.\nErreur : {e}")
+            return
+
+        # Effacer les champs du formulaire
         self.nom_input.clear()
         self.ref_input.clear()
         self.nacre_input.clear()
@@ -121,14 +151,16 @@ class MainWindow(QMainWindow):
         self.materiau_combo.setCurrentIndex(0)
         self.source_input.clear()
 
-        QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
+        # Mettre à jour l'affichage
+        self.afficher_donnees()
 
     def afficher_donnees(self):
         """Affiche les données dans le tableau."""
         self.table.setRowCount(len(self.data))
         for row_idx, row_data in self.data.iterrows():
             for col_idx, col_name in enumerate(self.columns):
-                item = QTableWidgetItem(str(row_data[col_name]))
+                # Utilise .get pour fournir une valeur par défaut si la colonne n'existe pas
+                item = QTableWidgetItem(str(row_data.get(col_name, "N/A")))
                 self.table.setItem(row_idx, col_idx, item)
 
 
