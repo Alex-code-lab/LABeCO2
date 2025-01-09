@@ -2,8 +2,12 @@
 -------------- Les choses à faire --------------
 ------------------------------------------------
 1.  Ajouter les calcules et les diagrammes pour les consommables pour le massique.
-2. Problème dans la modification : le changement de quantité des consommable n'est pas pris en compte, et notamment le calcil ne se fait pas
-
+3. Problème dans affichage véhicule / modification : 
+    - on a le total de km affiché, moi je voudrais qu'on ait : 
+        . le nombre km / jour
+        . nbr de jours
+        .total
+    Ainsi, lorsqu'on modifie, on ait bien de pré-rempli : le nombre de km/jour et le nbr de jour, et qu'on puisse modifier et que le calcul soit refait avec un nouveau total.
 
 3. Ajout des calculs en fonction de la masse 
 4. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature

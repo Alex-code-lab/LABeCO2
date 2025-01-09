@@ -913,10 +913,10 @@ class MainWindow(QMainWindow):
 
         category = data.get('category', '')
 
-        # Traitement spécifique pour les machines
+        # Cas Machine
         if category == 'Machine':
             machine_name = data.get('subcategory', '')
-            total_usage = data.get('value', 0.0)  # kWh total
+            total_usage = data.get('value', 0.0)  # kWh total (déjà en total)
             electricity_type = data.get('electricity_type', '')
 
             if not electricity_type:
@@ -931,16 +931,14 @@ class MainWindow(QMainWindow):
 
             emission_factor = filtered_data['total'].values[0]
             emissions = total_usage * emission_factor
-            emission_massique, total_mass = None, None
-            return emissions, emission_massique, total_mass
+            return emissions, None, None
 
-        # Traitement pour les autres catégories
+        # Pour les autres catégories
         subcategory = data.get('subcategory', '')
         subsub_name = data.get('subsubcategory', '')
         name = data.get('name', '')
         year = data.get('year', '')
-        value = data.get('value', 0)
-        unit = data.get('unit', '')
+        value = data.get('value', 0)  # Pour Véhicules, c'est déjà la distance totale
 
         mask = (
             (self.data['category'] == category) &
@@ -955,14 +953,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
             return None, None, None
 
+        # On multiplie directement "value" par le facteur
         total_emission_factor = filtered_data['total'].values[0]
-        emissions = value * total_emission_factor
+        emissions = float(value) * float(total_emission_factor)
 
+        # Gestion NACRES si besoin
         code_nacres = data.get('code_nacres', 'NA')
         emission_massique, total_mass = None, None
         if category == 'Achats' and code_nacres != 'NA':
-            # Récupérer la quantité depuis data
-            quantity = data.get('quantity', 1)  # Valeur par défaut 1 si non spécifiée
+            quantity = data.get('quantity', 1)
             emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres, quantity=quantity)
 
         return emissions, emission_massique, total_mass
@@ -995,8 +994,21 @@ class MainWindow(QMainWindow):
                 f"Machine - {subcategory} - {value:.2f} kWh : "
                 f"{emissions_price:.4f} kg CO₂e"
             )
+        elif category == 'Véhicules':
+            # Nouveau traitement pour les véhicules
+            days = data.get('days', 1)
+            total_km = data.get('value', 0)
+            try:
+                km_per_day = float(total_km) / days if days else float(total_km)
+            except (ValueError, ZeroDivisionError):
+                km_per_day = 0
+            item_text = (
+                f"{category} - {subcategory} - {code_nacres} - {name} : "
+                f"{km_per_day:.2f} km/jour sur {days} jours, total {total_km} {unit} : "
+                f"{emissions_price:.4f} kg CO₂e"
+            )
         else:
-            # Format général pour Achats / Véhicules / etc.
+            # Format général pour Achats / etc.
             item_text = (
                 f"{category} - {subcategory[:12]} - {code_nacres} - {name} - "
                 f"Dépense: {value} {unit} : {emissions_price:.4f} kg CO₂e"

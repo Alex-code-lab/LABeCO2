@@ -165,12 +165,10 @@ class EditCalculationDialog(QDialog):
         category = data.get('category', '')
         self.category_combo.setCurrentText(category)
 
-        # Cette méthode gère l'affichage machine vs normal en fonction de la catégorie
+        # Gère l’affichage machine vs normal
         self.update_subcategories()
 
-        # ------------------------------------------------------------------
-        #  Cas Machine : on pré-remplit les champs correspondants
-        # ------------------------------------------------------------------
+        # --- Cas Machine ---
         if category == 'Machine':
             self.machine_name_field.setText(data.get('subcategory', ''))
             self.power_field.setText(str(data.get('power', '')))
@@ -181,13 +179,8 @@ class EditCalculationDialog(QDialog):
             if electricity_type:
                 self.electricity_combo.setCurrentText(electricity_type)
 
-            # Pas de return ici, on laisse l'utilisateur libre de rechanger de catégorie
-            # plus tard via self.category_combo et update_subcategories().
-        
         else:
-            # ------------------------------------------------------------------
-            #  Cas Achats / Véhicules / Autre : pré-remplir les champs normaux
-            # ------------------------------------------------------------------
+            # --- Cas Achats / Véhicules / Autres ---
             self.subcategory_combo.setCurrentText(data.get('subcategory', ''))
             self.update_subsubcategory_names()
 
@@ -202,6 +195,7 @@ class EditCalculationDialog(QDialog):
             self.update_years()
             self.year_combo.setCurrentText(str(data.get('year', '')))
 
+            # Dans la plupart des catégories, "value" est ce qu'on affiche directement
             val = data.get('value', 0)
             self.input_field.setText(str(val))
             self.current_unit = data.get('unit', '')
@@ -213,18 +207,34 @@ class EditCalculationDialog(QDialog):
                 self.input_label.setText('Entrez la valeur:')
                 self.input_field.setEnabled(False)
 
-            # Gérer la visibilité du champ "Nombre de jours" si Véhicules
+            # --- Spécifique Véhicules : on stocke un total dans 'value',
+            #     mais on affiche du km/jour dans l’interface
             if category == 'Véhicules':
+                # Rendre visible le champ "Nombre de jours"
                 self.days_label.setVisible(True)
                 self.days_field.setVisible(True)
                 self.days_field.setEnabled(True)
-                self.days_field.setText(str(data.get('days', 1)))
+
+                days = data.get('days', 1)
+                self.days_field.setText(str(days))
+
+                # val = distance totale (ex: 300 km)
+                # km_per_day = val / days
+                try:
+                    total_distance = float(val)
+                    km_per_day = total_distance / days if days else total_distance
+                except (ValueError, ZeroDivisionError):
+                    km_per_day = 0
+
+                # On injecte km_per_day dans le champ input_field
+                self.input_field.setText(str(km_per_day))
+
             else:
                 self.days_label.setVisible(False)
                 self.days_field.setVisible(False)
                 self.days_field.setEnabled(False)
 
-            # Si Achats + Consommables => NACRES
+            # --- Cas Achats + Consommables => NACRES
             if category == 'Achats' and 'Consommables' in data.get('subcategory', ''):
                 self.update_nacres_filtered_combo()
                 
@@ -235,14 +245,14 @@ class EditCalculationDialog(QDialog):
                     index = self.nacres_filtered_combo.findText(nacres_text)
                     if index >= 0:
                         self.nacres_filtered_combo.setCurrentIndex(index)
-                # Toujours afficher et remplir le champ quantité si une quantité est présente
+
                 self.quantity_label.setVisible(True)
                 self.quantity_input.setVisible(True)
                 quantity = data.get('quantity', '')
                 if quantity is not None:
                     self.quantity_input.setText(str(quantity))
             else:
-                # Dans tous les autres cas, masquer NACRES/quantité
+                # Autres cas : masquer NACRES/quantité
                 self.nacres_filtered_label.setVisible(False)
                 self.nacres_filtered_combo.setVisible(False)
                 self.nacres_filtered_combo.clear()
@@ -261,14 +271,9 @@ class EditCalculationDialog(QDialog):
             if category == 'Machine':
                 machine_name = self.machine_name_field.text().strip()
                 
-                # Vérifier et convertir les champs numériques pour la machine
                 power_text = self.power_field.text().strip().replace(',', '.')
                 usage_time_text = self.usage_time_field.text().strip().replace(',', '.')
                 days_machine_text = self.days_machine_field.text().strip()
-
-                print("Machine - power:", repr(power_text), 
-                    "usage_time:", repr(usage_time_text), 
-                    "days_machine:", repr(days_machine_text))
 
                 if not power_text or not usage_time_text or not days_machine_text:
                     QMessageBox.warning(self, 'Erreur', 
@@ -303,18 +308,17 @@ class EditCalculationDialog(QDialog):
                 return
 
             # --------------------------------------------------------------------------
-            #  CAS "Achats" ou autre
+            #  CAS Achats, Véhicules ou autres
             # --------------------------------------------------------------------------
             subcategory = self.subcategory_combo.currentText()
             subsub_name = self.subsub_name_combo.currentText()
             subsubcategory, name = self.split_subsub_name(subsub_name)
             year = self.year_combo.currentText()
 
-            # Lecture sécurisée de la valeur principale
+            # Lecture de la valeur depuis input_field
             input_text = self.input_field.text().strip().replace(',', '.')
-            print("Input value text:", repr(input_text))
             try:
-                value = float(input_text)
+                value_entered = float(input_text)
             except ValueError:
                 QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique valide.')
                 return
@@ -323,7 +327,6 @@ class EditCalculationDialog(QDialog):
             days = 1
             if self.days_field.isVisible():
                 days_text = self.days_field.text().strip()
-                print("Days field text:", repr(days_text))
                 if days_text:
                     try:
                         days = int(days_text)
@@ -332,46 +335,14 @@ class EditCalculationDialog(QDialog):
                                             'Veuillez entrer un nombre de jours valide.')
                         return
 
-            # Gestion par défaut NACRES
-            code_nacres = 'NA'
-            consommable = 'NA'
-            if category == 'Achats' and subsubcategory:
-                code_nacres = subsubcategory[:4]
+            # Pour la catégorie Véhicules, on considère value_entered comme km/jour
+            if category == 'Véhicules':
+                total_distance = value_entered * days
+                final_value = total_distance
+            else:
+                final_value = value_entered
 
-            if self.nacres_filtered_combo.isVisible():
-                selected_nacres = self.nacres_filtered_combo.currentText().strip()
-                print("Selected NACRES:", repr(selected_nacres))
-                if selected_nacres and selected_nacres != "Aucune correspondance":
-                    if " - " in selected_nacres:
-                        code_nacres, consommable = selected_nacres.split(" - ", 1)
-                elif selected_nacres == "Aucune correspondance":
-                    if subsubcategory:
-                        code_nacres = subsubcategory[:4]
-                    else:
-                        code_nacres = 'NA'
-                    consommable = 'NA'
-
-            # Lecture sécurisée de la quantité
-            quantity = None
-            print("Quantité visible ? =>", self.quantity_input.isVisible())
-            if self.quantity_input.isVisible():
-                q_str = self.quantity_input.text().strip()
-                print("Quantity input text:", repr(q_str))
-                if not q_str:
-                    QMessageBox.warning(self, 'Erreur', 
-                                        "Le champ quantité est vide, veuillez saisir un entier.")
-                    return
-                try:
-                    quantity_val = int(q_str)
-                    if quantity_val <= 0:
-                        raise ValueError
-                    quantity = quantity_val
-                except ValueError:
-                    QMessageBox.warning(self, 'Erreur', 
-                                        'Veuillez entrer une quantité positive.')
-                    return
-
-            # Assemblage final dans self.modified_data
+            # Assemblage initial des données modifiées
             self.modified_data = {
                 'category': category,
                 'subcategory': subcategory,
@@ -379,12 +350,53 @@ class EditCalculationDialog(QDialog):
                 'name': name,
                 'year': year,
                 'unit': self.current_unit,
-                'value': value,
+                'value': final_value,   # total pour Véhicules, direct sinon
                 'days': days,
-                'code_nacres': code_nacres,
-                'consommable': consommable,
-                'quantity': quantity,
+                'code_nacres': 'NA',    # valeurs par défaut qui peuvent être modifiées plus loin
+                'consommable': 'NA',
             }
+
+            # Gestion du champ "Nombre de jours" pour Véhicules déjà prise en compte ci-dessus.
+
+            # --- Gestion NACRES pour Achats de Consommables ---
+            if category == 'Achats' and 'Consommables' in subcategory:
+                code_nacres = 'NA'
+                consommable = 'NA'
+                # Si on a un soussubcategory, en prendre les 4 premiers caractères pour NACRES de base
+                if subsubcategory:
+                    code_nacres = subsubcategory[:4]
+                if self.nacres_filtered_combo.isVisible():
+                    selected_nacres = self.nacres_filtered_combo.currentText().strip()
+                    if selected_nacres and selected_nacres != "Aucune correspondance":
+                        if " - " in selected_nacres:
+                            code_nacres, consommable = selected_nacres.split(" - ", 1)
+                    elif selected_nacres == "Aucune correspondance":
+                        if subsubcategory:
+                            code_nacres = subsubcategory[:4]
+                        else:
+                            code_nacres = 'NA'
+                        consommable = 'NA'
+                self.modified_data.update({
+                    'code_nacres': code_nacres,
+                    'consommable': consommable,
+                })
+
+                # Lecture sécurisée de la quantité
+                if self.quantity_input.isVisible():
+                    q_str = self.quantity_input.text().strip()
+                    if not q_str:
+                        QMessageBox.warning(self, 'Erreur', 
+                                            "Le champ quantité est vide, veuillez saisir un entier.")
+                        return
+                    try:
+                        quantity_val = int(q_str)
+                        if quantity_val <= 0:
+                            raise ValueError
+                        self.modified_data['quantity'] = quantity_val
+                    except ValueError:
+                        QMessageBox.warning(self, 'Erreur', 
+                                            'Veuillez entrer une quantité positive.')
+                        return
 
             print("Debug - Nouveau self.modified_data :", self.modified_data)
             self.accept()
