@@ -235,11 +235,12 @@ class EditCalculationDialog(QDialog):
                     index = self.nacres_filtered_combo.findText(nacres_text)
                     if index >= 0:
                         self.nacres_filtered_combo.setCurrentIndex(index)
-                        self.quantity_label.setVisible(True)
-                        self.quantity_input.setVisible(True)
-                        quantity = data.get('quantity', None)
-                        if quantity is not None:
-                            self.quantity_input.setText(str(quantity))
+                # Toujours afficher et remplir le champ quantité si une quantité est présente
+                self.quantity_label.setVisible(True)
+                self.quantity_input.setVisible(True)
+                quantity = data.get('quantity', '')
+                if quantity is not None:
+                    self.quantity_input.setText(str(quantity))
             else:
                 # Dans tous les autres cas, masquer NACRES/quantité
                 self.nacres_filtered_label.setVisible(False)

@@ -961,7 +961,9 @@ class MainWindow(QMainWindow):
         code_nacres = data.get('code_nacres', 'NA')
         emission_massique, total_mass = None, None
         if category == 'Achats' and code_nacres != 'NA':
-            emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres)
+            # Récupérer la quantité depuis data
+            quantity = data.get('quantity', 1)  # Valeur par défaut 1 si non spécifiée
+            emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres, quantity=quantity)
 
         return emissions, emission_massique, total_mass
 
@@ -1286,26 +1288,36 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")
 
-    def calculate_mass_based_emissions(self, code_nacres):
+    def calculate_mass_based_emissions(self, code_nacres, quantity=None):
         """
-        Calcule les émissions massiques basées sur le code NACRES et la quantité saisie.
-        Si aucune quantité n'est saisie ou si elle est invalide, aucun calcul n'est effectué.
+        Calcule les émissions massiques basées sur le code NACRES et la quantité donnée.
+        Si aucune quantité n'est fournie, la méthode tente de la lire depuis l'interface.
         """
-        # Lecture de la quantité saisie
-        quantite_text = self.quantity_input.text().strip()
-        
-        if not quantite_text:
-            # QMessageBox.warning(self, "Erreur", "Le champ quantité est vide. Aucun calcul ne sera effectué.")
-            return 0, 0
+        # Si la quantité n'est pas passée en argument, lire depuis l'interface
+        if quantity is None:
+            quantite_text = self.quantity_input.text().strip()
+            
+            if not quantite_text:
+                return 0, 0
 
-        try:
-            quantite = int(quantite_text)
-            if quantite <= 0:
-                raise ValueError("La quantité doit être un entier positif.")
-            print(f"Debug: Quantité saisie = '{quantite}'")
-        except ValueError as e:
-            QMessageBox.warning(self, "Erreur", str(e))
-            return None, None
+            try:
+                quantity = int(quantite_text)
+                if quantity <= 0:
+                    raise ValueError("La quantité doit être un entier positif.")
+                print(f"Debug: Quantité saisie = '{quantity}'")
+            except ValueError as e:
+                QMessageBox.warning(self, "Erreur", str(e))
+                return None, None
+        else:
+            # Si une quantité est fournie, vérifier qu'elle est valide
+            try:
+                quantity = int(quantity)
+                if quantity <= 0:
+                    raise ValueError("La quantité doit être un entier positif.")
+                print(f"Debug: Quantité fournie = '{quantity}'")
+            except ValueError as e:
+                QMessageBox.warning(self, "Erreur", str(e))
+                return None, None
 
         # Récupération du code NACRES et du nom de l'objet
         selected_nacres = self.nacres_filtered_combo.currentText()
@@ -1332,7 +1344,7 @@ class MainWindow(QMainWindow):
 
         # Conversion de la masse en kg
         masse_kg_unitaire = masse_g / 1000.0
-        masse_totale_kg = masse_kg_unitaire * quantite
+        masse_totale_kg = masse_kg_unitaire * quantity
 
         # Filtrage des données de matériaux pour obtenir l'équivalent CO₂
         mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
