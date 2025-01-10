@@ -1,6 +1,9 @@
 ------------------------------------------------
 -------------- Les choses à faire --------------
 ------------------------------------------------
-1.  Ajouter les calcules et les diagrammes pour les consommables pour le massique.
+1. Fianlement, peut être laisser tout le temps le choix du consommable et faire en sorte que si je choisis un consommable particulier,
+alors le code NACREs se rempli directement aussi. Et que si on choisi un codes nacres, on laisse "aucune correspondance".
+Il faudrait un "rechercher" dans le consommable.
+2. Ajouter les calcules et les diagrammes pour les consommables pour le massique.
 3. Ajout des calculs en fonction de la masse 
 4. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature

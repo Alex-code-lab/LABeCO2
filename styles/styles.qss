@@ -14,7 +14,7 @@ QLabel {
 
 /* Style des QLineEdit */
 QLineEdit {
-    background-color: #FFFFFF; /* Fond blanc pour les champs de texte */
+    background-color: #FFFFFF !important; /* Fond blanc prioritaire */
     border: 1px solid #C0C0C0; /* Bordure grise claire */
     border-radius: 4px; /* Coins légèrement arrondis */
     padding: 4px 8px; /* Espacement interne pour un meilleur confort de saisie */

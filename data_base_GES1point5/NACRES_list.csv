@@ -1,0 +1,1467 @@
+0
+"AA01 Pains, patisseries, viennoiseries congeles"
+AA02 Produits carnes congeles
+AA03 Produits de la mer ou deau douce congeles
+AA04 Fruits et legumes congeles
+AA05 Preparations alimentaires et plats cuisines congeles
+"AA11 Pains, patisseries, viennoiseries frais"
+AA12 Viandes fraiches - refrigerees
+AA13 Produits de la mer ou deau douce frais
+AA14 Fruits et legumes frais ou refrigeres
+AA15 Oeufs et produits laitiers 
+AA16 Preparations alimentaires et plats cuisines frais - refrigeres
+AA21 Boissons non alcoolisees
+AA22 Boissons alcolisees
+AA23 Conserves et epicerie
+AA31 Aliments adaptes a l'enfant
+AA32 Aliments dietetiques sans fin medicale
+AA41 Consommables pour la restauration
+AA42 Petites fournitures pour la restauration
+AA43 Mobilier de cuisine et de salle de restauration
+"AA44 Equipements de cuisine et de salle de restauration (electromenager, ...)"
+AA51 Petites fournitures pour l'hotellerie
+AA52 Mobilier d'hotellerie
+AA53 Equipement pour l'hotellerie et la buanderie
+AA61 Services de restauration sociale (restaurant propre a gestion concedee)
+AA62 Tickets et cheques repas
+AA63 Services de traiteurs / plateaux repas
+AA64 Services de restauration exterieurs (restaurants)
+AA65 Services de controles sanitaires et de qualite
+AA66 Services de blanchisserie- pressing pour la restauration et l'hotellerie
+AA71 Reparation et maintece des equipements de restauration et de cuisine
+AA72 Reparation et maintece des equipements d'hotellerie et buanderie
+AB01 Petites fournitures et petits equipements de bureau (hors informatique)
+AB02 Mobilier de bureau et de salles de reunion
+AB03 Mobilier et equipements specifiques ergonomiques
+AB11 Reparation et maintece des equipements de bureau et de salle de reunion
+AC01 Papiers blancs ou colores courants pour impression-reprographie
+AC02 Papiers cartonnes pour impression-reprographie
+AC03 Autres supports papier specifiques d'impression-reprographie
+"AC11 Consommables pour photocopieurs (encres, agraphes, ...)"
+AC12 Supports specifiques d'impression
+AC21 Equipements de reprographie de proximite
+AC22 Equipements de reprographie haut debit pour imprimerie
+AC23 Autres equipements pour atelier de reprographie
+AC31 Services d'impression et de reprographie
+AC41 Reparation et maintece des equipements de reprographie de proximite
+AC42 Reparation et maintece des equipements de reprographie haut debit
+AC43 Reparation et maintece des autres equipements d'atelier de reprographie
+AD01 Accessoires et pieces detachees pour le parc de vehicules
+"AD02 Materiel, outillage et equipements de garage "
+AD03 Produits pour l'entretien des vehicules
+AD04 Materiel d'essais de chocs et accessoires
+AD11 Vehicules automobiles de transport de personnes (achat ou loc. longue duree)
+AD12 Vehicules automobiles de transport en commun (achat ou loc. longue duree)
+AD13 Vehicules automobiles de transport de marchandises (achat ou loc. longue duree)
+AD14 Cycles et cyclomoteurs
+AD15 Vehicules tractes
+AD21 Carburants a la pompe (automobiles)
+AD22 Kerosene
+AD23 Carburants stockes
+AD24 Carburant pour navires
+AD25 Recharge electrique pour vehicules
+AD31 Controles techniques des vehicules
+AD32 Services de gestion de flotte automobile
+AD41 Entretien et reparation du parc vehicule
+AD42 Nettoyage des vehicules
+AD43 Maintece du materiel et de l'outillage de garage 
+AD44 Ne plus utiliser ad.32
+AD45 Entretien maintece de bornes de recharge electrique
+"AE01 Vetements, chaussures et accessoires (hors epi)"
+AE02 Petites fournitures de sport
+"AE03 Equipements de sport (pour infrastructures, ...)"
+AE11 Instruments de musique et accessoires
+AE21 Jeux educatifs
+AE22 Fournitures et equipements pour activites exterieures
+AE23 Autres fournitures et equipements pour activites recreatives
+AE24 Jouets
+AE25 Figurines
+AE26 Peluches
+AE27 Articles textiles et bijoux
+AE31 Reparation et maintece des equipements de sport
+AE32 Reparation et maintece des instruments de musique
+AE33 Reparation et maintece des equipements pour activites recreatives
+AE41 Services d'organisation et de promotion des manif. sportives (hors evenementiel)
+"AE42 Services d'evaluation, d'enregistrement ou de controle des prestations sportives"
+AE43 Services d'exploitation des installations sportives 
+AE44 Autres services pour le sport
+AE51 Services d'animation recreatifs
+AE52 Autres services recreatifs
+AF01 Mobilier pedagogique
+AF11 Articles de decoration et d'ornement
+AF21 Location de salles de courte duree (hors evenementiel)
+AF31 Cartes multiservices
+AF32 Systemes de creation et de gestion de cartes multiservices
+AF33 Repar. et maintece de systemes de creation et de gestion de cartes multiservices
+BA01 Electricite distribuee 
+BA02 Combustibles gazeux distribues 
+BA03 Eau courante
+BA04 Fioul domestique
+BA05 Chauffage urbain
+"BA06 Autres combustibles (bois de chauffage, ...)"
+"BA11 Materiel de stockage des fluides (cuves a fioul, ...)"
+BB01 Produits et petites fournitures d'hygiene et de toilette
+BB02 Produits et petites fournitures d'entretien menager
+BB03 Materiel pour l'entretien des locaux
+BB04 Materiels pour le traitement des dechets
+BB11 Services de nettoyage courant des locaux
+BB12 Services de nettoyage specialise des locaux 
+BB13 Services de nettoyage des vitres
+BB14 Services de nettoyage et d'entretien des locaux sensibles
+BB21 Services de desinfection
+BB22 Services de deratisation
+BB23 Services de desinsectisation
+"BB24 Services de decontamination nucleaire, biologique ou chimique"
+BB31 Services de traitement des dechets chimiques et assimiles
+BB32 Serv. traitmnt dechets biolog. et d'activit. de soins a risques infectieux (das)
+BB33 Services de traitement des dechets radioactifs d'activites nucleaires
+BB34 Services de traitement des dechets deee
+BB35 Services de traitement des dechets papier
+"BB36 Services de traitement des autres dechets (menagers, industriels, ...)"
+BB41 Reparation et maintece du materiel d'entretien des locaux
+BB42 Reparation et maintece du materiel pour le traitement des dechets
+BC01 Services de gardiennage et de securite
+BC02 Services de telesurveillance
+BC03 Services d'accueil
+"BC11 Contrôles relatifs a l'environnement (eau, eaux usees, incinerateurs)"
+BC12 Contrôles reglementaires des equipements des batiments
+BC13 Services d'analyses et essais des produits et equipements (hors scientifique)
+BD01 Materiaux et consom. pr la construct. et l'entretien des batiments et infrastr.
+BD02 Fournitures pour les installations electriques des batiments et infrastructures
+BD03 Fournitures de plomberie 
+BD04 Outillage pour la construction et l'entretien des bâtiments et infrastructures
+BD05 Batiments prefabriques ou modulaires
+"BD11 Portes, fenetres et menuiseries"
+BD12 Fournitures pour le revetement des murs et plafonds
+BD13 Fournitures pour le revetement des sols
+BD14 Fournitures et equipements d'ornement des locaux
+BD15 Quincallerie pour l'amenagement et l'entretien des batiments 
+BD21 Petites fournitures electriques pour l'equipement des batiments et infrastr.
+BD22 Gros equipements des installations electriques
+BD23 Equipements mecaniques pour batiments 
+"BD24 Equipements de chauffage, ventilation, climatisation (hors bat. experimentaux)"
+BD25 Equipements sanitaires et de plomberie pour l'equipement des batiments
+BD26 Fournitures et equipement de signalisation des batiments et infrastructures
+"BD27 Fournitures et equipements de securite (systemes d'alarmes, extincteurs, ...)"
+"BE01 Maconnerie, demolition et desamiantage"
+"BE02 Menuiserie, serrurerie"
+"BE03 Etancheite, bardage, couverture et zinguerie"
+"BE04 Platrerie, cloisons seches, faux plafonds"
+"BE05 Peintures, revetements de sols, ravalement"
+BE06 Electricite sur installations electriques des batiments
+"BE07 Cvc, plomberie et fluides speciaux"
+BE08 Voirie reseaux distribution (vrd)
+BE09 Autres travaux d'amenagement des batiments
+BE11 Reparation et maintece des equipements mecaniques des batiments
+BE12 Reparation et maintece des chambres froides
+BE13 Reparation et maintece des equipements de securite
+BE14 Reparation et maintece des installations et equipements electriques
+"BE15 Repar. et maintece equipmts climatisation, ventilation, chauffage, reservoirs"
+BE16 Reparation et maintece des equipements sanitaires et plomberie
+BE17 Reparation et maintece des autres equipements des batiments
+BE21 Ne plus utiliser
+BF01 Travaux de construction neuve 
+BF02 Travaux de rehabilitation ou de reutilisation 
+BF03 Travaux de mise en securite ou de mise en conformite reglementaire
+"BF11 Assistance a la maitrise d'ouvrage, conduite d'operations, app"
+BF12 Maitrise d'oeuvre et ingenierie
+"BF13 Etudes prealables (topographie, etudes de sol, prospection), programmation"
+"BF14 Controles techniques, missions de securite, csps "
+"BF15 Diagnostics, ordoncement-pilotage-coordination (opc), ssi "
+BG01 Produits phytosanitaires pour espaces verts
+"BG02 Semences, arbres, plantes et fleurs pour espaces verts"
+BG03 Petites fournitures pour espaces verts
+BG04 Materiel pour creation et entretien d'espaces verts
+BG11 Reparation et maintece du materiel d'entretien des espaces verts 
+BG21 Services de creation et d'entretien des espaces verts
+CA01 Communication : conception-redaction
+CA02 Communication : conception-realisation
+CA03 Communication : travaux graphiques 
+CA04 Communication : travaux photographiques 
+"CA11 Communication : conception, realisation de sites internet et frais connexes"
+CA12 Communication : conception et realisation de reseaux sociaux
+CA13 Communication : conception et realisation d'applications mobiles et web
+CA14 Communication : conception et realisation d'autres outils de communication web
+CA21 Communication : edition de documents imprimes
+CA22 Communication : edition de documents web
+CA23 Communication : correction et relecture de documents
+CA24 Communication : diffusion et promotion de documents sur tous supports
+CA31 Communication : conception-realisation audiovisuelles
+CA32 Communication : services audiovisuels d'ingenierie du son
+CA33 Communication : services audiovisuels d'ingenierie de l'image
+CA34 Communication : services de production audiovisuelle
+"CA35 Communication : diffusion, distribution et promotion audiovisuelles"
+CB01 Communication : objets promotionnels courants
+CB02 Communication : cadeaux
+CB03 Communication : materiel et equipements pour manifestations evenementielles
+CB11 Communication : location et reservation d'espaces pour manif. evenementielles
+"CB12 Communication : organisation de colloques, congres et seminaires"
+"CB13 Comm : organisation et realisation de salons, expositions et foires"
+CB14 Communication : services de billetterie pour manifestations evenementielles
+CB15 Communication : organisation d'autres manifestations evenementielles
+CB21 Communication : traiteurs pour manifestations evenementielles
+CB22 Communication : restauration pour manifestations evenementielles
+CB23 Communication : hebergement pour manifestations evenementielles
+CB24 Communication : promotion de manifestations evenementielles
+CB25 Communication : autres prestations associees aux manifestations evenementielles
+CC01 Communication : veille des medias traditionnels
+CC02 Communication : veille des medias internet
+CC03 Relations presse
+CC11 Comm : services de conseil et d'accompagnement de campagnes de communication
+CC12 Communication : services de conseil en identite visuelle
+CC13 Communication : services de conseil en image des personnes
+CC14 Communication : services de mediatraining
+CC15 Communication : autres services de conseil en communication et publicite
+CC21 Communication : achat d'espaces publicitaires 
+"CC22 Communication : etudes, sondages et enquetes de communication"
+CC23 Communication : autres services de communication
+CD01 Culture : oeuvres et objets d'art existants
+CD02 Culture : realisation d'oeuvres et objets d'art
+CD03 Culture: reproduction d'oeuvres et objets d'art
+CD11 Culture : achats de representations artistiques
+CD12 Culture : conception-realisation-installation d'eclairage et/ou de son
+CD13 Culture : conception-realisation-installation de decors
+CD14 Culture : conception-realisation de costumes
+"CD21 Services de gestion, de conserv. et de restaur. des collections des musees"
+CD22 Services de preservation des sites classes ou inscrits
+"CD23 Services relatifs a la preservation des jardins, zoos et reserves naturelles"
+CD24 Autres services de conservation du patrimoine (hors archivage)
+CD25 Services d'inventaires specifiques
+CD31 Culture : services d'animation culturelle
+"CD32 Services de parcs de recreation, de plages, de parcs d'attraction"
+CD33 Culture : services de mediation culturelle
+CD34 Culture : autres services socio-culturels
+CD41 Consommables specifiques pour la conservation et la restauration des collections
+CD42 Materiels specifiques pour la conservation et la restauration des collections
+CD43 Mobilier specifique pour la conservation des collections
+CE01 Documentation : livres scolaires imprimes de toutes matieres
+CE02 Documentation : livres scolaires electroniques de toutes matieres
+CE03 Documentation : livres non scolaires imprimes
+CE04 Documentation : livres non scolaires electroniques
+CE05 Documentation : livres d'occasion et epuises
+CE06 Documentation : livres anciens publies avant 1900
+"CE11 Document. : journaux, revues et periodiques scientifiques (support papier)"
+"CE12 Document. : journaux, revues et periodiques non scientifiques (support papier)"
+"CE13 Document. : journaux, revues et periodiques scientifiques (electroniques)"
+"CE14 Document. : journaux, revues et periodiques non scientifiques (electroniques)"
+CE21 Document. : droit d'acces a des bases de donnees documentaires scientifiques
+CE22 Document.: droit d'acces a des bases de donnees documentaires non scientifiques
+CE31 Documentation : partitions musicales
+"CE32 Documentation : cartes (geographiques, topographiques) et globes terrestres"
+CE33 Documentation : normes
+CE34 Documentation : autres documents
+CE41 Documentation : images fixes
+CE42 Documentation : images animees sur tout support 
+CE43 Documentation : autres images
+CE51 Documentation : entregistrements sonores 
+"CF01 Doc. : archives de journaux, revues et periodiques scientifiques (papier)"
+"CF02 Doc. : archives de journaux, revues et periodiques non scientifiques (papier)"
+"CF03 Doc. : archives de journaux, revues et periodiques scientifiques (electroniques)"
+"CF04 Doc. : archives de journaux, revues et periodiques non scientif. (electroniques)"
+CF11 Doc. : droit d'acces a des archives de bases de donnees documentaires scientif.
+CF12 Doc. : droit d'acces a des archives de bases de donnees document. non scientif.
+CF21 Documentation : archives de partitions musicales
+"CF22 Documentation : archives de cartes (geographiques, topographiques)"
+CF23 Documentation : archives d'autres documents imprimes
+CF31 Documentation : archives d'images fixes 
+CF32 Documentation : archives d'images animees sur tout support 
+CF33 Documentation : archives d'autres images
+CF41 Documentation : archives d'entregistrements sonores 
+CG01 Documentation : fournitures et equipements de conservation de documents 
+CG11 Documentation : mobilier de rangement de bibliotheques et de magasins d'archives
+CG12 Documentation : mobilier pour bibliotheques et magasins d'archives
+CG21 Doc : equipements de numerisation pour bibliotheques et magasins d'archives
+CG31 Reparation et maintece des mobiliers de bibliotheques et magasins d'archives
+CG32 Repar. et maintece des equipements de bibliotheques et magasins d'archives
+CH01 Doc : logiciels standards de gestion de bibliotheques
+CH02 Doc : logiciels specifiques de gestion de bibliotheques
+CH03 Doc : logic. standards d'acces aux contenus et ressources document.
+CH04 Doc : logic. specifiques d'acces aux contenus et ressources document.
+CH05 Doc : logic. standards de traitement et de catalogage partage de doc.
+CH06 Doc : logic. specifiques de traitement et de catalogage partage de doc.
+CH07 Doc : autres logiciels standards de gestion documentaire
+CH08 Documentation : autres logiciels specifiques de gestion documentaire
+CH11 Documentation : logiciels standards de gestion d'archivage
+CH12 Documentation : logiciels specifiques de gestion d'archivage
+CH21 Doc : maintece logiciels standards de gestion de bibliotheques
+CH22 Doc. : maintece logiciels specifiques de gestion de bibliotheques
+CH23 Doc. : maintece logic. standards d'acces aux contenus et ressources doc.
+CH24 Doc. : maintece logic. specifiques d'acces aux contenus et ressources doc.
+CH25 Doc. : maintece logic. standards de trait. et de catalogage partage de doc
+CH26 Doc. : maintece logic. specifiq. de trait. et de catalogage partage de doc
+CH27 Doc. : maintece d'autres logiciels standards de gestion documentaire
+CH28 Doc. : maintece d'autres logiciels specifiques de gestion documentaire
+CH31 Documentation : maintece des logiciels standards de gestion d'archives
+CH32 Documentation : maintece des logiciels specifiques de gestion d'archives
+CI01 Documentation : services de numerisation d'ouvrages et de documents
+CI02 Documentation : services de numerisation de fonds sonores et sources audio
+CI03 Documentation : services de numerisation de fonds audiovisuels
+CI04 Documentation : autres services de gestion documentaire
+CI11 Documentation : services d'archivage
+CI12 Documentation : services de conseil et d'assistance en archivage traditionnel
+CI13 Documentation : services de conseil et d'assistance en archivage electronique
+CI14 Documentation : autres services d'archivage
+DA01 Services de taxi ou de vtc
+DA02 Location de vehicules routiers sans chauffeur (courte duree)
+DA11 Services de transport ferroviaire de personnes
+DA12 Services de transport aerien de personnes
+"DA13 Services de transport maritime, fluvial et cotier de personnes"
+DA14 Services de transport collectif routier et urbain de personnes
+DA15 Serv.transp. specialises de personnes en situation handicap
+"DA16 Billets de telepheriques, remontees mecaniques ou funiculaires"
+DA17 Peages autoroute et droits de stationnement
+DA18 Prestations de transports sanitaires 
+DA19 Prestations de transports funeraires
+DB11 Hebergement en hôtel (hors evenementiel)
+"DB12 Hebergement en pension, demi-pension, refuge, camping... (hors evenementiel)"
+DC01 Services de reservations par agences de voyage ou centrales de reservation
+DC11 Services de gestion des visas et des formalites administratives
+DC12 Voyages d etudes
+EA01 Assurances du parc vehicules routier
+EA02 Assurances de la flotte aerienne
+"EA03 Assurances des vehicules maritimes, fluviaux et lacustres"
+EA11 Assurances de biens immobiliers
+EA12 Assurances d'equipements scientifiques
+EA13 Assurances des marchandises transportees
+EA14 Assurances des animaux
+EA21 Assurance responsabilite civile
+EA22 Assurances rapatriement des agents en mission
+EA23 Assurances couverture sante / mutuelle
+EA24 Autres assurances
+EA31 Services de conseil et audit en assurance
+EB01 Etudes de marches dans le domaine de la valorisation de la recherche
+EB02 Assistance a maitrise d'ouvrage (hors batiments et si - telecom)
+EB03 Conseil en securite (hors chantier) et protection des biens et des personnes
+EB04 Autres missions d'etudes et de conseil (hors bâtiment et informatique)
+EB11 Audit organisationnel
+EB12 Audit ficier
+EB13 Certification legale des comptes
+"EB14 Audit energertique (environnemental, bilan carbone, ...)"
+EB15 Audit hygiene et securite
+EB16 Autres services d'audit et d'accreditation
+EB21 Enquetes
+EB22 Sondages
+EB23 Prestation de service de votes (urne ou electronique)
+EB31 Services bancaires
+EB32 Intermediation ficiere et activites de conseil
+EB33 Autres services ficiers et comptables
+EB41 Services d'administration d'immeubles et frais d'agences immobilieres
+EB51 Services de traduction
+EB52 Services d'interpretariat
+EB53 Services de transcription
+EB54 Services de sonorisation
+EB55 Services de sous-titrage
+EB56 Services de revision de textes
+EB61 Services de conseils juridiques
+EB62 Services d'etablissement d'actes authentiques et des auxiliaires de justice
+EB63 Services de representation juridique
+EC01 Formations d'accompagnement techniques et metiers scientifiques
+EC02 Formations d'accompagnement en langues
+EC03 Formations d'accompagnement en bureautique
+EC04 Formations d'accompagnement en prevention et securite
+"EC05 Formations d'accompagnement en methodes de travail (management, savoir etre, ...)"
+EC06 Formations d'accompagnement des fonctions support et soutien
+EC07 Autres formations d'accompagnement
+EC08 Tests professionnels
+"EC11 Formations d'apprentissage de la conduite (automobile, bateau, avion, ...)"
+EC12 Preparations aux concours
+EC13 Preparations aux examens professionnels
+EC14 Formations d'insertion professionnelle
+EC15 Autres formations preparatoires
+"EC21 Bilans de competences, vae, qualification, insertion professionnelle"
+EC22 Audits d'unites ou de services
+"EC23 Assistance, conseil et services en recrutement"
+"EC24 Psychologues, graphologues"
+EC25 Organisation de concours
+EC26 Services d'agences interim
+EC27 Autres services de gestion des ressources humaines
+EC31 Services sociaux de conseil en economie sociale et familiale 
+EC32 Services sociaux d'hebergement
+EC33 Services sociaux de reinsertion
+EC34 Services sociaux de soin et d'aide a domicile
+EC35 Services sociaux : assistantes sociales inter-entreprises
+EC36 Autres services sociaux
+EC41 Medecine de prevention : prestataires medicaux
+EC42 Medecine de prevention : fournitures medicales et de soin
+ED01 Services de depot de brevet d'invention et de logiciels app
+"ED02 Services de propriete intellectuelle : brevet d'invention, gestion des annuites"
+ED11 Autres services de propriete intellectuelle (hors brevets d'invention)
+EE01 Services de formation en presentiel
+EE02 Services de formation en ligne
+EE11 Certification diplomation en presentiel
+EE12 Certification diplomation en ligne
+EE21 Assistance a la conception de cours en ligne 
+FA01 Fournitures d'emballage et de transport de marchandises ordinaires
+FA02 Fournitures d'emballage pour le transport de marchandises specifiques
+FA03 Equipements pour le deplacement de marchandises et accessoires
+FA11 Equipements de pesee du courrier et d'horodatage
+FB01 Courrier : courriers et affranchissement ordinaire
+FB02 Courrier : services de coursiers et courriers express
+FB11 Services de distribution et routage
+"FB12 Services de boites postales, de poste restante ou de reexpedition"
+FC01 Transports routiers et urbains de marchandises (en affretement)
+FC02 Transports aeriens de marchandises
+FC03 Transports maritimes et fluviaux en conteneurs
+FC04 Transports ferroviaires de marchandises
+"FC05 Services des gares, aeroports, ports fluviaux et maritimes, ..."
+FC06 Transports administratifs de document
+FC11 Transports specialises d'animaux de laboratoire
+FC12 Transports specialises de produits biologiques un3373
+FC13 Transports de marchandises dangereuses
+FC14 Transports de produits infectieux (classe 6.2)
+FC15 Autres services de transport/expedition specialises
+FD01 Services de demenagement courants
+FD02 Services de demontage et de demenagement d'instruments
+FD03 Operations de manutention mecanique de materiel
+FD04 Services de location de vehicules pour transport de marchandises
+FD11 Services de garde-meubles
+FD12 Services d'entrepot gardiennage de materiel
+GA01 Acetylene de qualite industrielle en bouteille
+GA02 Air synthetique de qualite industrielle en bouteille
+GA03 Argon de qualite industrielle en bouteille
+GA04 Azote gazeux de qualite industrielle en bouteille
+GA05 Dioxyde de carbone de qualite industrielle en bouteille
+GA06 Helium gazeux de qualite industrielle en bouteille
+GA07 Hydrogene de qualite industrielle en bouteille
+GA08 Oxygene de qualite industrielle en bouteille
+GA09 Autres gaz simples ou en melange de qualite industrielle en bouteille
+GA11 Argon de tres haute purete (superieure a 5.0) en bouteille
+GA12 Azote gazeux de tres haute purete (superieure a 5.0) en bouteille
+GA13 Dioxyde de carbone de haute purete (purete superieure a d.0) en bouteille
+"GA14 Gaz rares de tres haute purete (neon, xenon, krypton,...) en bouteille"
+GA15 Helium gazeux de haute purete (purete superieure a 5.0) en bouteille
+GA16 Gaz fluores ou chlores de tres haute purete (superieure a d.0) en bouteille
+GA17 Hydrogene de haute purete (purete superieure a 5.0) en bouteille
+GA18 Oxygene de haute purete (purete superieure a 4.5) en bouteille
+GA19 Autres gaz non melanges haute purete en bouteille
+GA21 Melanges de gaz scientifiques de haute purete en bouteille
+GA31 Gaz medicaux 
+"GA41 Prestations connexes a l'achat de gaz en bouteilles (location de bouteilles, ...)"
+GA51 Azote liquide en vrac et dewar
+GA52 Helium liquide en vrac et dewar
+GA53 Argon en vrac et dewar
+GA54 Oxygene en vrac et dewar
+GA55 Glace carbonique (hors transport de produits biologiques)
+GA61 Prestations connexes a l'achat de gaz liquides et solides en vrac
+"GB01 Generateurs de gaz (air, azote, hydrogene, oxygene, ...)"
+"GB02 Materiel de traitement et purification des gaz (compresseurs, secheurs, ...)"
+GB03 Liquefacteurs et accessoires
+"GB04 Materiel de preparation des gaz (realisation de melanges, ...)"
+GB11 Materiel de stockage des gaz et produits cryogeniques
+GB12 Materiel de distribution des gaz et produits cryogeniques
+GB13 Cryogenerateurs et cryostats (hors microscopie et rmn)
+GB21 Instruments pour l'analyse des gaz (hors rga)
+GC01 Reparation et maintece des equipements de generation et traitement des gaz
+GC02 Reparation et maintece des equipements de stockage et distribution des gaz
+GC03 Reparation et maintece des cryogenerateurs et cryostats
+HA01 Epi : gants a usage unique
+"HA02 Epi : autres epi jetables (blouses, surchausses, charlottes, masques)"
+HA03 Epi : blouses et autres vetements de laboratoire reutilisables
+HA04 Epi : vetements de travail et de protection courants (hors laboratoire)
+"HA05 Epi : accessoires (lunettes, casques, ...)"
+HA06 Equipements et vetements de protection et securite individuelle speciaux
+HA07 Equipements de radioprotection individuelle
+"HA11 Consommables pour reception des dechets (absorbants, recipients, ...)"
+"HA12 Petit materiel de securite collective (signaletique, detecteurs)"
+HA21 Armoires de securite et rangements
+HA22 Enceintes de confinement des subst. dangereuses et consomm. associes
+HA23 Postes de securite microbiologiques (psm) - hottes et consommables associes
+HA24 Securite au travail : autres equipements speciaux et consommables associes
+"HB01 Securite au travail : reparation, maintece et verification des hottes et psm"
+HB02 Securite au travail : maintece et verif. des autres equip. de protection
+HC01 Services de location et entretien des blouses de laboratoire
+HC02 Services de location et entretien autres vetements de protection individuelle
+IA01 Micro-ordinateurs et stations de travail fixes
+IA11 Ordinateurs portables
+IA12 Autres appareils mobiles (tablettes et ordinateurs ultraportables)
+IA21 Imprimantes 
+IA22 Consommables pour imprimantes
+IA23 Petites fournitures pour le stockage externe des donnees
+"IA24 Autre materiel informatique peripherique (ecrans, claviers, souris, ...)"
+IA25 Composants internes pour ordinateurs
+IA31 Serveurs d'applications
+IA32 Systemes pour le stockage et la sauvegarde de donnees
+IA33 Serveurs pour le calcul ou l'exploitation de donnees scientifiques
+"IA34 Serveurs hautes performances, super calculateurs "
+IA41 Reseaux : petits equipements de reseaux informatiques
+IA42 Reseaux : equipements de reseaux informatiques
+IA43 Reseaux : equipements de transmission de donnees sans fil (dont bornes wi-fi)
+IA44 Reseaux : equipements de supervision et metrologie
+IA45 Reseaux : analyseurs
+"IA46 Conception, realisation de reseaux informatiques"
+IA51 Informatique : systemes de sortie pour la realite virtuelle
+IA52 Informatique : calculateurs embarques
+IA53 Informatique : robots prototypes
+IA54 Informatique : autres systemes de pilotage
+IA55 Informatique : capteurs pour la realite virtuelle
+IA56 Informatique : capteurs pour la robotique
+IA57 Informatique : actionneurs
+IB01 Droits d'utilisation de logiciels standards pour systeme et reseaux
+IB02 Droits d'utilisation de logiciels specifiques pour systeme et reseaux
+IB03 Maintece des logiciels pour systeme et reseaux
+IB11 Droits d'utilisation de logiciels standards de bureautique
+IB12 Droits d'utilisation de logiciels specifiques de bureautique
+IB13 Maintece des logiciels de bureautique
+IB21 Droits d'utilisation de logiciels standards de developpement
+IB22 Droits d'utilisation de logiciels specifiques de developpement
+IB23 Maintece des logiciels de developpement
+IB31 Droits d'util. des autres logiciels scientifiques
+IB32 Droits d'utilisation des autres logiciels
+IB33 Maintece des autres logiciels scientifiques
+IB34 Maintece des autres logiciels
+"IC01 Maintece et reparation des micro-ordinateurs, stations de travail fixes"
+IC02 Maintece et reparation des appareils mobiles
+IC11 Maintece et reparation des peripheriques informatiques
+IC21 Maintece et reparation des serveurs d'applications
+IC22 Maintece et reparation des syst. de stockage et de sauvegarde de donnees
+IC23 Maintece et reparation serveurs de calcul ou d'exploit. de donnees scientif.
+"IC24 Maintece et reparation des serveurs haute performance, super calculateurs"
+IC31 Maintece et reparation des equipements de reseaux informatiques 
+IC41 Maintece et reparation des systemes specialises
+ID01 Informatique : prestations d'administration et exploitation de services reseaux
+ID11 Informatique : schema directeur et audit
+ID12 Informatique : assistance a maitrise d'ouvrage
+ID13 Informatique : assistance a maitrise d'oeuvre
+ID14 Informatique : traitements informatiques
+ID15 Informatique : infogerance de systemes d'information
+ID16 Informatique : developpements d'application de systemes d'information 
+ID17 Informatique : developpements d'application a usage scientifique
+ID18 Informatique : autres missions d'etudes et de conseils
+ID19 Informatique : autres services informatiques
+IE01 Appareils de production audiovisuelle 
+IE02 Equipements de visioconference
+IE11 Pieces detachees pour l'audiovisuel
+IE12 Consommables pour l'audiovisuel (hors consommables informatiques)
+"IE21 Appareils de reception, enregistrement ou reproduction du son "
+"IE22 Consommables pour appareils de recep., enreg. ou repro. du son"
+"IE23 Appareils professionnels de recept., enreg. ou reprod. du son (broadcast)"
+IE31 Appareils de reception enregistrement reproduction image
+IE32 Videoprojecteurs
+IE33 Tableaux blancs interactifs
+"IE34 Consommables pour appareils de recept., enreg. ou reprod. de l'image "
+"IE35 Appareils professionnels de recep., enreg. ou reprod. de l'image (broadcast)"
+IE36 Materiel photographique
+IE37 Preparations et produits de laboratoire pour la photographie 
+IE41 Materiel cinematographique
+"IE42 Plaques, pellicules, films et surfaces sensibles pour le cinema"
+IE43 Preparations et produits de laboratoire pour le cinema
+IF01 Maintece et repar. d'appareils de production audiovisuelle
+"IF02 Maintece et repar. des appareils de recept., enreg. ou reprod. du son"
+"IF03 Maintece et repar. des appareils profes. de recep., enreg. ou reprod. du son"
+IF04 Maintece et repar. des appareils de recept. enreg. ou reprod. de l'image
+"IF05 Maintece et repar. des appar. profes. de recep., enreg. ou reprod. de l'image"
+IF06 Maintece et repar. du materiel photographique
+IF07 Maintece et repar. du materiel cinematographique
+IG01 Telecommunications : terminaux de telephonie fixe
+IG02 Telecommunications : terminaux de telephonie mobile
+"IG03 Telecommunications : autres terminaux : telecopieurs, teleimprimeurs"
+IG04 Telecommunications : autres equipements de telecomunications
+IH01 Maintece et reparation des equipements de telephonie
+IH02 Maintece et reparation des postes telephoniques d'usagers et autres terminaux
+IH03 Maintece et reparation des autres equipements de telecomunications
+"II01 Telecom : consommations, abonnements, raccordements telephonie filaire"
+"II02 Telecom : consommations, abonnements telephonie mobile (voix et data)"
+"II03 Telecom : liaisons specialisees (fibres optiques, noires, liaisons louees...)"
+"II04 Telecommunications : consommations, abonnements liaisons iridium"
+II05 Telecommunications : prestations de reprise et reintegration des donnees
+II11 Telecommunications : installation et montage de materiel de telephonie 
+II12 Telecommunications : mise en place de plate-formes telephoniques
+II13 Telecommunications : services de conseil / amo en telecommunication 
+"JA01 Armoires simples, rangements, chaises et chariots de laboratoire"
+JA02 Paillasses de laboratoire
+JA03 Cloisons de salle blanche
+"JA11 Traitement de l'air : equipements de purification de l'air (salle blanche, ...)"
+JA12 Traitement de l'air : consommables et pieces detachees dedies aux equipements
+JA13 Traitement de l'eau : materiel de purification d'eau et accessoires
+JA14 Traitement de l'eau : consommables et pieces detachees
+"JB01 Traitement de l'air : reparation et maintece equipements (salle blanche, ...)"
+"JB11 Traitement de l'eau : reparation et maintece des equipements (osmoseurs, ...)"
+KA01 Rats et lignees entretenues de rats
+KA02 Souris et lignees entretenues de souris
+KA03 Cobayes et lignees entretenues de cobayes
+KA04 Lapins et lignees entretenues de lapins
+"KA05 Autres rongeurs et petits mammiferes (chiens, chats, ...)"
+KA11 Primates et lignees entretenues de primates
+KA12 Bovins et lignees entretenues de bovins
+"KA13 Ovins, caprins et lignees entretenues d'ovins et caprins"
+KA14 Porcins et lignees entretenues de porcins
+KA15 Autres gros mammiferes (equides)
+KA21 Volailles et lignees entretenues de volailles
+KA22 Oeufs d'oiseaux
+KA23 Autres oiseaux que volailles
+KA31 Amphibiens et lignees entretenues d'amphibiens
+KA32 Poissons et lignees entretenues de poissons
+"KA33 Insectes, arachnides et lignees entretenues d'insectes et arachnides"
+"KA34 Autres animaux (crustaces, mollusques, reptiles)"
+"KA41 Animaux sans finalite experimentale (chevaux d'equitation, ...)"
+KB01 Aliments non composes pour rongeurs et petits mammiferes
+KB02 Aliments composes pour rongeurs et petits mammiferes
+KB03 Complements vitaminiques et oligo-elements pour rongeurs et petits mammiferes
+"KB11 Aliments orig. animale compos., condition. ou transf. pr gros mammif. et oiseaux"
+"KB12 Aliments vegetaux composes, conditionnes ou transf. pr gros mammif. et oiseaux"
+KB13 Complements alimentaires pour gros mammiferes et oiseaux
+KB21 Aliments pour primates fruits et legumes pour l'alimentation des animaux
+"KB22 Aliments recoltes pour gros mammiferes et oiseaux (grain, fourrage,...)"
+KB23 Viandes et poissons pour l'alimentation des animaux
+KB24 Petits animaux vivants pour l'alimentation des animaux
+"KB31 Aliments pour autres animaux (poissons, batraciens, etc.)"
+KB41 Matieres premieres pour la fabrication d'aliments pour animaux
+KC01 Equipements et consommables d'identification des animaux (marquage)
+KC11 Equipements de contention (cages...) et accessoires d'animalerie
+KC12 Equipements de contention des gros mammiferes
+"KC13 Equipements de contention des poissons, reptiles et batraciens"
+KC21 Litiere
+KC22 Materiel de lavage et desinfection des animaleries et milieux d'elevage
+KC23 Consommables d'hygiene et de soin des animaux
+KC24 Consommables et produits veterinaires
+KC25 Materiels pour l'entretien et le soin des animaux
+KC31 Materiel de preparation et de distribution d'aliments pour animaux
+KC32 Materiel pour la conservation d'aliments pour animaux
+KC41 Vetements et equipements pour l'equitation
+"KC42 Materiels et consommables de traite, abattage, criblage"
+KC51 Materiels et consommables pour l'etude du comportement animal
+KD01 Substances actives medicamenteuses veterinaires naturelles
+KD02 Substances actives medicamenteuses veterinaires synthetiques
+KD03 Excipients veterinaires d'origine naturelle
+KD04 Excipients veterinaires d'origine synthetique
+KD05 Medicaments et preparations medicamenteuses a destination animale
+KD11 Vaccins pour experimentation animale
+KD12 Additifs pour vaccins pour experimentation animale
+KD21 Consommables et produits de soins pour experimentation animale
+KE01 Equipements d'imagerie animale
+KE02 Consommables d'imagerie animale
+KE11 Materiels d'anesthesie
+KE12 Materiels chirugicaux et de techniques operatoires animales
+KE13 Consommables d'anesthesie et de techniques operatoires animales
+"KE21 Materiels cardiovasculaires, renaux et respiratoires"
+KE22 Consommables pour equipements d'experimentation animale
+KE23 Autres equipements d'investigation animale
+KE31 Autres equipements et consommables d'experimentation animale
+KE41 Equipements et consommables pour l'exploitation animale
+KE51 Materiels et consommables pour l'etude du comportement animal
+KF01 Maintece repar. contrôle materiel de desinfect. et lavage des animaleries
+KF02 Maintece et reparation des autres equipements d'elevage animal
+KF03 Maintece et reparation des materiels pour l'etude des animaux
+KF11 Maintece et reparation des materiels d'imagerie animale
+KF12 Maintece et reparation des materiels d'anesthesie et de techniq. operatoires
+KF13 Maintece et reparation des materiels d'investigation animale
+KF14 Maintece et reparation des autres materiels d'experimentation animale
+KG01 Services d'externalisation de la gestion d'une animalerie
+KG02 Controles sanitaires et analyses veterinaires
+KG03 Services relatifs a la reproduction des animaux
+KG04 Autres services veterinaires
+KG05 Autres services relatifs a l'elevage des animaux
+KG06 Services relatifs a la cryoconservation
+KG11 Services d'imagerie animale
+KG12 Autres services d'experimentation animale
+LA01 Substances actives medicamenteuses naturelles
+LA02 Substances actives medicamenteuses synthetiques
+LA03 Excipients d'origine naturelle
+LA04 Excipients d'origine synthetique
+LA05 Medicaments et preparations medicamenteuses
+LA11 Vaccins
+LA12 Additifs pour vaccins
+"LB01 Equipements de cabinets medicaux, y compris pour medecine du travail"
+"LB02 Petit materiel pour cabinets medicaux, y compris pour medecine du travail"
+LB03 Produits et consommables de soins medicaux
+"LB11 Equipements d'imagerie medicale (irm, scanner,...)"
+LB12 Consommables pour les equipements d'imagerie medicale
+LB21 Equipements d'anesthesie et de techniques operatoires
+LB22 Consommables d'anesthesie et de techniques operatoires
+"LB31 Materiel d'investigation cardiovascul., renale et respirat."
+LB32 Autres equipements d'investigation clinique
+LB33 Consommables et reactifs d'investigation clinique
+LB41 Automates d'analyses medicales
+LB42 Consommables pour automates d'analyses medicales
+LB51 Petits materiels pour odontologie
+LB52 Produits et consommables  pour odontologie
+LB53 Equipements d'imagerie  pour odontologie
+LB54 Consommables d'imagerie pour odontologie
+"LB61 Fournitures optiques (verres, lunettes, ...)"
+LB62 Materiels d'ophtalmologie
+"LC01 Maintece et reparation des equipements d'imagerie medicale (irm, ...)"
+LC02 Maintece et reparation du materiel d'anesthesie et de tech. operatoires
+LC03 Maintece et reparation des equipements d'investigation clinique
+LC04 Maintece et reparation des equipements de biochimie clinique
+LC05 Maintece et reparation des equipements d'odontologie
+LC06 Maintece et reparation des materiels d'ophtalmologie
+LD01 Services de conduite d'essais cliniques (phases i a iv)
+"LD02 Serv. de cond. d'etudes et d'enquêtes d'epidemio., sante publ. et sociol medic."
+"LD03 Serv. de cond. d'etudes a caractere medical, hors essais cliniques et enquêtes"
+LD11 Services d'irm
+LD12 Autres services d'imagerie medicale
+LD21 Services d'analyses sanguines
+LD22 Autres services d'analyse medicale
+LD31 Ne plus utiliser
+LD32 Services de biobanques
+LD33 Autres services medicaux
+MA01 Materiel de preparation d'echantillons pour microscopie
+MA02 Consommables pour la preparation d'echantillons (hors lames)
+"MA11 Microscopes a champ proche (afm, spm, snom, electrochimiques)"
+MA12 Profilometres a contact
+MA13 Pointes et autres consommables pour microscopes a champ proche
+MA14 Microscopie a champ proche : autre materiel et pieces detachees
+MA15 Microscopie a champ proche : electronique de remplacement
+MA21 Microscopes electroniques et ioniques
+MA22 Microscopie electronique et ionique : detecteurs specifiques
+MA23 Microscopie electronique et ionique : cameras
+MA24 Microscopie electronique et ionique : autre materiel et pieces detac. hors n1
+MA25 Microscopie electronique et ionique : electronique de remplacement
+MA31 Systèmes de microscopie acoustique
+"MA32 Microscopie acoustique : accessoires, consommables et pieces detachees"
+MA33 Microscopie acoustique : electronique de remplacement
+MA41 Microscopie a angle de brewster : equipements et accessoires
+MA42 Profilometres optiques
+MA43 Microscopie photonique et de fluorescence : loupes et stereomicroscopes
+MA44 Microscopes photoniques et de fluorescence
+MA45 Lampes pour microscopes photoniques et de fluorescence
+MA46 Microscopie optique : autre materiel et pieces detachees hors o0
+"MA47 Autres microscopes optiques (magneto-optiques, à emission de lumière)"
+MA48 Microscopie optique : electronique de remplacement
+MB01 Materiel de prep. d'echantillons pr microscopie : reparation et maintece
+MB02 Microscopie a champ proche et profilometrie : reparation et maintece
+MB03 Microscopie electronique et ionique : reparation et maintece
+MB04 Microscopie acoustique : reparation et maintece du materiel
+MB05 Microscopie optique : reparation et maintece
+MC01 Microscopie a champ proche et profilometrie a contact : services d'analyse
+MC02 Microscopie electronique et ionique : services d'analyse
+MC03 Microscopie acoustique : services d'analyse
+MC04 Microscopie photonique et profilometrie optique : services d'analyse
+NA01 Solvants : acetate d'ethyle et autres esters
+NA02 Solvants : acetone
+NA03 Solvants : acetonitrile
+"NA04 Solvants : solvants chlores (dichloromethane, chloroforme, ...)"
+"NA05 Solvants : eau et alcools (methanol, ethanol, propan-2-ol, ...)"
+"NA06 Solvants : hydrocarbures (pentane, hexane, heptane, ...)"
+"NA07 Solvants : autres solvants (ethers, ...)"
+NA08 Solvants : solvants industriels (futs et tonnelets)
+"NA11 Solvants isotopiques (deuteries, ...)"
+NA12 Produits liquides et solides isotopiques non radioactifs (hors solvants)
+NA13 Chimie et biologie : produits radioactifs
+"NA21 Produits chimiques courants (acides, bases, sels...)"
+NA22 Produits chimiques pour la synthese organique
+NA23 Metaux purs et reactifs pour la science des materiaux
+"NA24 Etalons de calibration, standards et produits de reference"
+"NA25 Produits biochimiques courants (tampons, bsa, etc.)"
+NA26 Biologie : peptides et acides amines
+NA27 Biologie : proteines recombites (a facon)
+NA28 Biologie : produits chimiques a usage biochimique ou biologique
+NA31 Reactifs et kits pour le marquage et la detection des acides nucleiques
+NA32 Reactifs et kits pour le marquage et la detection des proteines
+NA41 Anticorps primaires non couples (hors anticorps controles et anti-tag)
+NA42 Anticorps primaires non couples controles
+NA43 Anticorps primaires non couples anti-tag
+NA44 Anticorps primaires couples marqueurs de cellules
+NA45 Autres anticorps primaires couples
+NA46 Anticorps secondaires
+NA47 Reactifs d'immunohistologie et d'histochimie
+NA51 Oligonucleotides de synthese et acides nucleiques
+NA52 Kits et reactifs pour l'isolement et la purification des acides nucleiques
+NA53 Enzymes de restriction
+"NA54 Enzymes de modification et de clonage (nucléases, kinases, phosphatases)"
+NA55 Enzymes et kits de synthese des acides nucleiques (pcr)
+NA56 Kits et reactifs pour l'isolement et la purification des proteines
+"NA61 Autres produits d'origine biologique (sang, ...)"
+NA62 Biopuces (microarrays)
+NA71 Serums et autres milieux pour culture de cellules animales
+NA72 Milieux pour culture de cellules vegetales
+NA73 Milieux pour culture de petits organismes vivants
+NA74 Milieux de bacteriologie et additifs
+NA75 Autres milieux de culture et additifs
+NA76 Antibiotiques pour culture cellulaire
+"NA77 Cytokines, facteurs de croissance et inhibiteurs"
+NA78 Enzymes pour culture cellulaire
+NA79 Autres produits pour culture cellulaire
+"NA81 Cellules, virus et petits organismes hors animaux"
+"NA82 Kits d'isolement et de detection des cellules, virus et organites"
+NA83 Biologie cellulaire : produits et reactifs biochimiques (de dosage)
+"NA84 Biologie cellulaire : kits de dosage, d'essai fonctionnel - kits biochimiques"
+NA85 Microbiologie : reactifs et kits biochimiques
+"NB01 Micropipettes mono-canal, multi-canaux et accessoires"
+NB02 Pointes (cones) pour micropipettes mono-canal et multi-canaux
+NB03 Seringues en plastique et aiguilles
+NB04 Pipettes a usage unique
+NB05 Pipettes reutilisables
+"NB11 Microtubes, cryotubes, tubes a usage unique"
+NB12 Portoirs et boites de stockage pour microtubes
+NB13 Culture cellulaire eucaryote : consommables en plastique specifiques
+NB14 Bacteriologie : consommables en plastique specifiques
+"NB15 Microplaques (pcr, hts, elisa) hors culture cellulaire et filtration"
+NB16 Lames et lamelles en verre et plastique
+NB17 Autres consommables en plastique et en verre hors culture cell. et bacterio
+NB21 Consommables de chromatographie et d'extraction non dedies aux instruments
+NB22 Electrophorese sur gel : consommables non dedies aux instruments
+NB23 Membranes et kits pour le transfert d'acides nucleiques et des proteines (blot)
+NB24 Consommables pour filtration et dialyse
+NB31 Films autoradiographiques et photographiques et reactifs
+NB32 Huile a immersion pour microscopie
+NB33 Consommables lampes et ampoules diverses (hors microscopie et spectro)
+"NB34 Produits de lavage, desinfection, sterilisation"
+NB35 Autres consommables de labo hors plastique et verre
+"NB41 Rotors rmn, tubes rmn et bouchons associes"
+NB42 Verrerie soufflee (a facon)
+"NB43 Vaisselle de laboratoire reutilisable en verre, plastique, porcelaine"
+NB44 Cuvettes en verre et quartz pour spectrometres
+"NB45 Recipients, creusets en materiaux speciaux (hors cibles)"
+NB51 Petit materiel de paillasse non electrique courant
+NB61 Electrochimie de paillasse : materiel et consommables
+NB62 Electrochimie : potentiostats / galvanostats et accessoires
+"NB71 Balances, materiel de pesee de paillasse et accessoires"
+NB72 Agitateurs magnetiques chauffants ou non
+"NB73 Agitateurs, melangeurs et accessoires"
+"NB74 Broyage, fractionnement, tamisage : materiel et accessoires"
+NB75 Pompes (hors vide va.01) (pompes osmotiques)
+"NB76 Chauffage : fours simples, bruleurs, plaques, chauffe-ballons, ..."
+"NB77 Thermostatisation et sechage : etuves, enceintes, bains, dessicateurs"
+NB78 Microcentrifugation : microcentrifugeuses et cytocentrifugeuses
+NB79 Chimie et biologie : autre materiel electrique de paillasse courant
+NB81 Centrifugation : centrifugeuses et ultracentrifugeuses
+"NB82 Centrifugation : accessoires (rotors, godets)"
+"NB83 Incubation : incubateurs, incubateurs a co2 et accessoires"
+"NB84 Froid : banques de sang, congelateurs, refrigerateurs, ..."
+"NB85 Purification des solvants, acides et bases : materiel et accessoires"
+NB86 Lavage : materiel et accessoires
+NB87 Sterilisation et desinfection : sterilisateurs et accessoires
+NC01 Electrophorese sur gel et transfert : petit materiel et accessoires dedies
+NC02 Purification des biomolecules : automates et accessoires dedies
+NC03 Purification des biomolecules : consommables dedies aux automates
+NC04 Extraction et separation des molecules : equipement de flash chromatographie
+NC05 Extraction et separation des molecules : consommables pour flash chromatographie
+"NC06 Separation des molecules : autres equipements (sfc, cpc, extracteurs)"
+NC07 Separation des molecules : consommables dedies aux autres equipements
+NC11 Biomol : imageurs pour gels et membranes et accessoires
+NC12 Biomol : compteurs de radioactivite (simple ou multi detection)
+NC13 Biomol : scanners (lecteurs optiques) de biopuces
+"NC14 Biomol : scanners / imageurs multifonctions (in vitro, in vivo, gels, ...)"
+NC15 Biomol : automates d'hybridation in situ et accessoires
+"NC16 Biomol : sequenceurs, analyseurs genetiques et accessoires"
+NC17 Biomol : sequenceurs haut debit
+NC21 Biologie moleculaire : thermocycleurs pour pcr conventionelle et accessoires
+NC22 Biologie moleculaire : thermocycleurs pour pcr quantitative et accessoires
+NC23 Biologie : automates pour la synthese des oligonucleotides et accessoires
+NC24 Biologie : automates pour la synthese des peptides et accessoires
+NC25 Chimie : appareils et reacteurs pour la chimie organique
+NC31 Biologie : station d'hybridation de biopuces (microarrays)
+NC32 Chimie et biologie : stations de pipetage automatisees
+NC33 Chimie et biologie : pointes (cones) pour robots de pipetage
+NC34 Chimie et biologie : automates de screening haut debit
+NC35 Chimie et biologie : automates d'electrophysiologie
+NC41 Culture cellulaire : fermenteurs et bioreacteurs
+"NC51 Materiel de micromanipulation des cellules, accessoires et consommables dedies"
+NC52 Biologie cellulaire : materiel de detection intracellulaire
+NC53 Detection intracellulaire : consommables dedies aux instruments
+NC54 Cytometrie en flux et tri cellulaire : materiel et accessoires
+NC55 Cytometrie en flux et tri cellulaire : consommables dedies aux instruments
+NC56 Comptage cellulaire : materiel et accessoires
+NC57 Comptage cellulaire : consommables dedies aux instruments
+NC58 Electrophysiologie conventionnelle (patch clamp) : materiel et accessoires
+NC59 Electrophysiologie conventionnelle : consommables dedies aux instruments
+NC61 Genie chimique : reacteurs
+NC62 Genie chimique : equipements de purification
+NC63 Genie chimique : autres equipements
+NC64 Genie chimique : accessoires et consommables
+"NC71 Chimie : appareils d'analyse elementaire (chns-o, aox, tn, ts,... )"
+NC72 Chimie : analyseurs de mercure
+"NC73 Chimie : appareils de speciation (du mercure, ...)"
+"NC74 Chimie : analyseurs des sels nutritifs (silicate, phosphate, nitrate,...)"
+NC75 Chimie : autres instruments d'analyse de l'eau
+NC76 Chimie : autres instruments d'analyse de l'environnement
+NC81 Chimie et physico-chimie : equipements de tests pharmaceutiques
+ND01 Micropipettes mono et multicanales : maintece - verification - reparation
+ND02 Verrerie soufflee : reparation
+ND03 Balances pour la chimie et biologie : maintece - reparation - verification 
+ND04 Centrifugeuses : maintece - reparation - verification
+ND05 Autre materiel de paillasse courant : maintece - verification - reparation
+ND11 Chambres et autres machines thermiques : maintece - reparation
+ND12 Incubateurs et incubateurs a co2 : maintece - reparation
+ND13 Sterilisateurs : maintece - reparation - contrôle
+"ND14 Autre materiel courant de labo : reparatio, maintenance, calibration"
+ND21 Materiel de separation/purification des molecules : maintece - reparation
+ND31 Materiel de detection pour la bio. mol. : maintece reparation
+ND32 Sequenceurs et analyseurs genetiques : maintece - reparation
+ND41 Thermocycleurs et automates de synthese : maintece - reparation
+ND51 Autres robots et automates : maintece - reparation
+"ND52 Cytometrie, comptage et tri cellulaire : maintece - reparation"
+ND53 Autres equipements de biologie cellulaire : maintece - reparation
+ND54 Equipements de genie chimique : reparation et maintece
+"ND55 Autre materiel specifiq. de chimie et physico-chimie : maintece, reparation"
+NE01 Biologie : services de sequencage bas debit et services connexes
+NE02 Biologie : services de sequencage haut debit et services connexes
+NE03 Biologie : services de genotypage et services connexes
+NE04 Biologie : autres services d'analyse genetique
+NE11 Biologie cellulaire : services de cytometrie en flux et de tri cellulaire
+NE12 Biologie cellulaire : autres services
+NE21 Biologie et chimie : services d'analyses par chromatographie (hplc)
+NE22 Biologie : autres services d'analyses biologiques et biochimiques
+NE23 Chimie : autres services d'analyse chimique
+NE24 Genie chimique : services d'etudes de procedes
+NE25 Chimie et biologie : autres services
+OA01 Opto : lentilles et systemes de lentilles
+OA02 Opto : miroirs
+"OA03 Opto : reseaux (diffraction, compression, ...)"
+"OA04 Opto : lames, fenetres et cristaux optiques"
+"OA05 Opto : filtres optiques, polarisateurs, cubes et prismes"
+OA06 Opto : fibres optiques
+OA07 Opto : autres composants optiques passifs
+OA08 Opto : masques et materiel coronographique
+OA11 Opto : cameras uv-visible
+OA12 Opto : cameras infra-rouge
+OA13 Opto : cameras a rayons x
+OA14 Opto : optique pour cameras
+OA15 Opto : detecteurs et autre materiel d'optoelectronique (hors cameras)
+OA21 Opto : micropositionnement et optomecanique
+"OA22 Opto : bancs, tables optiques, et accessoires"
+OA31 Opto : lasers a gaz
+OA32 Opto : lasers a solide
+OA33 Opto : lasers a semi-conducteurs (diodes lasers)
+OA34 Opto : lasers a vapeur metallique
+OA35 Opto : lasers a fibre
+OA36 Opto : lasers a colorants organiques (dye lasers)
+"OA37 Opto : autres types de lasers (chimiques, ...)"
+OA38 Opto : lampes et autres sources lumineuses (lampes flash ou continue...)
+"OA39 Opto : accessoires et consommables (colorants, ...) pour lasers"
+OA41 Opto : outillage pour l'optique
+OA42 Opto : instruments de metrologie des faisceaux lasers
+OA43 Opto : pyrometres optiques
+"OA44 Opto : autres instruments de metrologie optique (reflectometres, ...)"
+"OA45 Opto : telescopes, lunettes astronomiques, jumelles et accessoires"
+OA51 Systemes optiques ou opto electroniques complexes
+OB11 Opto : reparation verification maintece des lasers
+OB12 Opto : reparation verification maintece des cameras
+OB13 Opto : reparation verification maintece des autres equipements d'optique
+"OC01 Opto : services d'usinage des composants optiques (polissage,...)"
+OC02 Opto : services de traitement de surface des composants optiques
+OC03 Opto : services de controle des composants optiques
+OC04 Opto : services d'etudes et conception en optique
+OC05 Opto : services de tests en optique
+PA01 Radioactivite : sources radioactives
+PA02 Radioactivite : instruments de mesure (hors detection en biologie)
+PA11 Production de particules : canons a electrons et canons a ions
+PA12 Production de particules : accessoires et pieces detachees de canons
+PA21 Materiel pour l'acceleration des particules
+PA22 Materiel pour la convergence des faisceaux de particules
+PA23 Materiel de mesures de l'acceleration des particules
+"PB01 Instruments de calorimetrie, analyse thermique et thermomecanique"
+"PB02 Instruments de metrologie mecanique du solide (rheologie, ...) et accessoires"
+PB03 Instruments de caracterisation mecanique des surfaces et accessoires
+PB04 Granulometres lasers et accessoires
+PB05 Zetametres et accessoires
+PB06 Autres appareils d'analyse des particules solides et accessoires
+PB07 Autres instruments pour la caracterisation des solides  et accessoires
+PB11 Appareils de mesure / capteurs de pression
+PB12 Appareils de mesure / capteurs de temperature (hors cryogenie)
+PB13 Appareils de mesure / capteurs de vitesse / debit
+"PB21 Systemes magnetiques (aimants permanents, ...)"
+PB22 Instrumentation magnetique
+PB23 Systemes cryomagnetiques (hors rmn)
+PB24 Systemes de mesures cryogeniques
+PB25 Materiaux supraconducteurs
+PB31 Systemes de mesure a sonde de langmuir
+"PB32 Balances specifiques (balances d'adsorption, ...)"
+"PB33 Appareils de mesure de la charge electrique (electrometres, ...)"
+PB34 Appareils de mesures acoustiques
+PB35 Appareils de mesures physiques multiples
+PB36 Appareils pour autres mesures physiques
+PB41 Physico-chimie : fours speciaux hors techniques sous vide
+PB42 Materiel de cristallogenese
+PB43 Trempe sur roue (melt spinner)
+PB44 Physique : autres appareils speciaux
+PB51 Groupes frigorifiques
+PC01 Reparation et maintece des equipements de mesure de la radioactivite
+PC02 Production et acceleration des particules : reparation et maintece
+PC11 Reparation et maintece des appareils de caracterisation des materiaux
+PC21 Reparation et maintece des appareils de mesures physiques courants
+PC22 Reparation et maintece des autres appareils de mesures physiques
+PC23 Physique : reparation et maintece des autres appareils speciaux
+PC31 Maintece des groupes frigorifiques
+PD01 Mesure de la radioactivite : services de datation (au carbone 14)
+PD02 Physique nucleaire et corpusculaire : autres services
+PD11 Mesures physiques : services de caracterisation des materiaux
+QA01 Experimentation vegetale : plantes et plants
+QA02 Experimentation vegetale : semences et tubercules
+QA03 Experimentation vegetale : champignons
+QA04 Experimentation vegetale : vegetaux marins
+QA05 Experimentation vegetale : autres vegetaux
+QA11 Substrats de culture d'origine naturelle ou artificielle
+QA12 Fertilisants pour vegetaux type engrais
+QA13 Nutriments additionnels pour vegetaux et fertilisants des sols 
+QA21 Produits phytosanitaires contre les pathogenes vegetaux et plantes concurrentes
+QA22 Produits phytosanitaires contre les pathogenes cryptogamiques 
+QA23 Produits phytosanitaires insecticides et a usage repulsif
+QA24 Autres moyens de protection ou de conservation des vegetaux
+QB01 Experimentation vegetale : petites fournitures et consommables courants
+QB02 Experimentation vegetale : petites fournitures et consommables pour serres
+QB03 Petites fournitures hors serres pour la protection des espaces cultives
+QB04 Experimentation vegetale : autres petites fournitures et consommables
+QB11 Experimentation vegetale : serres
+QB12 Materiel et accessoires destines a l'experimentation vegetale sous serre
+QB21 Engins de traction agricole
+QB22 Engins tractes et equipements de manutention agricole
+QB23 Equipements tractes et machines automotrices pour travail des sols
+QB31 Equipements tractes et machines pour les semis et plantations
+QB32 Equipements d'irrigation des cultures
+QB33 Equipements de mesures hydrometriques et d'optimisation de l'irrigation
+"QB34 Materiel pour la fertilis., la protect. et l'entret. des cultures"
+QB35 Machines pour la recolte des fourrages conserves secs
+QB36 Machines pour la recolte des fourrages verts destines a l'ensilage
+"QB37 Machines pour la recolte des cereales, du colza et des proteagineux"
+QB38 Machines pour la recolte des tubercules
+QB39 Equipements de stockage et de conservation des aliments cultives
+QB41 Equipements et materiel specifiques pour la viticulture experimentale
+QB42 Equipements et materiel specifiques pour la sylviculture et l'arboriculture
+"QB43 Materiel de coupe commun a la viticulture, la sylviculture et l'arboriculture"
+QB51 Materiel destine a l'experimentation agronomique
+QC01 Reparation et maintece du materiel d'experimentation vegetale
+QD01 Experimentation vegetale : services d'expertise des sols
+QD02 Services d'expertise botanique
+QD03 Services d'entretien des sols et des cultures experimentales
+QD04 Services de recolte et de conditionnement des produits vegetaux
+QD05 Autres services connexes aux cultures experimentales
+RA01 Metaux (materiaux a usiner et pieces sur catalogue)
+RA02 Metaux nobles (materiaux a usiner et pieces sur catalogue)
+RA03 Plastiques (materiaux a usiner et pieces sur catalogue)
+RA04 Ceramiques  (materiaux a usiner et pieces sur catalogue)
+RA05 Composites  (materiaux et pieces sur catalogue)
+RA06 Materiaux organiques autres que plastiques  (materiaux et pieces sur catalogue)
+RA11 Machines-outils a commande numerique
+RA12 Accessoires pour machines-outils a commande numerique
+RA13 Machines-outils conventionnelles
+RA14 Accessoires pour machines-outils conventionnelles
+RA15 Consommables pour machines-outils (cn et conventionnelles)
+RA16 Outillage d'atelier non portatif
+RA17 Consommables pour outillage d'atelier non portatif
+"RA18 Machines 3d (imprimantes et scaners 3d, ...) et accessoires"
+RA19 Consommables pour machines 3d
+RA21 Outils electroportatifs et accessoires
+RA22 Outils a main non electroportatifs
+RA23 Quincaillerie - autres fournitures d'atelier diverses
+RA31 Mobilier d'atelier
+RA32 Rangements d'atelier
+RA33 Amenagements d'atelier
+RA41 Pont roulants et chariots elevateurs (hors batiments)
+RA42 Autres equipements mecaniques speciaux
+RB01 Automatique : maquettes de mise en situation ou de prototypage
+RB02 Automatique : elements de systeme electro-mecanique
+RB03 Automatique : elements de contrôle commande
+RC01 Reparation et maintece des machines et outils d'ateliers
+RC02 Reparation et maintece des ponts roulants et chariots elevateurs
+RC03 Reparation et maintece des autres gros materiels d'atelier
+RC11 Automatique : reparation et maintece des systemes electro-mecaniques
+RC12 Automatique : reparation et maintece des elements de contrôle commande
+RC13 Automatique : reparation et maintece de l'instrumentation specifique
+RD01 Services d'etudes et de conception de pieces mecaniques
+RD02 Pieces mecaniques usinees a facon
+RD03 Services de traitement de surface et traitement thermique de pieces mecaniques
+RD04 Services de blindage (electromagnetique)
+RD05 Services de metrologie et de contrôles en mecanique
+RD06 Services d'essais mecaniques
+RD07 Services de traitement de surface de pieces destinees aux experiment. spatiales
+"RD11 Automatique : services d'etude, conception, integration"
+RD21 Droits d'util. de logiciels de cao en mecanique
+RD22 Droits d'util. de logiciels de program. des machines a comde num.
+RD23 Droits d'util. de logiciels de simulation numerique
+RD24 Droits d'util. des autres logiciels pour la mecanique
+RD25 Maintece des logiciels pour la mecanique
+RD31 Droits d'util. des logiciels pour l'automatique
+RD32 Maintece des logiciels pour l'automatique
+SA01 Spectrometrie rmn : spectrometres complets
+SA02 Spectrometrie rmn : cryosondes / tetes de mesures
+SA03 Spectrometrie rmn : aimants supraconducteurs
+SA04 Spectrometrie rmn : consoles electroniques
+"SA05 Spectrometrie rmn : autre materiel, accessoires, pieces detachees"
+SA11 Spectrometrie rpe : spectrometres complets
+"SA12 Spectrometrie rpe : autre materiel, accessoires, pieces detachees"
+SB01 Spectrometrie de masse des ions secondaires : sondes ioniques ims
+SB02 Spectrometrie de masse des ions secondaires : autre materiel et pieces det.
+SB11 Spectroscopie massique de decharge luminescente (gdms) : spectrometres complets
+SB12 Spectroscopie gdms : autre materiel et pieces detachees 
+SB21 Spectrometres de masse a resoce cyclotronique d'ions (ft-icr)
+SB22 Spectrometrie ft-icr : autre materiel et consommables dedies
+SB23 Spectrometres de masse pour la biologie
+SB24 Spectro de masse pour la biologie : autre materiel et consommables dedies
+SB31 Spectrometres de masse pour la chimie
+SB32 Spectro de masse pour la chimie : autre materiel et consommables dedies 
+"SB51 Chromatographie liquide analytique : chaines, detecteurs, pompes"
+SB52 Chromatographie liquide analytique : colonnes et autres consommables dedies
+"SB53 Chromatographie gazeuse analytique : chaines, fours, detecteurs, ..."
+SB54 Chromatographie gazeuse analytique : colonnes et autres consommables dedies
+SB55 Materiel d'electrophorese capillaire : instruments
+SB56 Materiel d'electrophorese capillaire : consommables dedies aux instruments
+SC01 Diffraction x : diffractometres a rayons x complets
+SC02 Diffraction x : generateurs de rayons x
+SC03 Diffraction x : autre materiel et consommables dedies
+SC04 Diffusion des rayons x : systemes complets
+SC05 Diffusion des rayons x : autre materiel et consommables dedies
+SC11 Spectrometrie de fluorescence x (xrf) : spectrometres complets
+SC12 Spectrometrie de fluorescence x : autre materiel et consommables dedies
+SC21 Rayons x : tomographes a rayons x
+SC22 Rayons x : autre materiel et consommables dedies aux instruments
+"SD01 Spectrometres electroniques (auger, xps, esca, leed, rheed,..)"
+SD02 Spectrometrie electronique : autre materiel et consommables dedies
+"SD03 Appareils de spectrometrie ionique (heis ou rbs, meis, ...)"
+SD04 Spectrometrie ionique : autre materiel et consommables dedies
+SE01 Spectrometrie raman : spectrometres complets
+SE02 Spectrometrie raman : autre materiel et pieces detachees dedies
+SE11 Spectrophotometrie uv-visible : lecteurs de microplaques (sans radioactivite)
+SE12 Spectrometres uv-visible et infra rouge (hors lecteurs de microplaques)
+SE13 Spectrophotometrie uv-visible : autre materiel et consommables dedies
+SE14 Spectrofluorimetres et fluorimetres (hors lecteurs de microplaques)
+SE15 Spectrofluorimetrie et fluorimetrie : autre materiel et consommables dedies
+SE21 Spectropolarimetrie - polarimetrie : spectrometres complets
+SE22 Spectropolarimetrie - polarimetrie : autre materiel et consommables dedies
+SE23 Dichroisme circulaire : spectrometres complets
+SE24 Dichroisme circulaire : autre materiel et consommables dedies aux instruments
+SE31 Ellipsometrie spectroscopique : spectrometres complets
+SE32 Ellipsometrie spectroscopique : autre materiel et consommables dedies
+SE41 Interferometrie spectroscopique : spectrometres complets
+SE42 Interferometrie spectroscopique : autre materiel et consommables dedies
+SE51 Spectrometres d'absorption et d'emission atomique
+SE52 Spectrom. d'absorpt. et d'emiss. atomique : autre materiel et consomm. dedies
+SE61 Spectrometrie optique : lampes pour spectrometres / spectrophotometres
+SF01 Spectroscopie dielectrique : equipements et accessoires
+SF02 Refractometrie de resoce de plasmon de surface : equipements et accessoires
+SF03 Autres techniques spectroscopiques : equipements et accessoires
+"SG01 Spectrometrie rmn et rpe : maintece, reparation du materiel"
+SG11 Spectroscopie massique de decharge luminescente : maintece et reparation
+SG12 Spectrometrie de masse des ions secondaires : maintece et reparation
+SG13 Spectrometrie de masse : maintece et reparation
+SG14 Techniques separatives analytiques : maintece et reparation
+SG21 Diffraction x : maintece et reparation des instruments
+SG22 Fluorescence x : maintece et reparation des instruments
+SG23 Rayons x : maintece et reparation des autres instruments
+SG31 Spectrometrie electronique et ionique : maintece et reparation
+SG41 Spectrometrie raman : maintece et reparation
+SG42 Spectrometrie uv-vis-ir : maintece et reparation
+SG43 Spectrofluorimetrie et fluorimetrie : maintece et reparation 
+SG44 Spectropolarimetrie et dichroisme circulaire : maintece et reparation 
+SG45 Ellipsometrie spectroscopique : maintece et reparation
+SG46 Interferometrie : maintece et reparation
+SG47 Spectrometrie d'absorption et d'emission atomique : maintece et reparation
+SG48 Autres types de spectrometrie optique : maintece et reparation
+SG51 Spectroscopie dielectrique : maintece et reparation
+SG52 Refractometrie de resoce de plasmon de surface : maintece et reparation
+SH01 Spectrometrie rmn et rpe : services d'analyses
+SH11 Spectrometrie de masse : services d'analyses
+SH12 Spectrometrie de masse des ions secondaires : services d'analyses
+SH13 Spectroscopie massique de decharge luminescente (gdms) : services d'analyses
+SH21 Diffraction x : services d'analyses
+SH22 Diffusion x : services d'analyses
+SH23 Fluorescence x : services d'analyses
+SH24 Tomographie x : services d'analyses
+SH31 Spectrometrie electronique et ionique : services d'analyses
+SH41 Spectrometrie raman : services d'analyses
+SH42 Spectrometrie uv-vis-ir : services d'analyses
+SH43 Spectrofluorimetrie et fluorimetrie : services d'analyses
+SH44 Spectrometrie d'absorption et d'emission atomique : services d'analyses
+SH45 Autres types de spectrometrie optique : services d'analyse
+SH51 Autres techniques spectroscopiques : services d'analyse
+TA01 Composants electroniques actifs et passifs
+TA02 Composants electromecaniques et accessoires de cablage
+"TA03 Sous-ensembles mecaniques pour l'electronique (chassis, baies, coffrets, ...)"
+TA04 Circuits imprimes multicouches (pcb) standards ou a facon
+TA05 Cartes electroniques (realisation et cablage de)
+TA06 Composants electroniques specifiques (asic) (fabriques a facon)
+TA11 Composants electroniques actifs et passifs (appli. spatiale)
+TA12 Composants electromecaniques et accessoires de cablage  (appli. spatiale)
+"TA13 Sous-ensembles mecaniques (chassis, baies, coffrets,...) (appli. spatiale)"
+TA14 Circuits imprimes multicouches (pcb) standards ou a facon  (appli. spatiale)
+TA15 Cartes electroniques (realisation et cablage de)  (appli. spatiale)
+TA16 Composants electroniques specifiques (asic) (a facon)  (appli. spatiale)
+"TA21 Machines dediees a l'electronique (soudure, placement,...)"
+TA22 Petits equipements et consommables pour l'electronique
+TA31 Systemes electroniques ou electromecaniques speciaux
+"TB01 Instruments de generation et traitement des signaux (generateurs, ampli)"
+"TB02 Oscilloscopes, analyseurs et accessoires (sondes,...)"
+"TB03 Acquisition de donnees (cartes,...)"
+"TB04 Petite instrumentation courante de tests et mesures (voltmetres,...)"
+TB05 Instrumentation radiofrequences et hyperfrequences
+"TB11 Energie : materiel d'alimentation (alim., ampli., onduleurs,...)"
+TB12 Energie : piles a l'unite et assemblage de piles classiques et speciales
+TB13 Energie : piles et assemblage de piles rechargeables (classiques et speciales)
+TC01 Electronique : reparation et maintece des equip. de tests energie mesures
+TC02 Maintece des systemes electroniques et electromecaniques speciaux
+TC11 Test energie mesure : reparation et maintece des equipements
+"TD01 Electronique : services de mesures, tests, caracterisation, certifications"
+TD02 Electronique : services d'etudes en r&d electronique
+TD03 Electronique : autres services sans fourniture
+TD11 Droits d'utilisation des logiciels de cao en electronique
+TD12 Droits d'util. de logiciels pour la program. microcontroleur
+TD13 Droits d'util. de logiciels pour la program. des compos. program.
+TD14 Droits d'util. de logiciels pour la program. interface homme machine
+TD15 Droits d'util. des autres logiciels pour l'electronique
+TD16 Maintece des logiciels pour l'electronique
+UA01 Navires
+"UA02 Embarcations transportables ou a usage d'annexe (semi-rigides,...)"
+"UA03 Plateformes, radeaux, barges a usage fluvial"
+UA11 Moteurs de bateau
+"UA12 Auxiliaires de pont de navire (treuils, grue, portique)"
+UA13 Materiel d'accastillage
+"UA14 Equipements de securite, de survie et de surveillance pour navire"
+UA15 Materiel de navigation
+UA16 Autres equipements pour bateaux
+UA21 Consommables pour l'entretien des bateaux
+UA22 Pieces mecaniques de rechange pour equipements de bateaux
+UA23 Pieces hydrauliques pour equipements de bateaux
+UA24 Pieces electriques / electroniques pour equipements de bateaux
+UA31 Travaux d'entretien et services pour bateaux semi-rigides
+UA32 Travaux mecaniques pour equipements de bateaux
+UA33 Travaux hydrauliques pour equipements de bateaux
+UA34 Travaux electriques pour equipements de bateaux
+UA35 Reparation et maintece du materiel de navigation et de communication
+UA36 Travaux d'entretien des coques et ponts de bateaux
+"UA37 Services, tests et contr_x001a_les pour certification"
+"UA41 Materiel de chauffage, ventilation, climatisation, sanitaire pr bateaux"
+UA42 Mobilier et autres equipements d'amenagement des bateaux
+UA43 Travaux d'amenagement des bateaux
+UA51 Materiels de prelevement
+UA52 Materiels de plongee sous-marine
+UA53 Maintece des materiels de plongee sous-marine
+UB01 Drones marins
+UB02 Flotteurs marins
+UB11 Pieces mecaniques pour vehicules marins autonomes
+UB12 Pieces hydrauliques pour vehicules marins autonomes
+UB13 Pieces electroniques pour vehicules marins autonomes
+UB21 Travaux sur elements mecaniques de vehicules marins autonomes (m.o)
+UB22 Travaux sur elements hydrauliques de vehicules marins autonomes (m.o)
+UB23 Travaux electriques sur vehicules marins autonomes (m.o)
+UC01 Equipements sources de la chaine d_x001a_acquisition sismique
+UC02 Equipements de reception _x001a_et traitement de la chaine d_x001a_acquisition sismique
+UC03 Materiel associe a la chaine d_x001a_acquisition sismique
+UC11 Thermosalinographes
+UC12 Capteurs ctd (conductivty temperature depth)
+"UC13 Capteurs acoustiques (adcp, hydrophone,...)"
+"UC14 Instrumentation optique (capteurs, fluorimetres,...)"
+UC15 Oceanographie : autres capteurs
+UC21 Oceanographie : instrumentation  thermique
+UC22 Oceanographie : equipements electrochimiques
+UC23 Oceanographie : instrumentation electromagnetique
+UC24 Oceanographie : poissons instrumentes
+UC25 Oceanographie : autres instruments scientifiques embarques
+UC31 Fluides et consommables pour equipements scientifiques embarques
+UC32 Pieces mecaniques de rechange pour la sismique
+UC33 Pieces mecaniques de rechange pour autres equipements scientifiques embarques
+UC34 Composants electroniques de rechange pour la sismique
+UC35 Pieces electroniques de rechange pour autres equipements scientifiques embarques
+UC36 Pieces informatiques de rechange pour equipements scientifiques embarques
+UC41 Reparation et maintece sur la sismique
+UC42 R_x001a_paration et maintece sur les autres equipements scientifiques embarques
+UD01 Vehicules terrestres specifiques
+UD11 Equipements pour vehicules terrestres specifiques
+UD21 Vehicules terrestres specifiques : consommables
+UD22 Vehicules terrestres specifiques : pieces mecaniques et electroniques
+"UD23 Vehicules terrestres specifiques : travaux mecaniques, electriques, hydrauliques"
+UE01 Carrotage : carrotiers a moteurs et accessoires
+UE02 Forage : foreuses et accessoires
+UE11 Carottage : consommables et pieces de rechange pour carottiers
+UE12 Forage : consommables et pieces de rechange pour foreuses
+"UE21 Travaux mecaniques, electriques et entretien du materiel de carottage"
+"UE22 Travaux mecaniques, electriques et hydrauliques du materiel de forage"
+UF01 Avions et helicopteres
+UF02 Equipements d'avions et d'helicopteres
+UF03 Drones aeriens et assimiles
+UF04 Aeronefs et ballons solaires
+UF11 Materiel pour l'amenagement des vehicules aeriens
+UF21 Equipements techniques et de navigation pour vehicules aeriens
+UF31 Consommables pour le fonctionnement et l'entretien des vehicules aeriens
+UF32 Pieces de rechange pour moteurs et autres equipements de vehicules aeriens
+UF41 Reparation et maintece des moteurs d'avion
+UF42 Reparation et maintece des avions (hors moteurs)
+UF43 Reparation et maintece des autres vehicules aeriens
+UG01 Meteorologie : equipements de meteorologie
+"UG02 Meteorologie : radiometres (profileurs radiometriques microondes,...)"
+"UG03 Meteorologie : radars (radars profileurs vhf,...)"
+UG04 Meteorologie : lidars
+UG11 Geophysique : materiel de mesure des vibrations
+UG12 Geophysique : materiel de mesure de position et mesure geodesique
+UG13 Geophysique : instruments de topographie et de mesure des distances
+UG14 Geophysique : magnetometres
+UG15 Geophysique : capteurs (hors oceanographie)
+UG16 Groupes electrogenes pour activites scientifiques
+UG21 Appareillage de simulation pour applications spatiales
+UG22 Autre materiel scientifique d'astrophysique
+UG31 Consommables et pieces de rechange pour materiel de meteorologie
+UG32 Consommables et pieces de rechange pour autre materiel de geophysique
+UG33 Consommables et pieces de rechange pour materiel d'astrophysique
+"UG41 Travaux mecaniques, electriques et d'entretien sur materiel de meteorologie"
+"UG42 Travaux mecan., electr. et d'entretien sur autre materiel de geophysique"
+"UG43 Travaux mecaniques, electriques et d'entretien sur materiel d'astrophysique"
+UH01 Service d'acquisition de donnees meteorologiques et climatologiques
+UH02 Services d'aquisition de donnees de pollution
+UH03 Services d'imagerie satellitaires
+UH04 Services de mesures lidar
+UH11 Services d'etablissement de cartes et de photointerpretation
+UH12 Travaux de forage
+UH14 Services de conseil et assistance pour operations en mer
+UH15 Autres services specialises en geophysique
+UI01 Archeologie : fournitures pour fouilles archeologiques
+UI11 Archeologie : prestations services sur chantier de fouilles (terrassement)
+"VA01 Vide primaire : pompes (a membranes, palettes, pistons, roots,...)"
+"VA02 Vide secondaire et ultravide : pompes (turbomoleculaires,...)"
+VA03 Vide et ultravide : consommables et pieces detachees pour pompes
+VA11 Vide et ultravide : enceintes et batis pour le vide et l'ultravide
+"VA12 Vide et ultravide : composants pour enceintes (vannes, raccords, hublots)"
+VA13 Vide et ultravide : manipulateurs uhv et accessoires
+VA14 Vide et ultravide : elements chauffants pour le vide
+VA15 Vide et ultravide : autres equipements d'enceintes a vide
+"VA21 Vide et ultravide : instrumentation de mesure du vide (jauges, vacuometres,...)"
+VA22 Vide et ultravide : debitmetres - regulateurs de debit
+VA23 Vide et ultravide : analyseurs des gaz residuels (rga) et detecteurs de fuite
+VB01 Techniques sous vide : machines de depot et de gravure
+VB02 Techniques sous vide : evaporateurs sous vide
+VB03 Techniques sous vide : syst_x001a_mes d'ionisation a faisceau d'ions focalises (fib)
+VB04 Techniques sous vide : microbalances
+VB05 Techniques sous vide : cellules d'effusion
+"VB06 Techniques sous vide : autre materiel (appareils de preparation de surface,...)"
+VC01 Reparation et maintece des pompes a vide et ultravide
+VC02 Reparation et maintece du materiel de mesure et contr_x001a_le du vide
+VC11 Reparation et maintece des equipements de depot et gravure
+WA01 Nanotechnologies - microelectronique : materiaux semi-conducteurs
+WA02 Nanotechnologies - microelectronique : autres substrats 
+WA03 Ne plus utiliser - utiliser na.23
+"WA04 Nanotechnologies - microelectronique : consommables (resines,...)"
+WA11 Nanotechnologies - microelectronique : materiel pour photolithographie
+WA12 Nanotechnologies - microelec : materiel de lithographie laser accessoires
+WA13 Nanotechnologies - microelec : consommables pour equipement de lithographie
+WA14 Nanotechnologies - microelec : materiel de lithographie electronique et acces.
+WA15 Nanotechnologies - microelec : logiciels de lithographie electronique
+WA21 Nanotechnologies - microelec. : materiel pour le depot (hors vide)
+WA22 Nanotechnologies - microelec. : materiel d'implantation ionique
+WA23 Nanotechnologies - microelec. : materiel de serigraphie / impression
+WA24 Nanotechnologies - micro-electronique : fours speciaux
+"WA25 Micro-electronique : autres machines dediees (microsoudure, bonding, test,...)"
+WB01 Reparation et maintece des equipements de lithographie
+WB11 Reparation et maintece des autres equipements pr micro-electronique
+WC01 Nanotechnologies - micro-electronique : services specialises
+XA01 Remboursement frais de missions en france metropolitaine personnels
+XA02 Remboursement frais de missions a l'etranger personnels
+XA03 Subventions frais de recherche sur le terrain personnels
+XA04 Autres remboursements de frais de missions personnels
+XA11 Remboursement frais de missions en france metropolitaine etudiants
+XA12 Remboursement frais de missions a l'etranger etudiants
+XA13 Autres remboursements de frais de missions etudiants
+XA14 Frais de missions de recherche sur le terrain etudiants
+XA21 Remboursement frais de missions france metropolitaine personnalit_x001a_s ext_x001a_rieures
+XA22 Remboursement frais de missions a l'etranger  personnalit_x001a_s ext_x001a_rieures
+XA23 Autres remboursements frais de missions  personnalit_x001a_s ext_x001a_rieures
+XA24 Frais de missions de recherche sur le terrain  personnalit_x001a_s ext_x001a_rieures
+XA31 Remboursements de depenses realisees par cartes affaires
+XA41 Indemnites forfaitaires de changement de residence
+XB01 Taxe sur les salaires
+XB02 Taxe d'apprentissage
+XB03 Versements de transport personnel permanent
+XB04 Versements de transport remunerations diverses
+XB05 Cotisations fnal personnel permanent
+XB06 Cotisations fnal remunerations diverses
+XB07 Autres impots et taxes sur remunerations
+XB08 Autres charges de personnel redevances a l_x001a_omi
+XB09 Taxe percue par les organismes publics internationaux
+"XB11 Accueils, echanges titulaires accueillis en delegations"
+XB12 Accueils chaires d'excellence cnrs-universites
+XB13 Cotisations urssaf sur remunerations diverses
+XB14 Charges denseignement vacataires
+XB15 Alloc.pour perte d'emploi -remunerations diverses
+XB16 Indemn de preavis et de licenciement-  remunerations diverses
+"XB17 Personnel interimaire, detache ou prete"
+XB18 Avantages familiaux remuneration diverses  (hors france)
+XB19 Autres remunerations diverses
+XB21 Ne plus utiliser - utiliser ec.41
+XB22 Medecine statutaire - visites d'embauche
+XB23 Medecine du travail: frais medicaux lies aux departs a l'etranger
+XB24 Medecine du travail: autres frais medicaux
+XB31 Oeuvres sociales aides exceptionnelles
+XB32 Depenses sociales diverses
+XB33 Subventions caes
+XB34 Subventions pour autres oeuvres sociales
+"XB35 Restauration sociale : subventions organismes, et restaurants inter-entreprises"
+XB36 Pr_x001a_t a mobilite
+XB41 Facturation paye a facon
+XC01 Frais d'inscription a des colloques non organises par l'etablissement
+XC02 Cotisations associations / concours divers
+XC03 Ne plus utiliser - utiliser xc.02
+XC11 Ne plus utiliser
+XC12 Frais de publication d'annonces de recrutement
+"XC13 Autres frais de publication (boamp,...)"
+XC14 Frais pour publication en acces ouvert d_x001a_un article scientifique (article processing charge)
+XC15 Frais de publication monographie
+XC16 Frais de liberation de publication scientifiques pour diffusion en acces ouvert
+"XC17 Frais de publications scientifiques pour services (soumission, aide a la publication d_x001a_ouvrage, figures et pages supplementaires"
+XC21 Subv. ou particip. versees ds le cadre de contrats et prog. de rech. et de dev.
+XC22 Subventions ou participations versees dans le cadre de conventions de mixite
+XC23 Mandat de gestion
+XC24 Delegation globale de gestion - fonctionnement et investissement courant
+XC25 Delegation globale de gestion - investissement non courant
+XC26 Soutien aux reunions et colloques
+XC27 Autres subventions ou participations versees a d'autres organismes
+XC31 Services de prets d'ouvrages entre etablissements
+XC32 Acces aux equipements scientifiques d'autres etablissements
+XD01 Baux et loyers 
+XD02 Charges locatives et de copropriete
+XD03 Location de terrain nu
+XD04 Ppp loyer composante investissement
+XD05 Ppp loyer composante ficement
+XD06 Ppp loyer composante fonctionnement
+XD11 Taxe fonciere
+XD12 Impots directs autres impots locaux
+XD13 Impots directs taxe sur les bureaux de la region idf(art. 231 ter du cgi)
+XD14 Impots directs taxe sur le chiffre d'affaire non recuperables
+XD15 Impots indirects
+XD16 Droits de mutation
+XD17 Taxe differentielle sur les vehicules a moteur
+XD18 Autres droits - administration des impots
+XD19 Autres droits et taxes
+XD21 Penalites sur marches et desdits payes sur achats et ventes
+"XD22 Penalites, amendes fiscales ou penales"
+XD23 Ne plus utiliser
+"XD24 Deficits, debets admis en decharge ou remise gracieuse"
+XD25 Autres charges exceptionnelles
+XD26 Avances de l'etat et des collectivites publiques
+XD27 Cotisation fiphfp
+XD31 Bourses et frais annexes
+XD32 Gratifications (stage)
+XD33 Remboursements de frais avances par les etudiants
+"XD34 Aides et soutiens divers accordes aux etudiants (prise en charge inscription,...)"
+XD35 Autres charges specifiques destinees aux etudiants
+XD36 Honoraires maitres de stage
+XD41 Frais de  recherche et de developpement
+XD42 Brevet d'invention et licences royalties versees au coconcedant
+XD43 Subvention filiale de valo et transf techno : services en prop. intellectuelle
+"XD44 Honoraires des filiales de valorisation et de transfert de technologie (fist,...)"
+"XD45 Redevances pour concessions, brevets, marques et procedes"
+XD46 Droits d'auteurs et de reproduction
+"XD47 Autres conces, droits simil, brevets, licenc, proced, droits valeurs : filiale"
+XD51 Indemnisation des personnes se pretant a une experimentation (hors loi hurriet)
+XD52 Indemnisation des personnes se pretant a une experimentation (loi hurriet)
+XD53 Contr_x001a_le ficier et services du tresor
+XD54 Ne plus utiliser
+XD55 Perte  de change 
+XD56 Autres charges de gestion courante
+XD57 Ne plus utiliser
+XD58 Ne plus utiliser
+XD59 Charges sociales droits d'auteur
+XD61 Frais de port et d'emballage (hors carboglace) ou de gestion
+XD62 Droits de douane
+XD63 Frais de dossier sur dedouanement 
+XE01 Acomptes versees sur immobilisation incorporelles 
+XE02 Acomptes versees sur immobilisation corporelles 
+XE03 Ppp : interets intercalaires
+XE04 Acompte verses sur commande immo corporelles
+XE11 Logiciels crees
+XE12 Autres immobilisations incorporelles 
+XE13 Autres immobilisations incorporelles en cours
+XE21 Achat de terrain nus
+XE22 Achat de terrain amenages
+XE23 Achat de terrain batis
+XE24 Immobilisations corporelles en cours-terrains
+XE25 Construction : operation terminee
+XE26 Ganil
+XE27 Collections de documentation
+"XE28 Collections litterraires, scientifiques et artistiques"
+XF01 Facturation interne - fonctionnement courant (hors fluides)
+XF02 Facturation interne - fluides
+"XF03 Facturation interne - fournitures & _x001a_quipements scientifiques, valorisation"
+"XF04 Facturation interne -  missions, d_x001a_placements, colloques et communication"
+XF05 Facturation interne - informatique
+XF06 Facturation interne - immobilier
+XF07 Facturation interne - action sociale
+XF08 Facturation interne - subventions
+XF09 Facturation interne - autres

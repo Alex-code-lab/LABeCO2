@@ -21,7 +21,7 @@ class DataMassWindow(QMainWindow):
         # Nom du fichier HDF5
         self.hdf5_file = "./data_masse_eCO2/data_eCO2_masse_consommable.hdf5"
 
-        self.columns = ["Nom de l'objet",
+        self.columns = ["Consommable",
                         "Référence",
                         "Code NACRES",
                         "Masse unitaire (g)",
@@ -47,7 +47,7 @@ class DataMassWindow(QMainWindow):
                 return pd.DataFrame(columns=self.columns)
         else:
             data = pd.DataFrame([{
-                "Nom de l'objet": "Tube Falcon 15ml",
+                "Consommable": "Tube Falcon 15ml",
                 "Référence": "N/A",
                 "Code NACRES": "NB13",
                 "Masse unitaire (g)": 6.7,
@@ -91,7 +91,7 @@ class DataMassWindow(QMainWindow):
 
         self.source_input = QLineEdit()
 
-        form_layout.addRow("Nom de l'objet:", self.nom_input)
+        form_layout.addRow("Consommable:", self.nom_input)
         form_layout.addRow("Référence:", self.ref_input)
         form_layout.addRow("Code NACRES:", self.nacres_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
@@ -113,6 +113,17 @@ class DataMassWindow(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
+
+        # Appliquer le style pour avoir le texte en noir
+        self.table.setStyleSheet("""
+                                QTableWidget { 
+                                    color: black; 
+                                }
+                                QHeaderView::section {
+                                    color: black;
+                                }
+                            """)
+
         main_layout.addWidget(self.table)
 
         container = QWidget()
@@ -120,7 +131,7 @@ class DataMassWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def verifier_existence_objet(self, nom, reference, code_nacres):
-        if not self.data[self.data["Nom de l'objet"] == nom].empty:
+        if not self.data[self.data["Consommable"] == nom].empty:
             return f"Un objet avec le nom '{nom}' existe déjà."
 
         if not self.data[(self.data["Référence"] == reference) & (self.data["Code NACRES"] == code_nacres)].empty:
@@ -152,7 +163,7 @@ class DataMassWindow(QMainWindow):
             return
 
         nouvel_objet = {
-            "Nom de l'objet": nom,
+            "Consommable": nom,
             "Référence": reference,
             "Code NACRES": nacres,
             "Masse unitaire (g)": masse,
@@ -242,7 +253,7 @@ class DataMassWindow(QMainWindow):
         eCO2_total = quantite * masse_kg * eCO2_par_kg
 
         QMessageBox.information(self, "Calcul eCO₂ via masse",
-                        f"Consommable: {last_obj['Nom de lobjet']}\n"
+                        f"Consommable: {last_obj['Consommable']}\n"
                         f"Quantité: {quantite}\n"
                         f"Masse unitaire: {masse_g} g ({masse_kg:.4f} kg)\n"
                         f"Matériau: {materiau}\n"

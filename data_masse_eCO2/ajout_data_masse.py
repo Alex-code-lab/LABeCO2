@@ -1,9 +1,8 @@
-import sys
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QMessageBox, QComboBox
+    QWidget, QMessageBox, QComboBox, QHeaderView
 )
 
 
@@ -20,7 +19,7 @@ class MainWindow(QMainWindow):
 
         # Colonnes du tableau principal
         self.columns = [
-            "Consommable", "Référence", "Code Nacre",
+            "Consommable", "Référence", "Code NACRES",
             "Masse unitaire (g)", "Matériau", "Source/Signature"
         ]
 
@@ -35,11 +34,18 @@ class MainWindow(QMainWindow):
         """Charge les données principales depuis le fichier HDF5."""
         try:
             df = pd.read_hdf(self.hdf5_data_path, key='data')
+
+            # Afficher TOUTES les lignes dans la console
             print(f"Tableau chargé depuis {self.hdf5_data_path}.")
+            print(df.to_string())  # <-- Affichage sans troncature
+
             return df
-        except FileNotFoundError:
-            print(f"Fichier {self.hdf5_data_path} introuvable. Initialisation avec un tableau vide.")
-            return pd.DataFrame(columns=self.columns)
+
+        except (FileNotFoundError, KeyError):
+            print(f"Fichier introuvable ou clé 'data' absente dans {self.hdf5_data_path}. Initialisation d'un tableau vide.")
+            empty_df = pd.DataFrame(columns=self.columns)
+            empty_df.to_hdf(self.hdf5_data_path, key='data', mode='w')
+            return empty_df
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger le fichier principal.\nErreur : {e}")
             return pd.DataFrame(columns=self.columns)
@@ -51,8 +57,8 @@ class MainWindow(QMainWindow):
             materials = df['Materiau'].drop_duplicates().sort_values().tolist()
             print(f"Matériaux chargés depuis {self.hdf5_materials_path}.")
             return materials
-        except FileNotFoundError:
-            print(f"Fichier {self.hdf5_materials_path} introuvable. Liste des matériaux vide.")
+        except (FileNotFoundError, KeyError):
+            print(f"Fichier ou clé 'data' introuvable dans {self.hdf5_materials_path}. Liste des matériaux vide.")
             return []
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger la liste des matériaux.\nErreur : {e}")
@@ -74,7 +80,7 @@ class MainWindow(QMainWindow):
 
         form_layout.addRow("Consommable:", self.nom_input)
         form_layout.addRow("Référence:", self.ref_input)
-        form_layout.addRow("Code Nacre:", self.nacre_input)
+        form_layout.addRow("Code NACRES:", self.nacre_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
         form_layout.addRow("Matériau:", self.materiau_combo)
         form_layout.addRow("Source/Signature:", self.source_input)
@@ -94,6 +100,10 @@ class MainWindow(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
+
+        # Ajuster la taille des colonnes pour voir tout le contenu
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
         main_layout.addWidget(self.table)
 
         # Conteneur principal
@@ -126,7 +136,7 @@ class MainWindow(QMainWindow):
         nouvel_objet = {
             "Consommable": nom,
             "Référence": reference,
-            "Code Nacre": nacre,
+            "Code NACRES": nacre,
             "Masse unitaire (g)": masse,
             "Matériau": materiau,
             "Source/Signature": source
@@ -155,17 +165,17 @@ class MainWindow(QMainWindow):
         self.afficher_donnees()
 
     def afficher_donnees(self):
-        """Affiche les données dans le tableau."""
+        """Affiche les données dans le tableau PySide6."""
         self.table.setRowCount(len(self.data))
         for row_idx, row_data in self.data.iterrows():
             for col_idx, col_name in enumerate(self.columns):
-                # Utilise .get pour fournir une valeur par défaut si la colonne n'existe pas
-                item = QTableWidgetItem(str(row_data.get(col_name, "N/A")))
+                val = str(row_data.get(col_name, "N/A"))
+                item = QTableWidgetItem(val)
                 self.table.setItem(row_idx, col_idx, item)
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication([])
     window = MainWindow()
     window.show()
-    sys.exit(app.exec())
+    app.exec()
