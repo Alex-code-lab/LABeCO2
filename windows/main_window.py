@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur", f"Fichier {data_materials_path} introuvable.")
             sys.exit(1)
         self.data_materials = pd.read_hdf(data_materials_path)
-        # Assurez-vous que 'Materiau' et 'eCO2_kg' existent dans self.data_materials
+        # Assurez-vous que 'Materiau' et 'eCO2_kg' (ou 'Equivalent CO₂ (kg eCO₂/kg)') existent dans self.data_materials
 
         # Initialisation de variables
         self.calculs = []
@@ -69,37 +69,29 @@ class MainWindow(QMainWindow):
         self.pie_chart_window = None
         self.bar_chart_window = None
         self.proportional_bar_chart_window = None
-        self.data_mass_window = None # Important: initialisation à None
+        self.data_mass_window = None  # Important: initialisation à None
 
-        # Widgets principaux
-        # ComboBox pour sélectionner la catégorie principale (ex : Achats, Véhicules, Machines, etc.).
-        self.category_combo = None  
-        # ComboBox pour sélectionner la sous-catégorie associée à la catégorie choisie (ex : "Consommables" pour "Achats").
-        self.subcategory_combo = None  
-        # ComboBox pour sélectionner une sous-sous-catégorie ou un nom spécifique dans la sous-catégorie choisie.
-        self.subsub_name_combo = None  
-        # ComboBox pour choisir l'année des données utilisées pour les calculs (ex : année d'achat ou de référence).
-        self.year_combo = None  
-        # Champ de saisie (QLineEdit) pour entrer une valeur numérique pour le calcul des émissions (ex : quantité, valeur monétaire).
-        self.input_field = None  
-        # Champ de saisie pour indiquer le nombre de jours d'utilisation dans des catégories spécifiques (ex : Véhicules, Machines).
-        self.days_field = None  
-        # Groupe de widgets (QWidget) dédié à la gestion des informations pour les "Machines" (nom, puissance, etc.).
-        self.machine_group = None  
-        # Liste (QListWidget) pour afficher l'historique des calculs effectués par l'utilisateur.
-        self.history_list = None  
-        # Label pour afficher le total des émissions calculées (ex : "Total des émissions : 0.0000 kg CO₂e").
-        self.result_area = None  
-        # Champ de recherche (QLineEdit) pour filtrer ou rechercher des éléments dans les sous-catégories.
-        self.search_field = None  
-        # Label pour afficher le logo de l'application en haut de l'interface.
-        self.logo_label = None  
-        # Label pour afficher du texte d'introduction ou d'information dans la partie "header" (ex : contexte, objectifs de l'application).
-        self.header_label = None  
-        # Label indiquant le texte de l'instruction pour l'utilisateur (ex : "Entrez la valeur en kg").
-        self.input_label = None  
-        # Label indiquant le texte pour le nombre de jours d'utilisation (visible uniquement pour certaines catégories).
-        self.days_label = None  
+        # Widgets principaux (on les définira vraiment dans initUI())
+        self.category_combo = None
+        self.subcategory_combo = None
+        self.subsub_name_combo = None
+        self.year_combo = None
+        self.input_field = None
+        self.days_field = None
+        self.machine_group = None
+        self.history_list = None
+        self.result_area = None
+        self.search_field = None
+        self.logo_label = None
+        self.header_label = None
+        self.input_label = None
+        self.days_label = None
+
+        # Spécifique NACRES
+        self.nacres_filtered_label = None
+        self.nacres_filtered_combo = None
+        self.quantity_label = None
+        self.quantity_input = None
 
         self.setStyleSheet("""
                     QPushButton {
@@ -128,7 +120,7 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(10, 10, 10, 10)
 
-         # 1. Configuration du header (logo + texte d'intro)
+        # 1. Configuration du header (logo + texte d'intro)
         self.initUIHeader(main_layout)
 
         # 2. Configuration de la sélection de catégories / sous-catégories
@@ -145,7 +137,6 @@ class MainWindow(QMainWindow):
 
         # 6. Affichage du total des émissions et source
         main_layout.addWidget(self.result_area)
-
 
         self.source_label = QLabel(
             'Les données utilisées ici sont issues de la base de données fournie par <a href="https://labos1point5.org/" style="color:blue; text-decoration:none;">Labo 1point5</a>'
@@ -242,7 +233,9 @@ class MainWindow(QMainWindow):
         self.category_combo = QComboBox()
 
         categories = self.data['category'].dropna().unique().tolist()
+        # Retirer 'Électricité' de la combo
         categories = [cat for cat in categories if cat != 'Électricité']
+        # On ajoute la catégorie "Machine" manuellement
         categories.append('Machine')
         self.category_combo.addItems(sorted(categories))
 
@@ -270,7 +263,6 @@ class MainWindow(QMainWindow):
 
         self.calculate_button = QPushButton('Calculer le Bilan Carbone')
         self.calculate_button.setToolTip("Calcule le bilan carbone sélectionné et tente également le calcul via la masse si possible.")
-        # self.calculate_button.clicked.connect(self.calculate_emission)
 
         existing_layout = QVBoxLayout()
         existing_layout.setSpacing(5)
@@ -285,24 +277,23 @@ class MainWindow(QMainWindow):
         existing_layout.addWidget(self.year_label)
         existing_layout.addWidget(self.year_combo)
 
-        # NACRES filtré
-        self.nacres_filtered_label = QLabel("Code NACRES Filtré :")
+        # ------ NACRES tjrs visible ------
+        self.nacres_filtered_label = QLabel("Code NACRES / Consommable :")
         self.nacres_filtered_combo = QComboBox()
-        self.nacres_filtered_label.setVisible(False)
-        self.nacres_filtered_combo.setVisible(False)
+        self.nacres_filtered_label.setVisible(True)
+        self.nacres_filtered_combo.setVisible(True)
         existing_layout.addWidget(self.nacres_filtered_label)
         existing_layout.addWidget(self.nacres_filtered_combo)
 
-        # Ajout du champ quantité
+        # Champ quantité (uniquement visible si un consommable ≠ "non renseignée")
         self.quantity_label = QLabel("Quantité:")
         self.quantity_input = QLineEdit()
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
-
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
 
-         # Bouton Gestion des Consommables
+        # Bouton Gestion des Consommables
         self.manage_consumables_button = QPushButton("Gestion des Consommables")
         self.manage_consumables_button.setStyleSheet("""
             QPushButton {
@@ -328,9 +319,6 @@ class MainWindow(QMainWindow):
         existing_group = QWidget()
         existing_group.setLayout(existing_layout)
         main_layout.addWidget(existing_group)
-        # Ajout du spacer pour équilibrer le layout
-        # spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        # main_layout.addItem(spacer)
 
     def initUIMachineSection(self, main_layout):
         """
@@ -339,16 +327,20 @@ class MainWindow(QMainWindow):
         self.machine_name_label = QLabel('Nom de la machine:')
         self.machine_name_field = QLineEdit()
         self.machine_name_field.setMaximumWidth(200)
+
         self.power_label = QLabel('Puissance de la machine (kW):')
         self.power_field = QLineEdit()
         self.power_field.setMaximumWidth(200)
+
         self.usage_time_label = QLabel("Temps d'utilisation par jour (heures):")
         self.usage_time_field = QLineEdit()
         self.usage_time_field.setMaximumWidth(200)
         self.usage_time_field.setValidator(QIntValidator(1, 24, self))
+
         self.days_machine_label = QLabel("Nombre de jours d'utilisation:")
         self.days_machine_field = QLineEdit()
         self.days_machine_field.setMaximumWidth(200)
+
         self.electricity_label = QLabel('Type d\'électricité:')
         self.electricity_combo = QComboBox()
         self.electricity_combo.setMaximumWidth(200)
@@ -357,7 +349,6 @@ class MainWindow(QMainWindow):
         self.electricity_combo.addItems(sorted(electricity_types))
 
         self.add_machine_button = QPushButton('Ajouter la machine')
-        # self.add_machine_button.clicked.connect(self.add_machine)
 
         self.machine_layout = QFormLayout()
         self.machine_layout.addRow(self.machine_name_label, self.machine_name_field)
@@ -390,9 +381,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(history_scroll)
 
         self.delete_button = QPushButton('Supprimer le calcul sélectionné')
-        # self.delete_button.clicked.connect(self.delete_selected_calculation)
         self.modify_button = QPushButton('Modifier le calcul sélectionné')
-        # self.modify_button.clicked.connect(self.modify_selected_calculation)
 
         calc_buttons_layout = QHBoxLayout()
         calc_buttons_layout.setSpacing(1)
@@ -400,9 +389,7 @@ class MainWindow(QMainWindow):
         calc_buttons_layout.addWidget(self.modify_button)
 
         self.export_button = QPushButton('Exporter les données')
-        # self.export_button.clicked.connect(self.export_data)
         self.import_button = QPushButton('Importer les données')
-        # self.import_button.clicked.connect(self.import_data)
 
         export_import_layout = QHBoxLayout()
         export_import_layout.setSpacing(0)
@@ -427,15 +414,12 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(graph_summary_label)
 
         self.generate_pie_button = QPushButton('Diagramme en Secteurs')
-        self.generate_pie_button.clicked.connect(self.generate_pie_chart)
         self.generate_pie_button.setToolTip("Affiche un diagramme en secteurs...")
 
         self.generate_bar_button = QPushButton('Barres Empilées à 100%')
-        self.generate_bar_button.clicked.connect(self.generate_bar_chart)
         self.generate_bar_button.setToolTip("Affiche un graphique à barres empilées à 100%...")
 
         self.generate_proportional_bar_button = QPushButton('Barres Empilées')
-        self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
         self.generate_proportional_bar_button.setToolTip("Affiche un graphique à barres empilées proportionnelles...")
 
         buttons_layout_graph = QHBoxLayout()
@@ -449,77 +433,81 @@ class MainWindow(QMainWindow):
         """
         Connexion des signaux/slots
         """
-        # Gère le clic sur le lien dans le header pour afficher/masquer le texte complet.
+        # Lien du header "voir plus/voir moins"
         self.header_label.linkActivated.connect(self.toggle_text_display)
 
-        # Met à jour les sous-catégories lorsqu'une catégorie est sélectionnée.
+        # Quand la catégorie change
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
 
-        # Met à jour les sous-sous-catégories lorsqu'une sous-catégorie est sélectionnée.
+        # Quand la sous-catégorie change
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
 
-        # Met à jour les sous-sous-catégories lorsqu'un texte est saisi dans le champ de recherche.
-        self.search_field.textChanged.connect(self.update_subsubcategory_names)
+        # Quand le texte de recherche change => on passe par la fonction on_search_text_changed
+        self.search_field.textChanged.connect(self.on_search_text_changed)
 
-        # Met à jour les années disponibles lorsqu'une sous-sous-catégorie est sélectionnée.
+        # Sous-sous-catégorie
         self.subsub_name_combo.currentIndexChanged.connect(self.update_years)
+        self.subsub_name_combo.currentIndexChanged.connect(self.on_subsub_name_changed)
 
-        # Met à jour l'unité d'entrée lorsque l'année sélectionnée change.
+        # Quand l'année change
         self.year_combo.currentIndexChanged.connect(self.update_unit)
-
-        # Met à jour les options filtrées des codes NACRES lorsque l'année sélectionnée change.
         self.year_combo.currentIndexChanged.connect(self.update_nacres_filtered_combo)
 
-        # Ouvre l'interface pour modifier un calcul lorsqu'un élément de l'historique est double-cliqué.
-        self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
-
-        # Lance le calcul des émissions lorsqu'on clique sur le bouton "Calculer".
+        # Boutons
         self.calculate_button.clicked.connect(self.calculate_emission)
-
-        # Ajoute une machine avec ses paramètres lorsqu'on clique sur "Ajouter la machine".
-        self.add_machine_button.clicked.connect(self.add_machine)
-
-        # Supprime le calcul sélectionné dans l'historique lorsqu'on clique sur "Supprimer".
         self.delete_button.clicked.connect(self.delete_selected_calculation)
-
-        # Ouvre l'interface pour modifier un calcul lorsqu'on clique sur "Modifier".
         self.modify_button.clicked.connect(self.modify_selected_calculation)
-
-        # Exporte les données dans un fichier lorsqu'on clique sur "Exporter".
         self.export_button.clicked.connect(self.export_data)
-
-        # Importe des données depuis un fichier lorsqu'on clique sur "Importer".
         self.import_button.clicked.connect(self.import_data)
 
-        # Affiche un diagramme en secteurs (camembert) lorsqu'on clique sur "Diagramme en Secteurs".
+        # Graphiques
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
-
-        # Affiche un graphique à barres empilées à 100% lorsqu'on clique sur "Barres Empilées à 100%".
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
-
-        # Affiche un graphique à barres empilées proportionnelles lorsqu'on clique sur "Barres Empilées".
         self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
-            
-    def add_logo(self):
-        logo_path = load_logo()
-        self.logo_label = QLabel()
-        pixmap = QPixmap(logo_path)
-        if pixmap.isNull():
-            QMessageBox.warning(self, 'Erreur', f"Impossible de charger l'image : {logo_path}")
-        else:
-            resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.logo_label.setPixmap(resized_pixmap)
-            self.logo_label.setAlignment(Qt.AlignCenter)
-            
-    def toggle_text_display(self):
-        if self.header_label.text() == self.collapsed_text:
-            self.header_label.setText(self.full_text)
-        else:
-            self.header_label.setText(self.collapsed_text)
+
+        # Historique : double-clic => modifier
+        self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
+
+        # Machines
+        self.add_machine_button.clicked.connect(self.add_machine)
+
+        # NACRES
+        self.nacres_filtered_combo.currentIndexChanged.connect(self.on_nacres_filtered_changed)
+
+    def on_search_text_changed(self, text):
+        """
+        Se déclenche à chaque modification du champ de recherche.
+        On met à jour subsubcategory + NACRES, puis on tente de sélectionner
+        automatiquement l'élément s'il n'y a qu'une seule correspondance.
+        """
+        self.update_subsubcategory_names()
+        self.update_nacres_filtered_combo()
+        self.synchronize_after_search()
+
+    def synchronize_after_search(self):
+        """
+        Si, après la recherche, il n'y a qu'une seule correspondance (outre "non renseignée")
+        dans subsub_name_combo ou nacres_filtered_combo, on la sélectionne automatiquement.
+        """
+        # SUBSUB
+        count_subsub = self.subsub_name_combo.count()
+        # Normalement, on a au moins "non renseignée"
+        if count_subsub == 2:
+            # => On sélectionne directement la 2ème
+            self.subsub_name_combo.setCurrentIndex(1)
+
+        # NACRES
+        count_nacres = self.nacres_filtered_combo.count()
+        if count_nacres == 2:
+            self.nacres_filtered_combo.setCurrentIndex(1)
+
+        # Vérifie si on doit montrer/cacher la quantité
+        self.update_quantity_visibility()
 
     def update_subcategories(self):
         category = self.category_combo.currentText()
         if category == 'Machine':
+            # Masquer la zone "Achats/Véhicules/etc." pour Machine
             self.subcategory_label.setVisible(False)
             self.subcategory_combo.setVisible(False)
             self.search_label.setVisible(False)
@@ -534,16 +522,18 @@ class MainWindow(QMainWindow):
             self.days_field.setVisible(False)
             self.calculate_button.setVisible(False)
             self.machine_group.setVisible(True)
-
-            # Ajustez la politique de taille pour empêcher le recalcul
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             self.manage_consumables_button.setVisible(False)
 
-            self.nacres_filtered_label.setVisible(False)
-            self.nacres_filtered_combo.setVisible(False)
+            # Pour Machine, rendre NACRES visible mais la vider
+            self.nacres_filtered_label.setVisible(True)
+            self.nacres_filtered_combo.setVisible(True)
+            self.nacres_filtered_combo.clear()
+            self.nacres_filtered_combo.addItem("non renseignée")
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
         else:
+            # Réafficher les éléments pour les autres catégories
             self.subcategory_label.setVisible(True)
             self.subcategory_combo.setVisible(True)
             self.search_label.setVisible(True)
@@ -556,16 +546,16 @@ class MainWindow(QMainWindow):
             self.input_field.setVisible(True)
             self.calculate_button.setVisible(True)
             self.machine_group.setVisible(False)
-
-            # Ajustez la politique de taille
             self.machine_group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.manage_consumables_button.setVisible(True)
 
+            # Mise à jour de la combo sous-catégories
             subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
             self.subcategory_combo.clear()
             self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
             self.update_subsubcategory_names()
 
+            # Gestion spécifique pour "Véhicules"
             if category == "Véhicules":
                 self.days_label.setVisible(True)
                 self.days_field.setVisible(True)
@@ -575,22 +565,60 @@ class MainWindow(QMainWindow):
                 self.days_field.setVisible(False)
                 self.days_field.setEnabled(False)
 
+        # Gestion de l'affichage NACRES selon la catégorie
+        if category == 'Achats':
+            # Afficher et mettre à jour la section NACRES pour Achats
+            self.nacres_filtered_label.setVisible(True)
+            self.nacres_filtered_combo.setVisible(True)
+            self.update_nacres_filtered_combo()
+        else:
+            # Masquer la section NACRES pour les autres catégories
+            self.nacres_filtered_label.setVisible(False)
+            self.nacres_filtered_combo.setVisible(False)
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+
+        # # On force la mise à jour NACRES dans tous les cas
+        # self.update_nacres_filtered_combo()
+
     def update_subsubcategory_names(self):
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         search_text = self.search_field.text().lower()
-        mask = (self.data['category'] == category) & (self.data['subcategory'] == subcategory)
+
+        # Filtrage principal
+        mask = (self.data['category'] == category)
+        if subcategory:
+            mask &= (self.data['subcategory'] == subcategory)
+
         filtered_data = self.data[mask]
-        subsub_names = (filtered_data['subsubcategory'].fillna('') + ' - ' + filtered_data['name'].fillna('')).str.strip(' - ')
+
+        # Construction des libellés "subsubcategory - name"
+        subsub_names = (
+            filtered_data['subsubcategory'].fillna('')
+            + ' - '
+            + filtered_data['name'].fillna('')
+        ).str.strip(' - ')
+
         subsub_names_unique = subsub_names.unique()
 
+        # Application du filtrage par le champ de recherche
         if search_text:
             subsub_names_filtered = [s for s in subsub_names_unique if search_text in s.lower()]
         else:
-            subsub_names_filtered = subsub_names_unique
+            subsub_names_filtered = list(subsub_names_unique)
 
+        # On ajoute "non renseignée" tout en haut
+        subsub_names_filtered.insert(0, "non renseignée")
+
+        self.subsub_name_combo.blockSignals(True)
         self.subsub_name_combo.clear()
-        self.subsub_name_combo.addItems(sorted(subsub_names_filtered))
+        non_renseignee = subsub_names_filtered.pop(0)
+        subsub_names_filtered = sorted(subsub_names_filtered)
+        subsub_names_filtered.insert(0, non_renseignee)
+        self.subsub_name_combo.addItems(subsub_names_filtered)
+        self.subsub_name_combo.blockSignals(False)
+
         self.update_years()
 
     def update_years(self):
@@ -606,8 +634,11 @@ class MainWindow(QMainWindow):
             (self.data['name'].fillna('') == name)
         )
         years = self.data[mask]['year'].dropna().astype(str).unique()
+
+        self.year_combo.blockSignals(True)
         self.year_combo.clear()
         self.year_combo.addItems(sorted(years))
+        self.year_combo.blockSignals(False)
         self.update_unit()
 
     def update_unit(self):
@@ -637,49 +668,133 @@ class MainWindow(QMainWindow):
             self.input_field.setEnabled(False)
 
     def update_nacres_filtered_combo(self):
-        category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
-        subsub_name = self.subsub_name_combo.currentText()
+        """
+        Met toujours à jour la combo NACRES/Consommable de façon "complète",
+        puis effectue un filtrage par le champ de recherche si besoin.
+        """
+        self.nacres_filtered_label.setVisible(True)
+        self.nacres_filtered_combo.setVisible(True)
 
-        if category == 'Achats' and 'Consommables' in subcategory:
-            self.nacres_filtered_label.setVisible(True)
-            self.nacres_filtered_combo.setVisible(True)
-            self.nacres_filtered_combo.clear()
+        # On bloque les signaux pour éviter un cascade calls
+        self.nacres_filtered_combo.blockSignals(True)
+        self.nacres_filtered_combo.clear()
+        self.nacres_filtered_combo.addItem("non renseignée")
 
-            if subsub_name:
-                subsubcategory, name = self.split_subsub_name(subsub_name)
-                code_nacres_prefix = subsubcategory[:4]
-                filtered_entries = self.data_masse[
-                    self.data_masse['Code NACRES'].str.strip().str.startswith(code_nacres_prefix, na=False)
-                ]
+        # Appliquer la recherche
+        search_text = self.search_field.text().lower()
+        for idx, row in self.data_masse.iterrows():
+            code_nacres_val = (row['Code NACRES'].strip()
+                               if isinstance(row['Code NACRES'], str)
+                               else '')
+            consommable_val = (row['Consommable'].strip()
+                               if isinstance(row['Consommable'], str)
+                               else '')
+            display_text = f"{code_nacres_val} - {consommable_val}"
 
-                if not filtered_entries.empty:
-                    for idx, row in filtered_entries.iterrows():
-                        nom_objet_val = row["Consommable"]
-                        display_text = f"{row['Code NACRES']} - {nom_objet_val}"
-                        self.nacres_filtered_combo.addItem(display_text)
+            if search_text:
+                if search_text in display_text.lower():
+                    self.nacres_filtered_combo.addItem(display_text)
+            else:
+                self.nacres_filtered_combo.addItem(display_text)
 
-            # Toujours ajouter "Aucune correspondance"
-            self.nacres_filtered_combo.addItem("Aucune correspondance")
-            self.nacres_filtered_combo.setCurrentText("Aucune correspondance")
+        self.nacres_filtered_combo.blockSignals(False)
+        # MàJ de la visibilité du champ quantité
+        self.update_quantity_visibility()
 
-            self.nacres_filtered_combo.currentIndexChanged.connect(self.on_nacres_filtered_changed)
+    def on_subsub_name_changed(self):
+        """
+        Lorsqu'une sous-sous-catégorie est sélectionnée, 
+        réinitialise le champ NACRES à "non renseignée" 
+        pour éviter une synchronisation inverse automatique.
+        """
+        # Forcer le champ NACRES à "non renseignée"
+        self.nacres_filtered_combo.blockSignals(True)
+        if self.nacres_filtered_combo.findText("non renseignée") != -1:
+            self.nacres_filtered_combo.setCurrentText("non renseignée")
+        self.nacres_filtered_combo.blockSignals(False)
 
-        else:
-            self.nacres_filtered_label.setVisible(False)
-            self.nacres_filtered_combo.setVisible(False)
-            self.nacres_filtered_combo.clear()
-            self.quantity_label.setVisible(False)
-            self.quantity_input.setVisible(False)
+        # Mise à jour de la visibilité du champ quantité si nécessaire
+        self.update_quantity_visibility()
 
     def on_nacres_filtered_changed(self):
+        """
+        Synchronise la sous-sous-catégorie quand on choisit un code NACRES/Consommable.
+        """
         selected_text = self.nacres_filtered_combo.currentText()
-        if selected_text == "Aucune correspondance":
+        if (not selected_text) or (selected_text == "non renseignée"):
+            # On cache le champ quantité
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+            # Forcer la sous-sous-catégorie à "non renseignée"
+            self.subsub_name_combo.blockSignals(True)
+            if self.subsub_name_combo.findText("non renseignée") != -1:
+                self.subsub_name_combo.setCurrentText("non renseignée")
+            self.subsub_name_combo.blockSignals(False)
+            return
+
+        # Extraire code NACRES
+        if " - " in selected_text:
+            code_nacres, _consommable = selected_text.split(" - ", 1)
+        else:
+            code_nacres = selected_text.strip()
+
+        # Chercher dans self.data si on a subsubcategory commençant par code_nacres
+        mask = self.data['subsubcategory'].fillna('').str.startswith(code_nacres)
+        possible_subsubs = self.data[mask]['subsubcategory'].unique()
+
+        self.subsub_name_combo.blockSignals(True)
+        if len(possible_subsubs) > 0:
+            matched_subsub = possible_subsubs[0]
+            # Récupération du name associé
+            sub_data = self.data[self.data['subsubcategory'] == matched_subsub]
+            if not sub_data.empty:
+                name_val = sub_data.iloc[0]['name'] or ''
+                new_subsub_name = (matched_subsub.strip() + ' - ' + str(name_val).strip()).strip(' - ')
+            else:
+                new_subsub_name = matched_subsub
+
+            idx = self.subsub_name_combo.findText(new_subsub_name)
+            if idx != -1:
+                self.subsub_name_combo.setCurrentIndex(idx)
+            else:
+                if self.subsub_name_combo.findText("non renseignée") != -1:
+                    self.subsub_name_combo.setCurrentText("non renseignée")
+        else:
+            if self.subsub_name_combo.findText("non renseignée") != -1:
+                self.subsub_name_combo.setCurrentText("non renseignée")
+        self.subsub_name_combo.blockSignals(False)
+
+        self.update_quantity_visibility()
+
+    def update_quantity_visibility(self):
+        """
+        Montre ou cache le champ 'quantité' selon si on a sélectionné un consommable
+        spécifique (≠ 'non renseignée') dans la combo NACRES.
+        """
+        current_nacres = self.nacres_filtered_combo.currentText()
+        if (not current_nacres) or (current_nacres == "non renseignée"):
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
         else:
             self.quantity_label.setVisible(True)
             self.quantity_input.setVisible(True)
+
+    def add_logo(self):
+        logo_path = load_logo()
+        self.logo_label = QLabel()
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            QMessageBox.warning(self, 'Erreur', f"Impossible de charger l'image : {logo_path}")
+        else:
+            resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.logo_label.setPixmap(resized_pixmap)
+            self.logo_label.setAlignment(Qt.AlignCenter)
+
+    def toggle_text_display(self):
+        if self.header_label.text() == self.collapsed_text:
+            self.header_label.setText(self.full_text)
+        else:
+            self.header_label.setText(self.collapsed_text)
 
     def split_subsub_name(self, subsub_name):
         if ' - ' in subsub_name:
@@ -696,7 +811,6 @@ class MainWindow(QMainWindow):
         """
         print("calculate_emission appelé")
 
-        # 1. Récupération des données sélectionnées
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -711,28 +825,26 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
             return
 
-        # 2. Déterminer le code_nacres par défaut
+        # Code NACRES par défaut
         code_nacres = 'NA'
         consommable = 'NA'
-        
-        # Si "Achats" et on a au moins quelque chose en subsubcategory
+
+        # Si "Achats" et on a subsubcategory
         if category == 'Achats' and subsubcategory:
-            # On prend subsubcategory[:4] comme code NACRES "de base"
             code_nacres = subsubcategory[:4]
-        
-        # Si la combo NACRES est visible et qu'on a un NACRES plus précis sélectionné
+
+        # Récup combo NACRES
         selected_nacres = (
             self.nacres_filtered_combo.currentText()
             if self.nacres_filtered_combo.isVisible()
             else None
         )
-        has_nacres_match = selected_nacres and selected_nacres != "Aucune correspondance"
+        has_nacres_match = selected_nacres and selected_nacres != "non renseignée"
         if has_nacres_match:
-            # Par ex. "GA55 - Glace carbonique"
             if " - " in selected_nacres:
                 code_nacres, consommable = selected_nacres.split(" - ", 1)
 
-        # 3. Validation de la valeur
+        # Récup la valeur
         try:
             input_text = self.input_field.text().strip().replace(',', '.')
             value = float(input_text)
@@ -742,11 +854,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Veuillez entrer une valeur numérique positive valide.')
             return
 
-        # 4. Gestion du nombre de jours
+        # Nombre de jours
         days = int(self.days_field.text()) if self.days_field.isEnabled() and self.days_field.text() else 1
         total_value = value * days
 
-        # 5. Recherche du facteur d’émission
+        # Recherche du facteur d’émission dans self.data
         mask = (
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
@@ -762,24 +874,23 @@ class MainWindow(QMainWindow):
         total_emission_factor = filtered_data['total'].values[0]
         emissions = total_value * total_emission_factor
 
-        # 6. Gestion des émissions massiques si NACRES complet
+        # Gestion des émissions massiques via NACRES
         emission_massique, total_mass = None, None
         if has_nacres_match:
             emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres)
 
-        # 7. Construire le dictionnaire final
         new_data = {
             'category': category,
             'subcategory': subcategory,
-            'subsubcategory': subsubcategory,  # ex. "GA55"
-            'name': category_nacres,           # ex. "Glace carbonique (hors transport...)"
+            'subsubcategory': subsubcategory,
+            'name': category_nacres,
             'value': total_value,
             'unit': self.current_unit,
             'emissions_price': emissions,
             'emission_mass': emission_massique if emission_massique is not None else None,
             'total_mass': total_mass if total_mass is not None else None,
-            'code_nacres': code_nacres,        # ex. "GA55"
-            'consommable': consommable,        # ex. "Glace carbonique..."
+            'code_nacres': code_nacres,
+            'consommable': consommable,
             'days': days,
         }
 
@@ -789,24 +900,22 @@ class MainWindow(QMainWindow):
         self.update_total_emissions()
         self.input_field.clear()
         self.data_changed.emit()
-   
+
     def update_total_emissions(self):
-        total_emissions = 0.0        # Total des émissions basées sur le prix
-        total_mass_emissions_conso = 0.0   # Total des émissions massiques
-        total_price_emissions_conso = 0.0   # Total des émissions massiques
+        total_emissions = 0.0
+        total_mass_emissions_conso = 0.0
+        total_price_emissions_conso = 0.0
 
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
             data = item.data(Qt.UserRole)
             if data:
-                # Émissions basées sur le prix (déjà existantes dans 'emissions_price' ou 'emissions')
                 emissions_price = data.get('emissions_price', data.get('emissions', 0))
                 total_emissions += emissions_price
 
-                # Émissions massiques
                 emission_mass = data.get('emission_mass', 0)
                 if emission_mass is None or emission_mass == 'NA':
-                    emission_mass = 0.0  # Si pas de données massiques, on prend 0
+                    emission_mass = 0.0
                 else:
                     total_price_emissions_conso += emissions_price
                     total_mass_emissions_conso += float(emission_mass)
@@ -814,11 +923,10 @@ class MainWindow(QMainWindow):
         self.total_emissions = total_emissions
         self.total_mass_emissions_conso = total_mass_emissions_conso
         self.total_price_emissions_conso = total_price_emissions_conso
-        # Mettre à jour l'affichage. Par exemple, afficher sur deux lignes :
         self.result_area.setText(
             f'Total des émissions (prix) : {total_emissions:.4f} kg CO₂e\n'
-            f'Emission des consommable par la masse : {total_mass_emissions_conso:.4f} kg CO₂e\n'
-            f'Emission des consommable par le prix : {total_price_emissions_conso:.4f} kg CO₂e'
+            f'Emission des consommables par la masse : {total_mass_emissions_conso:.4f} kg CO₂e\n'
+            f'Emission des consommables par le prix : {total_price_emissions_conso:.4f} kg CO₂e'
         )
 
     def delete_selected_calculation(self):
@@ -839,86 +947,38 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
             return
 
-        # Ouvrir la boîte de dialogue d’édition
         dialog = EditCalculationDialog(
             parent=self,
             data=data,
-            main_data=self.data, 
+            main_data=self.data,
             data_masse=self.data_masse,
             data_materials=self.data_materials
         )
-     
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
-            
-            # 1 ) (Éventuellement) recalculer les émissions
             emissions, emission_massique, total_mass = self.recalculate_emissions(modified_data)
             modified_data['emissions_price'] = emissions
-            modified_data['emission_mass']   = emission_massique
-            modified_data['total_mass']      = total_mass
-            
-            # 2 ) Supprimer l’ancien item
+            modified_data['emission_mass'] = emission_massique
+            modified_data['total_mass'] = total_mass
+
             self.history_list.takeItem(self.history_list.row(selected_item))
-            
-            # 3 ) Réinscrire l’item mis à jour
             self.create_or_update_history_item(modified_data)
-            
-            # 4 ) Mise à jour de l’UI
             self.update_total_emissions()
-            
+
         self.data_changed.emit()
-   
-    def update_subcategory_combo(self, category, subcategory_combo):
-        """
-        Met à jour les sous-catégories disponibles pour la catégorie donnée.
-        """
-        subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
-        subcategory_combo.clear()
-        subcategory_combo.addItems(sorted(subcategories.astype(str)))
-
-    def update_subsubcategory_combo_for_dialog(self, subsub_name_combo, category, subcategory):
-        """
-        Met à jour les sous-sous-catégories disponibles pour la catégorie et la sous-catégorie données.
-        """
-        if not category or not subcategory:
-            subsub_name_combo.clear()
-            return
-
-        mask = (self.data['category'] == category) & (self.data['subcategory'] == subcategory)
-        filtered_data = self.data[mask]
-        subsub_names = (
-            (filtered_data['subsubcategory'].fillna('') + ' - ' + filtered_data['name'].fillna(''))
-            .str.strip(' - ')
-            .unique()
-        )
-
-        subsub_name_combo.clear()
-        subsub_name_combo.addItems(sorted(subsub_names))
 
     def recalculate_emissions(self, data):
         """
         Recalcule les émissions carbone en fonction des données fournies.
-        
-        Parameters:
-            data (dict): Dictionnaire contenant les informations nécessaires pour le calcul, 
-                        telles que la catégorie, la sous-catégorie, la valeur, l'année, etc.
-
-        Returns:
-            tuple: (emissions, emission_massique, total_mass)
-                - emissions: Émissions basées sur la valeur monétaire ou l'utilisation (float)
-                - emission_massique: Émissions basées sur la masse (float ou None si non applicable)
-                - total_mass: Masse totale en kg (float ou None si non applicable)
         """
         print("Recalcul des émissions avec les données :", data)
 
         category = data.get('category', '')
-
-        # Cas Machine
         if category == 'Machine':
+            # Cas Machine
             machine_name = data.get('subcategory', '')
-            total_usage = data.get('value', 0.0)  # kWh total (déjà en total)
+            total_usage = data.get('value', 0.0)
             electricity_type = data.get('electricity_type', '')
-
             if not electricity_type:
                 QMessageBox.warning(self, 'Erreur', "Type d'électricité manquant pour la machine.")
                 return None, None, None
@@ -933,12 +993,12 @@ class MainWindow(QMainWindow):
             emissions = total_usage * emission_factor
             return emissions, None, None
 
-        # Pour les autres catégories
+        # Autres catégories
         subcategory = data.get('subcategory', '')
         subsub_name = data.get('subsubcategory', '')
         name = data.get('name', '')
         year = data.get('year', '')
-        value = data.get('value', 0)  # Pour Véhicules, c'est déjà la distance totale
+        value = data.get('value', 0)
 
         mask = (
             (self.data['category'] == category) &
@@ -947,17 +1007,14 @@ class MainWindow(QMainWindow):
             (self.data['name'].fillna('') == name) &
             (self.data['year'].astype(str) == str(year))
         )
-
         filtered_data = self.data[mask]
         if filtered_data.empty:
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
             return None, None, None
 
-        # On multiplie directement "value" par le facteur
         total_emission_factor = filtered_data['total'].values[0]
         emissions = float(value) * float(total_emission_factor)
 
-        # Gestion NACRES si besoin
         code_nacres = data.get('code_nacres', 'NA')
         emission_massique, total_mass = None, None
         if category == 'Achats' and code_nacres != 'NA':
@@ -969,12 +1026,7 @@ class MainWindow(QMainWindow):
     def create_or_update_history_item(self, data, item=None):
         """
         Crée ou met à jour un élément dans l'historique avec les données fournies.
-        
-        :param data: dict contenant toutes les infos nécessaires (category, subcategory, value, emissions, etc.)
-        :param item: (optionnel) QListWidgetItem existant à mettre à jour. Si None, on crée un nouvel item.
-        :return: L'élément QListWidgetItem final (mis à jour ou créé).
         """
-        # Extraire les infos essentielles
         category = data.get('category', '')
         subcategory = data.get('subcategory', '')
         subsubcategory = data.get('subsubcategory', '')
@@ -987,15 +1039,12 @@ class MainWindow(QMainWindow):
         code_nacres = data.get('code_nacres', 'NA')
         consommable = data.get('consommable', 'NA')
 
-        # Construire la chaîne de texte
         if category == 'Machine':
-            # Format machine
             item_text = (
                 f"Machine - {subcategory} - {value:.2f} kWh : "
                 f"{emissions_price:.4f} kg CO₂e"
             )
         elif category == 'Véhicules':
-            # Nouveau traitement pour les véhicules
             days = data.get('days', 1)
             total_km = data.get('value', 0)
             try:
@@ -1008,13 +1057,11 @@ class MainWindow(QMainWindow):
                 f"{emissions_price:.4f} kg CO₂e"
             )
         else:
-            # Format général pour Achats / etc.
             item_text = (
                 f"{category} - {subcategory[:12]} - {code_nacres} - {name} - "
                 f"Dépense: {value} {unit} : {emissions_price:.4f} kg CO₂e"
             )
 
-            # Ajout d’info massique ou consommable, si présent
             if emission_mass is not None and total_mass is not None:
                 item_text += f" - Masse {total_mass:.4f} kg : {emission_mass:.4f} kg CO₂e"
             elif consommable != 'NA':
@@ -1022,17 +1069,15 @@ class MainWindow(QMainWindow):
             else:
                 item_text += " - Pas de précisions."
 
-        # Mettre à jour ou créer l’item
         if item:
             item.setText(item_text)
             item.setData(Qt.UserRole, data)
+            return item
         else:
             new_item = QListWidgetItem(item_text)
             new_item.setData(Qt.UserRole, data)
             self.history_list.addItem(new_item)
             return new_item
-
-        return item
 
     def export_data(self):
         """
@@ -1042,7 +1087,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Information', 'Aucune donnée à exporter.')
             return
 
-        # Préparation des données à exporter
         data_to_export = []
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
@@ -1055,7 +1099,7 @@ class MainWindow(QMainWindow):
                     'Nom': data.get('name', ''),
                     'Valeur': data.get('value', 0),
                     'Unité': data.get('unit', ''),
-                    'Émissions (kg CO₂e)': data.get('emissions', 0),
+                    'Émissions (kg CO₂e)': data.get('emissions_price', 0),
                     'Code NACRES': data.get('code_nacres', 'NA'),
                     'Consommable': data.get('consommable', 'NA')
                 })
@@ -1065,7 +1109,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Information', 'Aucune donnée valide à exporter.')
             return
 
-        # Options de sauvegarde
         default_file_name = os.path.join(os.getcwd(), 'bilan_carbone_export')
         options = QFileDialog.Options()
         file_name, selected_filter = QFileDialog.getSaveFileName(
@@ -1080,7 +1123,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Annulation', 'Exportation annulée.')
             return
 
-        # Ajout de l'extension appropriée si nécessaire
+        # Ajout extension si besoin
         if selected_filter == "Fichiers CSV (*.csv)" and not file_name.endswith('.csv'):
             file_name += '.csv'
         elif selected_filter == "Fichiers Excel (*.xlsx)" and not file_name.endswith('.xlsx'):
@@ -1088,7 +1131,6 @@ class MainWindow(QMainWindow):
         elif selected_filter == "Fichiers HDF5 (*.h5)" and not file_name.endswith('.h5'):
             file_name += '.h5'
 
-        # Exportation des données
         try:
             if file_name.endswith('.csv'):
                 df.to_csv(file_name, index=False, encoding='utf-8-sig')
@@ -1099,14 +1141,13 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Succès', f'Données exportées avec succès dans {file_name}')
         except Exception as e:
             QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'exportation : {e}')
-            
+
     def import_data(self):
         """
         Importe les données à partir d'un fichier (CSV, Excel ou HDF5) et les ajoute à l'historique.
         """
-        print("Début de la méthode d'importation")  # Pour vérifier combien de fois la méthode est appelée
+        print("Début de la méthode d'importation")
 
-        # Options pour le fichier
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(
             self,
@@ -1116,12 +1157,11 @@ class MainWindow(QMainWindow):
             options=options
         )
 
-        if not file_name:  # Si aucun fichier sélectionné
+        if not file_name:
             print("Aucun fichier sélectionné")
             return
 
         try:
-            # Lecture du fichier selon son type
             if file_name.endswith('.csv'):
                 df = pd.read_csv(file_name)
             elif file_name.endswith('.xlsx'):
@@ -1132,13 +1172,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, 'Erreur', 'Type de fichier non pris en charge.')
                 return
 
-            # Vérifiez si les colonnes nécessaires sont présentes
             required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)', 'Code NACRES', 'Consommable'}
             if not required_columns.issubset(df.columns):
                 QMessageBox.warning(self, 'Erreur', 'Le fichier importé ne contient pas les colonnes nécessaires.')
                 return
 
-            # Ajout des données importées dans l'interface
             for index, row in df.iterrows():
                 category = row.get('Catégorie', '')
                 subcategory = row.get('Sous-catégorie', '')
@@ -1174,15 +1212,14 @@ class MainWindow(QMainWindow):
                 })
                 self.history_list.addItem(item)
 
-            # Mise à jour de l'interface après l'importation
             self.update_total_emissions()
-            print("Fin de l'importation")  # Pour confirmer que tout s'est bien passé
+            print("Fin de l'importation")
             QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
             self.data_changed.emit()
 
         except Exception as e:
             QMessageBox.warning(self, 'Erreur', f'Erreur lors de la lecture du fichier : {e}')
-            
+
     def add_machine(self):
         """
         Gère l'ajout d'une machine dans l'historique, 
@@ -1194,7 +1231,6 @@ class MainWindow(QMainWindow):
             usage_time = float(self.usage_time_field.text().strip())
             days = int(self.days_machine_field.text().strip())
 
-            # Vérifier la cohérence
             if usage_time > 24:
                 QMessageBox.warning(self, 'Erreur', "Le temps d'utilisation ne peut pas dépasser 24 heures par jour.")
                 return
@@ -1211,23 +1247,19 @@ class MainWindow(QMainWindow):
             emission_factor = filtered_data['total'].values[0]
             emissions = total_usage * emission_factor
 
-            # Construire le dictionnaire standard
             data_for_machine = {
                 'category': 'Machine',
                 'subcategory': machine_name,
                 'value': total_usage,
                 'unit': 'kWh',
-                'emissions_price': emissions,  # ou 'emissions'
+                'emissions_price': emissions,
                 'power': power,
                 'usage_time': usage_time,
                 'days_machine': days,
                 'electricity_type': electricity_type,
             }
 
-            # Appel centralisé
             self.create_or_update_history_item(data_for_machine)
-
-            # Nettoyage et mise à jour
             self.update_total_emissions()
             self.machine_name_field.clear()
             self.power_field.clear()
@@ -1297,21 +1329,20 @@ class MainWindow(QMainWindow):
             self.data_masse = pd.read_hdf(data_masse_path)
             QMessageBox.information(self, "Succès", "Données massiques rechargées avec succès.")
             self.update_nacres_filtered_combo()
+            # Optionnel : on peut ajouter un item "Aucune correspondance" si besoin
+            # self.nacres_filtered_combo.insertItem(0, "Aucune correspondance")
+
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Erreur lors du rechargement des données massiques : {e}")
 
     def calculate_mass_based_emissions(self, code_nacres, quantity=None):
         """
-        Calcule les émissions massiques basées sur le code NACRES et la quantité donnée.
-        Si aucune quantité n'est fournie, la méthode tente de la lire depuis l'interface.
+        Calcule les émissions massiques basées sur le code NACRES et la quantité.
         """
-        # Si la quantité n'est pas passée en argument, lire depuis l'interface
         if quantity is None:
             quantite_text = self.quantity_input.text().strip()
-            
             if not quantite_text:
                 return 0, 0
-
             try:
                 quantity = int(quantite_text)
                 if quantity <= 0:
@@ -1321,7 +1352,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", str(e))
                 return None, None
         else:
-            # Si une quantité est fournie, vérifier qu'elle est valide
             try:
                 quantity = int(quantity)
                 if quantity <= 0:
@@ -1331,40 +1361,34 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", str(e))
                 return None, None
 
-        # Récupération du code NACRES et du nom de l'objet
         selected_nacres = self.nacres_filtered_combo.currentText()
         if " - " in selected_nacres:
-            code_nacres, objet_nom = selected_nacres.split(" - ", 1)
+            code_nacres_str, objet_nom = selected_nacres.split(" - ", 1)
         else:
-            code_nacres = selected_nacres.strip()
+            code_nacres_str = selected_nacres.strip()
             objet_nom = ""
 
-        # Filtrage des données correspondant au code NACRES et à l'objet
         matching = self.data_masse[
-            (self.data_masse['Code NACRES'].str.strip() == code_nacres) &
+            (self.data_masse['Code NACRES'].str.strip() == code_nacres_str) &
             (self.data_masse["Consommable"].str.strip() == objet_nom)
         ]
 
         if matching.empty:
-            QMessageBox.warning(self, "Erreur", f"Aucun consommable trouvé pour le code NACRES: {code_nacres} et l'objet: {objet_nom}")
+            QMessageBox.warning(self, "Erreur", f"Aucun consommable trouvé pour le code NACRES: {code_nacres_str} et l'objet: {objet_nom}")
             return None, None
 
-        # Extraction des informations du consommable
         consommable_row = matching.iloc[0]
         masse_g = consommable_row["Masse unitaire (g)"]
         materiau = consommable_row["Matériau"]
 
-        # Conversion de la masse en kg
         masse_kg_unitaire = masse_g / 1000.0
         masse_totale_kg = masse_kg_unitaire * quantity
 
-        # Filtrage des données de matériaux pour obtenir l'équivalent CO₂
         mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
         if mat_filter.empty:
             QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans les données de matériaux.")
             return None, None
 
-        # Calcul de l'équivalent CO₂ total
         eCO2_par_kg = float(mat_filter.iloc[0]["Equivalent CO₂ (kg eCO₂/kg)"])
         eCO2_total = masse_totale_kg * eCO2_par_kg
 
