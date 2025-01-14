@@ -88,8 +88,8 @@ class MainWindow(QMainWindow):
         self.days_label = None
 
         # Spécifique NACRES
-        self.nacres_filtered_label = None
-        self.nacres_filtered_combo = None
+        self.conso_filtered_label = None
+        self.conso_filtered_combo = None
         self.quantity_label = None
         self.quantity_input = None
 
@@ -159,11 +159,11 @@ class MainWindow(QMainWindow):
         self.update_subcategories()
 
         # Définition des tailles de la fenêtre
-        self.resize(600, 700)
+        self.resize(800, 800)
         screen = QApplication.primaryScreen()
         screen_size = screen.size()
         self.setMaximumSize(screen_size.width(), screen_size.height())
-        self.setMinimumSize(600, 700)
+        self.setMinimumSize(700, 800)
 
     def initUIHeader(self, main_layout):
         """
@@ -228,28 +228,75 @@ class MainWindow(QMainWindow):
     def initUICategorySelectors(self, main_layout):
         """
         Initialise la partie sélection de catégorie, sous-catégorie, etc.
+        avec des champs alignés.
         """
+        # Création des widgets de sélection
         self.category_label = QLabel('Catégorie:')
         self.category_combo = QComboBox()
-
         categories = self.data['category'].dropna().unique().tolist()
-        # Retirer 'Électricité' de la combo
         categories = [cat for cat in categories if cat != 'Électricité']
-        # On ajoute la catégorie "Machine" manuellement
         categories.append('Machine')
         self.category_combo.addItems(sorted(categories))
 
         self.subcategory_label = QLabel('Sous-catégorie:')
         self.subcategory_combo = QComboBox()
 
-        self.search_label = QLabel('Rechercher:')
-        self.search_field = QLineEdit()
-
-        self.subsub_name_label = QLabel('Sous-sous-catégorie - Nom:')
+        self.subsub_name_label = QLabel('Nom:')
         self.subsub_name_combo = QComboBox()
+        self.subsub_name_combo.setFixedWidth(200)
+        self.search_label = QLabel('Recherche:')
+        self.search_field = QLineEdit()
+        self.search_field.setFixedWidth(200)
 
-        self.year_label = QLabel('Année:')
-        self.year_combo = QComboBox()
+        # Disposition pour la ligne "Nom" avec barre de recherche
+        nom_layout = QHBoxLayout()
+        nom_layout.addWidget(self.subsub_name_combo)
+        nom_layout.addWidget(self.search_label)
+        nom_layout.addWidget(self.search_field)
+
+        self.conso_filtered_label = QLabel("Consommable:")
+        self.conso_filtered_combo = QComboBox()
+        self.conso_filtered_combo.setFixedWidth(200)
+        self.conso_search_label = QLabel("Recherche:")
+        self.conso_search_field = QLineEdit()
+        self.conso_search_field.setFixedWidth(200)
+
+        # Disposition pour la ligne "Consommable" avec barre de recherche
+        conso_layout = QHBoxLayout()
+        conso_layout.addWidget(self.conso_filtered_combo)
+        conso_layout.addWidget(self.conso_search_label)
+        conso_layout.addWidget(self.conso_search_field)
+
+        # Création d'un QComboBox pour l'année, caché car non utilisé visuellement
+        
+        self.year_combo = QComboBox(parent=self)
+        self.year_combo.setVisible(False)
+        
+        # self.year_label = QLabel('Année:')
+        # self.year_combo = QComboBox()
+
+        # Autres widgets
+        self.quantity_label = QLabel("Quantité:")
+        self.quantity_input = QLineEdit()
+        self.quantity_label.setVisible(False)
+        self.quantity_input.setVisible(False)
+
+      
+
+        self.manage_consumables_button = QPushButton("Gestion des Consommables")
+        self.manage_consumables_button.setStyleSheet("""
+            QPushButton {
+                text-decoration: underline;
+                color: blue;
+                background: none;
+                border: none;
+                padding: 0;
+            }
+            QPushButton:hover {
+                color: darkblue;
+            }
+        """)
+        self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
 
         self.input_label = QLabel('Entrez la valeur:')
         self.input_field = QLineEdit()
@@ -262,60 +309,37 @@ class MainWindow(QMainWindow):
         self.days_field.setVisible(False)
 
         self.calculate_button = QPushButton('Calculer le Bilan Carbone')
-        self.calculate_button.setToolTip("Calcule le bilan carbone sélectionné et tente également le calcul via la masse si possible.")
+        self.calculate_button.setToolTip(
+            "Calcule le bilan carbone sélectionné et tente également le calcul via la masse si possible."
+        )
 
+        # Utilisation de QFormLayout pour aligner les champs
+        form_layout = QFormLayout()
+        form_layout.setSpacing(5)
+        form_layout.setLabelAlignment(Qt.AlignRight)
+
+        form_layout.addRow(self.category_label, self.category_combo)
+        form_layout.addRow(self.subcategory_label, self.subcategory_combo)
+        form_layout.addRow(self.subsub_name_label, nom_layout)
+        form_layout.addRow(self.conso_filtered_label, conso_layout)
+
+
+        # Disposition verticale principale
         existing_layout = QVBoxLayout()
         existing_layout.setSpacing(5)
-        existing_layout.addWidget(self.category_label)
-        existing_layout.addWidget(self.category_combo)
-        existing_layout.addWidget(self.subcategory_label)
-        existing_layout.addWidget(self.subcategory_combo)
-        existing_layout.addWidget(self.search_label)
-        existing_layout.addWidget(self.search_field)
-        existing_layout.addWidget(self.subsub_name_label)
-        existing_layout.addWidget(self.subsub_name_combo)
-        existing_layout.addWidget(self.year_label)
-        existing_layout.addWidget(self.year_combo)
+        existing_layout.addLayout(form_layout)
 
-        # ------ NACRES tjrs visible ------
-        self.nacres_filtered_label = QLabel("Code NACRES / Consommable :")
-        self.nacres_filtered_combo = QComboBox()
-        self.nacres_filtered_label.setVisible(True)
-        self.nacres_filtered_combo.setVisible(True)
-        existing_layout.addWidget(self.nacres_filtered_label)
-        existing_layout.addWidget(self.nacres_filtered_combo)
-
-        # Champ quantité (uniquement visible si un consommable ≠ "non renseignée")
-        self.quantity_label = QLabel("Quantité:")
-        self.quantity_input = QLineEdit()
-        self.quantity_label.setVisible(False)
-        self.quantity_input.setVisible(False)
+        # Ajout des éléments suivants sous le formulaire
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
-
-        # Bouton Gestion des Consommables
-        self.manage_consumables_button = QPushButton("Gestion des Consommables")
-        self.manage_consumables_button.setStyleSheet("""
-            QPushButton {
-                text-decoration: underline; 
-                color: blue; 
-                background: none; 
-                border: none;
-                padding: 0;
-            }
-            QPushButton:hover { 
-                color: darkblue; 
-            }
-        """)
-        self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         existing_layout.addWidget(self.manage_consumables_button)
-
         existing_layout.addWidget(self.input_label)
         existing_layout.addWidget(self.input_field)
         existing_layout.addWidget(self.days_label)
         existing_layout.addWidget(self.days_field)
         existing_layout.addWidget(self.calculate_button)
 
+        # Intégration dans le layout global
         existing_group = QWidget()
         existing_group.setLayout(existing_layout)
         main_layout.addWidget(existing_group)
@@ -442,6 +466,11 @@ class MainWindow(QMainWindow):
         # Quand la sous-catégorie change
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
 
+        # Barre de recherche spécifique NACRES
+        self.conso_search_field.textChanged.connect(
+            lambda text: self.update_conso_filtered_combo(filter_text=text)
+        )
+
         # Quand le texte de recherche change => on passe par la fonction on_search_text_changed
         self.search_field.textChanged.connect(self.on_search_text_changed)
 
@@ -451,7 +480,7 @@ class MainWindow(QMainWindow):
 
         # Quand l'année change
         self.year_combo.currentIndexChanged.connect(self.update_unit)
-        self.year_combo.currentIndexChanged.connect(self.update_nacres_filtered_combo)
+        self.year_combo.currentIndexChanged.connect(self.update_conso_filtered_combo)
 
         # Boutons
         self.calculate_button.clicked.connect(self.calculate_emission)
@@ -472,7 +501,7 @@ class MainWindow(QMainWindow):
         self.add_machine_button.clicked.connect(self.add_machine)
 
         # NACRES
-        self.nacres_filtered_combo.currentIndexChanged.connect(self.on_nacres_filtered_changed)
+        self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
 
     def on_search_text_changed(self, text):
         """
@@ -481,13 +510,13 @@ class MainWindow(QMainWindow):
         automatiquement l'élément s'il n'y a qu'une seule correspondance.
         """
         self.update_subsubcategory_names()
-        self.update_nacres_filtered_combo()
+        self.update_conso_filtered_combo(filter_text=None)
         self.synchronize_after_search()
 
     def synchronize_after_search(self):
         """
         Si, après la recherche, il n'y a qu'une seule correspondance (outre "non renseignée")
-        dans subsub_name_combo ou nacres_filtered_combo, on la sélectionne automatiquement.
+        dans subsub_name_combo ou conso_filtered_combo, on la sélectionne automatiquement.
         """
         # SUBSUB
         count_subsub = self.subsub_name_combo.count()
@@ -497,9 +526,9 @@ class MainWindow(QMainWindow):
             self.subsub_name_combo.setCurrentIndex(1)
 
         # NACRES
-        count_nacres = self.nacres_filtered_combo.count()
+        count_nacres = self.conso_filtered_combo.count()
         if count_nacres == 2:
-            self.nacres_filtered_combo.setCurrentIndex(1)
+            self.conso_filtered_combo.setCurrentIndex(1)
 
         # Vérifie si on doit montrer/cacher la quantité
         self.update_quantity_visibility()
@@ -514,7 +543,7 @@ class MainWindow(QMainWindow):
             self.search_field.setVisible(False)
             self.subsub_name_label.setVisible(False)
             self.subsub_name_combo.setVisible(False)
-            self.year_label.setVisible(False)
+            # self.year_label.setVisible(False)
             self.year_combo.setVisible(False)
             self.input_label.setVisible(False)
             self.input_field.setVisible(False)
@@ -526,10 +555,10 @@ class MainWindow(QMainWindow):
             self.manage_consumables_button.setVisible(False)
 
             # Pour Machine, rendre NACRES visible mais la vider
-            self.nacres_filtered_label.setVisible(True)
-            self.nacres_filtered_combo.setVisible(True)
-            self.nacres_filtered_combo.clear()
-            self.nacres_filtered_combo.addItem("non renseignée")
+            self.conso_filtered_label.setVisible(True)
+            self.conso_filtered_combo.setVisible(True)
+            self.conso_filtered_combo.clear()
+            self.conso_filtered_combo.addItem("non renseignée")
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
         else:
@@ -540,7 +569,7 @@ class MainWindow(QMainWindow):
             self.search_field.setVisible(True)
             self.subsub_name_label.setVisible(True)
             self.subsub_name_combo.setVisible(True)
-            self.year_label.setVisible(True)
+            # self.year_label.setVisible(True)
             self.year_combo.setVisible(True)
             self.input_label.setVisible(True)
             self.input_field.setVisible(True)
@@ -568,13 +597,13 @@ class MainWindow(QMainWindow):
         # Gestion de l'affichage NACRES selon la catégorie
         if category == 'Achats':
             # Afficher et mettre à jour la section NACRES pour Achats
-            self.nacres_filtered_label.setVisible(True)
-            self.nacres_filtered_combo.setVisible(True)
-            self.update_nacres_filtered_combo()
+            self.conso_filtered_label.setVisible(True)
+            self.conso_filtered_combo.setVisible(True)
+            self.update_conso_filtered_combo()
         else:
             # Masquer la section NACRES pour les autres catégories
-            self.nacres_filtered_label.setVisible(False)
-            self.nacres_filtered_combo.setVisible(False)
+            self.conso_filtered_label.setVisible(False)
+            self.conso_filtered_combo.setVisible(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
 
@@ -667,38 +696,32 @@ class MainWindow(QMainWindow):
             self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
 
-    def update_nacres_filtered_combo(self):
+    def update_conso_filtered_combo(self, filter_text=None):
         """
-        Met toujours à jour la combo NACRES/Consommable de façon "complète",
-        puis effectue un filtrage par le champ de recherche si besoin.
+        Met à jour la liste déroulante NACRES/Consommable en fonction d'un texte de recherche.
         """
-        self.nacres_filtered_label.setVisible(True)
-        self.nacres_filtered_combo.setVisible(True)
+        self.conso_filtered_combo.blockSignals(True)
+        self.conso_filtered_combo.clear()
+        self.conso_filtered_combo.addItem("non renseignée")
 
-        # On bloque les signaux pour éviter un cascade calls
-        self.nacres_filtered_combo.blockSignals(True)
-        self.nacres_filtered_combo.clear()
-        self.nacres_filtered_combo.addItem("non renseignée")
+        # Définir le texte de filtrage
+        if filter_text is None:
+            # Si aucun filtre spécifique, on peut laisser la liste complète
+            filter_text = ""
+        else:
+            filter_text = filter_text.lower()
 
-        # Appliquer la recherche
-        search_text = self.search_field.text().lower()
+        # Parcourir les données pour remplir la combo selon le filtre
         for idx, row in self.data_masse.iterrows():
-            code_nacres_val = (row['Code NACRES'].strip()
-                               if isinstance(row['Code NACRES'], str)
-                               else '')
-            consommable_val = (row['Consommable'].strip()
-                               if isinstance(row['Consommable'], str)
-                               else '')
-            display_text = f"{code_nacres_val} - {consommable_val}"
+            code_nacres = row.get('Code NACRES', '').strip()
+            consommable = row.get('Consommable', '').strip()
+            display_text = f"{code_nacres} - {consommable}"
 
-            if search_text:
-                if search_text in display_text.lower():
-                    self.nacres_filtered_combo.addItem(display_text)
-            else:
-                self.nacres_filtered_combo.addItem(display_text)
+            # Ajouter l'item s'il correspond au filtre ou si aucun filtre n'est saisi
+            if not filter_text or filter_text in display_text.lower():
+                self.conso_filtered_combo.addItem(display_text)
 
-        self.nacres_filtered_combo.blockSignals(False)
-        # MàJ de la visibilité du champ quantité
+        self.conso_filtered_combo.blockSignals(False)
         self.update_quantity_visibility()
 
     def on_subsub_name_changed(self):
@@ -708,24 +731,26 @@ class MainWindow(QMainWindow):
         pour éviter une synchronisation inverse automatique.
         """
         # Forcer le champ NACRES à "non renseignée"
-        self.nacres_filtered_combo.blockSignals(True)
-        if self.nacres_filtered_combo.findText("non renseignée") != -1:
-            self.nacres_filtered_combo.setCurrentText("non renseignée")
-        self.nacres_filtered_combo.blockSignals(False)
+        self.conso_filtered_combo.blockSignals(True)
+        if self.conso_filtered_combo.findText("non renseignée") != -1:
+            self.conso_filtered_combo.setCurrentText("non renseignée")
+        self.conso_filtered_combo.blockSignals(False)
 
         # Mise à jour de la visibilité du champ quantité si nécessaire
         self.update_quantity_visibility()
 
-    def on_nacres_filtered_changed(self):
+    def on_conso_filtered_changed(self):
         """
-        Synchronise la sous-sous-catégorie quand on choisit un code NACRES/Consommable.
+        Lorsqu'un item est sélectionné dans la combo NACRES, 
+        on ajuste la sous-sous-catégorie si on trouve un code NACRES correspondant.
         """
-        selected_text = self.nacres_filtered_combo.currentText()
-        if (not selected_text) or (selected_text == "non renseignée"):
-            # On cache le champ quantité
+        selected_text = self.conso_filtered_combo.currentText()
+
+        if not selected_text or selected_text == "non renseignée":
+            # Masquer la quantité si pas de consommable sélectionné
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
-            # Forcer la sous-sous-catégorie à "non renseignée"
+            # Facultatif : remettre la sous-sous-catégorie à "non renseignée"
             self.subsub_name_combo.blockSignals(True)
             if self.subsub_name_combo.findText("non renseignée") != -1:
                 self.subsub_name_combo.setCurrentText("non renseignée")
@@ -738,18 +763,17 @@ class MainWindow(QMainWindow):
         else:
             code_nacres = selected_text.strip()
 
-        # Chercher dans self.data si on a subsubcategory commençant par code_nacres
+        # Exemple de recherche dans self.data
         mask = self.data['subsubcategory'].fillna('').str.startswith(code_nacres)
         possible_subsubs = self.data[mask]['subsubcategory'].unique()
 
         self.subsub_name_combo.blockSignals(True)
         if len(possible_subsubs) > 0:
             matched_subsub = possible_subsubs[0]
-            # Récupération du name associé
             sub_data = self.data[self.data['subsubcategory'] == matched_subsub]
             if not sub_data.empty:
                 name_val = sub_data.iloc[0]['name'] or ''
-                new_subsub_name = (matched_subsub.strip() + ' - ' + str(name_val).strip()).strip(' - ')
+                new_subsub_name = f"{matched_subsub} - {name_val}".strip(" - ")
             else:
                 new_subsub_name = matched_subsub
 
@@ -762,8 +786,8 @@ class MainWindow(QMainWindow):
         else:
             if self.subsub_name_combo.findText("non renseignée") != -1:
                 self.subsub_name_combo.setCurrentText("non renseignée")
-        self.subsub_name_combo.blockSignals(False)
 
+        self.subsub_name_combo.blockSignals(False)
         self.update_quantity_visibility()
 
     def update_quantity_visibility(self):
@@ -771,7 +795,7 @@ class MainWindow(QMainWindow):
         Montre ou cache le champ 'quantité' selon si on a sélectionné un consommable
         spécifique (≠ 'non renseignée') dans la combo NACRES.
         """
-        current_nacres = self.nacres_filtered_combo.currentText()
+        current_nacres = self.conso_filtered_combo.currentText()
         if (not current_nacres) or (current_nacres == "non renseignée"):
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
@@ -835,8 +859,8 @@ class MainWindow(QMainWindow):
 
         # Récup combo NACRES
         selected_nacres = (
-            self.nacres_filtered_combo.currentText()
-            if self.nacres_filtered_combo.isVisible()
+            self.conso_filtered_combo.currentText()
+            if self.conso_filtered_combo.isVisible()
             else None
         )
         has_nacres_match = selected_nacres and selected_nacres != "non renseignée"
@@ -1328,7 +1352,7 @@ class MainWindow(QMainWindow):
         try:
             self.data_masse = pd.read_hdf(data_masse_path)
             QMessageBox.information(self, "Succès", "Données massiques rechargées avec succès.")
-            self.update_nacres_filtered_combo()
+            self.update_conso_filtered_combo()
             # Optionnel : on peut ajouter un item "Aucune correspondance" si besoin
             # self.nacres_filtered_combo.insertItem(0, "Aucune correspondance")
 
@@ -1361,7 +1385,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", str(e))
                 return None, None
 
-        selected_nacres = self.nacres_filtered_combo.currentText()
+        selected_nacres = self.conso_filtered_combo.currentText()
         if " - " in selected_nacres:
             code_nacres_str, objet_nom = selected_nacres.split(" - ", 1)
         else:

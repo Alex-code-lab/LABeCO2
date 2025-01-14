@@ -31,4 +31,6 @@ if __name__ == '__main__':
 
     window = MainWindow()  # Crée la fenêtre principale
     window.show()  # Affiche la fenêtre
+    for w in QApplication.topLevelWidgets():
+        print(w, w.windowTitle(), w.isVisible())
     sys.exit(app.exec())  # Lance la boucle d'événements
