@@ -1,7 +1,9 @@
 ------------------------------------------------
 -------------- Les choses à faire --------------
 ------------------------------------------------
-1. Il faudrait un "rechercher" dans le consommable.
-2. Ajouter les calcules et les diagrammes pour les consommables pour le massique.
-3. Ajout des calculs en fonction de la masse 
-4. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature
+1. Ajouter les calcules et les diagrammes pour les consommables pour le massique.
+        - les diagrames à quoi doivent ils ressembler? 
+                - camebert en proportion consommable individuellement
+                - Cammembert fonction code NACRES
+                - Différence entre quantité CO2 prix vs quantité CO2 massique. 
+3. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature

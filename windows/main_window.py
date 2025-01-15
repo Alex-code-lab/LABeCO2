@@ -159,11 +159,11 @@ class MainWindow(QMainWindow):
         self.update_subcategories()
 
         # Définition des tailles de la fenêtre
-        self.resize(800, 800)
+        self.resize(760, 700)
         screen = QApplication.primaryScreen()
         screen_size = screen.size()
         self.setMaximumSize(screen_size.width(), screen_size.height())
-        self.setMinimumSize(700, 800)
+        self.setMinimumSize(700, 700)
 
     def initUIHeader(self, main_layout):
         """
