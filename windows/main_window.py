@@ -20,7 +20,7 @@ from windows.bar_chart import BarChartWindow
 from windows.proportional_bar_chart import ProportionalBarChartWindow
 from windows.data_mass_window import DataMassWindow  # Import de DataMassWindow
 from windows.edit_calculation_dialog import EditCalculationDialog  # NOUVEAU IMPORT
-
+from windows.stacked_bar_consumables import StackedBarConsumablesWindow
 
 class MainWindow(QMainWindow):
     """
@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         self.bar_chart_window = None
         self.proportional_bar_chart_window = None
         self.data_mass_window = None  # Important: initialisation à None
+        self.stacked_bar_consumables_window = None
 
         # Widgets principaux (on les définira vraiment dans initUI())
         self.category_combo = None
@@ -446,10 +447,20 @@ class MainWindow(QMainWindow):
         self.generate_proportional_bar_button = QPushButton('Barres Empilées')
         self.generate_proportional_bar_button.setToolTip("Affiche un graphique à barres empilées proportionnelles...")
 
+        self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées (Consommables)")
+        self.generate_stacked_bar_consumables_button.setToolTip(
+            "Affiche un graphique en barres empilées uniquement pour les consommables à quantité > 0."
+        )
+
+        self.generate_nacres_bar_button = QPushButton("Barres NACRES")
+        self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
+
         buttons_layout_graph = QHBoxLayout()
         buttons_layout_graph.addWidget(self.generate_pie_button)
         buttons_layout_graph.addWidget(self.generate_bar_button)
         buttons_layout_graph.addWidget(self.generate_proportional_bar_button)
+        buttons_layout_graph.addWidget(self.generate_stacked_bar_consumables_button)
+
         main_layout.addLayout(buttons_layout_graph)
         main_layout.addSpacing(5)
 
@@ -465,6 +476,9 @@ class MainWindow(QMainWindow):
 
         # Quand la sous-catégorie change
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
+
+        # Ajout : on veut aussi vérifier la visibilité des consommables
+        self.subcategory_combo.currentIndexChanged.connect(self.update_nacres_visibility)
 
         # Barre de recherche spécifique NACRES
         self.conso_search_field.textChanged.connect(
@@ -493,6 +507,8 @@ class MainWindow(QMainWindow):
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
         self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
+        self.generate_stacked_bar_consumables_button.clicked.connect(self.generate_stacked_bar_consumables)
+
 
         # Historique : double-clic => modifier
         self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
@@ -583,6 +599,7 @@ class MainWindow(QMainWindow):
             self.subcategory_combo.clear()
             self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
             self.update_subsubcategory_names()
+            self.update_nacres_visibility()
 
             # Gestion spécifique pour "Véhicules"
             if category == "Véhicules":
@@ -594,18 +611,18 @@ class MainWindow(QMainWindow):
                 self.days_field.setVisible(False)
                 self.days_field.setEnabled(False)
 
-        # Gestion de l'affichage NACRES selon la catégorie
-        if category == 'Achats':
-            # Afficher et mettre à jour la section NACRES pour Achats
-            self.conso_filtered_label.setVisible(True)
-            self.conso_filtered_combo.setVisible(True)
-            self.update_conso_filtered_combo()
-        else:
-            # Masquer la section NACRES pour les autres catégories
-            self.conso_filtered_label.setVisible(False)
-            self.conso_filtered_combo.setVisible(False)
-            self.quantity_label.setVisible(False)
-            self.quantity_input.setVisible(False)
+        # Gestion de l'affichage Conso selon la catégorie
+        # if category == 'Achats':
+        #     # Afficher et mettre à jour la section NACRES pour Achats
+        #     self.conso_filtered_label.setVisible(True)
+        #     self.conso_filtered_combo.setVisible(True)
+        #     self.update_conso_filtered_combo()
+        # else:
+        #     # Masquer la section NACRES pour les autres catégories
+        #     self.conso_filtered_label.setVisible(False)
+        #     self.conso_filtered_combo.setVisible(False)
+        #     self.quantity_label.setVisible(False)
+        #     self.quantity_input.setVisible(False)
 
         # # On force la mise à jour NACRES dans tous les cas
         # self.update_nacres_filtered_combo()
@@ -898,6 +915,15 @@ class MainWindow(QMainWindow):
         total_emission_factor = filtered_data['total'].values[0]
         emissions = total_value * total_emission_factor
 
+        # Récupérer la quantité seulement si le champ est visible
+        quantity = 0
+        if self.quantity_label.isVisible() and self.quantity_input.isVisible():
+            try:
+                quantity_str = self.quantity_input.text().strip()
+                quantity = int(quantity_str) if quantity_str else 0
+            except:
+                quantity = 0
+
         # Gestion des émissions massiques via NACRES
         emission_massique, total_mass = None, None
         if has_nacres_match:
@@ -916,6 +942,7 @@ class MainWindow(QMainWindow):
             'code_nacres': code_nacres,
             'consommable': consommable,
             'days': days,
+            'quantity': quantity,
         }
 
         print("DEBUG new_data in creation:", new_data)
@@ -1326,6 +1353,44 @@ class MainWindow(QMainWindow):
         self.proportional_bar_chart_window.raise_()
         self.proportional_bar_chart_window.activateWindow()
 
+    def generate_stacked_bar_consumables(self):
+        """
+        Ouvre (ou rafraîchit) la fenêtre StackedBarConsumablesWindow,
+        qui affiche un graphique de barres empilées pour
+        les consommables (Achats + 'Consommables') ayant quantité > 0.
+        """
+        # Si la fenêtre n'existe pas encore ou a été fermée, on la recrée
+        if self.stacked_bar_consumables_window is None:
+            self.stacked_bar_consumables_window = StackedBarConsumablesWindow(self)
+            self.stacked_bar_consumables_window.finished.connect(self.on_stacked_bar_consumables_window_closed)
+        else:
+            # Si elle existe déjà, on actualise juste ses données
+            self.stacked_bar_consumables_window.refresh_data()
+
+        self.stacked_bar_consumables_window.show()
+        self.stacked_bar_consumables_window.raise_()
+        self.stacked_bar_consumables_window.activateWindow()
+
+    def generate_nacres_bar_chart(self):
+        # Vérifie si la fenêtre est déjà ouverte
+        if not hasattr(self, 'nacres_bar_chart_window') or self.nacres_bar_chart_window is None:
+            self.nacres_bar_chart_window = ProportionalBarChartWindow(self)
+            # Quand la fenêtre se ferme, on remet l'attribut à None
+            self.nacres_bar_chart_window.finished.connect(
+                lambda: setattr(self, 'nacres_bar_chart_window', None)
+            )
+
+        self.nacres_bar_chart_window.show()
+        self.nacres_bar_chart_window.raise_()
+        self.nacres_bar_chart_window.activateWindow()
+
+    def on_stacked_bar_consumables_window_closed(self):
+        """
+        Slot appelé quand la fenêtre de barres empilées se ferme.
+        On met l'attribut à None pour pouvoir la recréer plus tard.
+        """
+        self.stacked_bar_consumables_window = None
+
     def on_pie_chart_window_closed(self):
         self.pie_chart_window = None
 
@@ -1417,3 +1482,29 @@ class MainWindow(QMainWindow):
         eCO2_total = masse_totale_kg * eCO2_par_kg
 
         return eCO2_total, masse_totale_kg
+    
+    def update_nacres_visibility(self):
+        """
+        Affiche ou masque la ligne 'Consommable' + 'Rechercher Consommable'
+        uniquement si :
+            - la catégorie est 'Achats'
+            - la sous-catégorie contient le mot 'Consommables'
+        """
+        category = self.category_combo.currentText()
+        subcategory = self.subcategory_combo.currentText()
+        
+        # Critère : Achats + sous-catégorie contenant 'Consommables'
+        if category == 'Achats' and 'Consommables' in subcategory:
+            self.conso_filtered_label.setVisible(True)
+            self.conso_filtered_combo.setVisible(True)
+            self.conso_search_label.setVisible(True)
+            self.conso_search_field.setVisible(True)
+            # Optionnel : mettre à jour la combo NACRES
+            self.update_conso_filtered_combo()
+        else:
+            self.conso_filtered_label.setVisible(False)
+            self.conso_filtered_combo.setVisible(False)
+            self.conso_search_label.setVisible(False)
+            self.conso_search_field.setVisible(False)
+            self.quantity_label.setVisible(False)    # On masque aussi la quantité
+            self.quantity_input.setVisible(False)
