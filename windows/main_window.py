@@ -21,6 +21,7 @@ from windows.proportional_bar_chart import ProportionalBarChartWindow
 from windows.data_mass_window import DataMassWindow  # Import de DataMassWindow
 from windows.edit_calculation_dialog import EditCalculationDialog  # NOUVEAU IMPORT
 from windows.stacked_bar_consumables import StackedBarConsumablesWindow
+from windows.nacres_bar_chart import NacresBarChartWindow
 
 class MainWindow(QMainWindow):
     """
@@ -42,7 +43,7 @@ class MainWindow(QMainWindow):
         self.data = load_data()
 
         # Charger les données massiques consommables
-        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5')
+        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5') #'mock_consumables_50.hdf5')#'data_eCO2_masse_consommable.hdf5')
         if not os.path.exists(data_masse_path):
             QMessageBox.critical(self, "Erreur", f"Fichier {data_masse_path} introuvable.")
             sys.exit(1)
@@ -447,6 +448,12 @@ class MainWindow(QMainWindow):
         self.generate_proportional_bar_button = QPushButton('Barres Empilées')
         self.generate_proportional_bar_button.setToolTip("Affiche un graphique à barres empilées proportionnelles...")
 
+        buttons_layout_graph_line1 = QHBoxLayout()
+        buttons_layout_graph_line1 .addWidget(self.generate_pie_button)
+        buttons_layout_graph_line1 .addWidget(self.generate_bar_button)
+        buttons_layout_graph_line1 .addWidget(self.generate_proportional_bar_button)
+        main_layout.addLayout(buttons_layout_graph_line1)
+
         self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées (Consommables)")
         self.generate_stacked_bar_consumables_button.setToolTip(
             "Affiche un graphique en barres empilées uniquement pour les consommables à quantité > 0."
@@ -455,13 +462,11 @@ class MainWindow(QMainWindow):
         self.generate_nacres_bar_button = QPushButton("Barres NACRES")
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
 
-        buttons_layout_graph = QHBoxLayout()
-        buttons_layout_graph.addWidget(self.generate_pie_button)
-        buttons_layout_graph.addWidget(self.generate_bar_button)
-        buttons_layout_graph.addWidget(self.generate_proportional_bar_button)
-        buttons_layout_graph.addWidget(self.generate_stacked_bar_consumables_button)
+        buttons_layout_graph_line2 = QHBoxLayout()
+        buttons_layout_graph_line2.addWidget(self.generate_stacked_bar_consumables_button)
+        buttons_layout_graph_line2.addWidget(self.generate_nacres_bar_button)
+        main_layout.addLayout(buttons_layout_graph_line2)
 
-        main_layout.addLayout(buttons_layout_graph)
         main_layout.addSpacing(5)
 
     def initUISignals(self):
@@ -758,54 +763,72 @@ class MainWindow(QMainWindow):
 
     def on_conso_filtered_changed(self):
         """
-        Lorsqu'un item est sélectionné dans la combo NACRES, 
-        on ajuste la sous-sous-catégorie si on trouve un code NACRES correspondant.
+        Lorsqu'on sélectionne un consommable NACRES :
+        - S'il est "non renseignée", on masque la quantité, etc.
+        - Sinon, on force category_combo = "Achats" 
+        et subcategory_combo = la sous-catégorie contenant "Consommables".
+        - On appelle ensuite update_subsubcategory_names(), 
+        ce qui mettra à jour la combo subsub_name selon la catégorie & sous-catégorie.
+        - Enfin, on appelle update_unit() pour tenter d'activer le champ input_field.
         """
-        selected_text = self.conso_filtered_combo.currentText()
 
+        selected_text = self.conso_filtered_combo.currentText()
         if not selected_text or selected_text == "non renseignée":
-            # Masquer la quantité si pas de consommable sélectionné
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
-            # Facultatif : remettre la sous-sous-catégorie à "non renseignée"
+            # Forcer subsub_name à "non renseignée"
             self.subsub_name_combo.blockSignals(True)
-            if self.subsub_name_combo.findText("non renseignée") != -1:
-                self.subsub_name_combo.setCurrentText("non renseignée")
+            idx_nr = self.subsub_name_combo.findText("non renseignée")
+            if idx_nr != -1:
+                self.subsub_name_combo.setCurrentIndex(idx_nr)
+            else:
+                self.subsub_name_combo.setCurrentIndex(-1)
             self.subsub_name_combo.blockSignals(False)
+            self.update_unit()
             return
 
-        # Extraire code NACRES
-        if " - " in selected_text:
-            code_nacres, _consommable = selected_text.split(" - ", 1)
+        # Ici, on a un consommable NACRES sélectionné (ex. "NB13 - Culture cellulaire...")
+        # => On force la Catégorie = "Achats"
+        idx_cat = self.category_combo.findText("Achats")
+        if idx_cat >= 0:
+            self.category_combo.blockSignals(True)
+            self.category_combo.setCurrentIndex(idx_cat)
+            self.category_combo.blockSignals(False)
+
+        # On cherche une sous-catégorie qui contient "Consommables"
+        # (par ex. "Consommables (Matières premières...)")
+        target_subcat = None
+        for i in range(self.subcategory_combo.count()):
+            txt = self.subcategory_combo.itemText(i)
+            if "Consommables" in txt:
+                target_subcat = txt
+                break
+
+        if target_subcat is not None:
+            idx_sub = self.subcategory_combo.findText(target_subcat)
+            if idx_sub != -1:
+                self.subcategory_combo.blockSignals(True)
+                self.subcategory_combo.setCurrentIndex(idx_sub)
+                self.subcategory_combo.blockSignals(False)
         else:
-            code_nacres = selected_text.strip()
+            # Si vous n'en trouvez pas, on peut en ajouter une
+            self.subcategory_combo.blockSignals(True)
+            self.subcategory_combo.addItem("Consommables (Matières premières...)")
+            self.subcategory_combo.setCurrentText("Consommables (Matières premières...)")
+            self.subcategory_combo.blockSignals(False)
 
-        # Exemple de recherche dans self.data
-        mask = self.data['subsubcategory'].fillna('').str.startswith(code_nacres)
-        possible_subsubs = self.data[mask]['subsubcategory'].unique()
+        # Maintenant que category et subcategory sont fixés sur Achats + Consommables,
+        # on met à jour la liste subsub_name
+        self.update_subsubcategory_names()  # => Remplit subsub_name_combo
+        # On peut éventuellement synchroniser subsub_name si on veut :
+        #   - Soit on fait comme avant : on cherche subsub dans self.data
+        #   - Soit on laisse l'utilisateur choisir
 
-        self.subsub_name_combo.blockSignals(True)
-        if len(possible_subsubs) > 0:
-            matched_subsub = possible_subsubs[0]
-            sub_data = self.data[self.data['subsubcategory'] == matched_subsub]
-            if not sub_data.empty:
-                name_val = sub_data.iloc[0]['name'] or ''
-                new_subsub_name = f"{matched_subsub} - {name_val}".strip(" - ")
-            else:
-                new_subsub_name = matched_subsub
-
-            idx = self.subsub_name_combo.findText(new_subsub_name)
-            if idx != -1:
-                self.subsub_name_combo.setCurrentIndex(idx)
-            else:
-                if self.subsub_name_combo.findText("non renseignée") != -1:
-                    self.subsub_name_combo.setCurrentText("non renseignée")
-        else:
-            if self.subsub_name_combo.findText("non renseignée") != -1:
-                self.subsub_name_combo.setCurrentText("non renseignée")
-
-        self.subsub_name_combo.blockSignals(False)
+        # On active la quantité
         self.update_quantity_visibility()
+
+        # Puis on appelle update_unit()
+        self.update_unit()
 
     def update_quantity_visibility(self):
         """
@@ -1372,17 +1395,31 @@ class MainWindow(QMainWindow):
         self.stacked_bar_consumables_window.activateWindow()
 
     def generate_nacres_bar_chart(self):
-        # Vérifie si la fenêtre est déjà ouverte
+        """
+        Ouvre (ou rafraîchit) une fenêtre affichant un Bar Chart dédié à l'analyse 
+        par code NACRES, regroupant et/ou empilant les émissions. 
+        Vous pouvez adapter la logique interne selon vos besoins (filtrage, etc.).
+        """
         if not hasattr(self, 'nacres_bar_chart_window') or self.nacres_bar_chart_window is None:
-            self.nacres_bar_chart_window = ProportionalBarChartWindow(self)
-            # Quand la fenêtre se ferme, on remet l'attribut à None
-            self.nacres_bar_chart_window.finished.connect(
-                lambda: setattr(self, 'nacres_bar_chart_window', None)
-            )
+            # Si la fenêtre n'existe pas encore, on la crée
+            self.nacres_bar_chart_window = NacresBarChartWindow(self)
+            # On connecte le signal finished pour savoir quand la fenêtre se ferme
+            self.nacres_bar_chart_window.finished.connect(self.on_nacres_bar_chart_window_closed)
+        else:
+            # Sinon, on rafraîchit juste les données
+            self.nacres_bar_chart_window.refresh_data()
 
         self.nacres_bar_chart_window.show()
         self.nacres_bar_chart_window.raise_()
         self.nacres_bar_chart_window.activateWindow()
+
+    def on_nacres_bar_chart_window_closed(self):
+        """
+        Slot appelé quand la fenêtre NacresBarChartWindow se ferme.
+        Permet de remettre l'attribut nacres_bar_chart_window à None
+        pour pouvoir la recréer plus tard.
+        """
+        self.nacres_bar_chart_window = None
 
     def on_stacked_bar_consumables_window_closed(self):
         """
