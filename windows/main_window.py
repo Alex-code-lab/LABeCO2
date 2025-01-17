@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
         self.data = load_data()
 
         # Charger les données massiques consommables
-        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5') #'mock_consumables_50.hdf5')#'data_eCO2_masse_consommable.hdf5')
+        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'mock_consumables_50.hdf5')#'data_eCO2_masse_consommable.hdf5')
         if not os.path.exists(data_masse_path):
             QMessageBox.critical(self, "Erreur", f"Fichier {data_masse_path} introuvable.")
             sys.exit(1)
@@ -763,15 +763,13 @@ class MainWindow(QMainWindow):
 
     def on_conso_filtered_changed(self):
         """
-        Lorsqu'on sélectionne un consommable NACRES :
-        - S'il est "non renseignée", on masque la quantité, etc.
-        - Sinon, on force category_combo = "Achats" 
-        et subcategory_combo = la sous-catégorie contenant "Consommables".
-        - On appelle ensuite update_subsubcategory_names(), 
-        ce qui mettra à jour la combo subsub_name selon la catégorie & sous-catégorie.
-        - Enfin, on appelle update_unit() pour tenter d'activer le champ input_field.
+        Lorsqu'on sélectionne un consommable NACRES dans conso_filtered_combo :
+        - Si "non renseignée", on masque quantité et on désactive la valeur en euro.
+        - Sinon, on force la catégorie "Achats" + sous-catégorie "Consommables(...)",
+        on met à jour la combo subsub_name, et on tente de sélectionner la bonne
+        sous-sous-catégorie via subsubcategory[:4] == code_nacres_4.
+        - Enfin, on appelle update_unit() pour activer le champ euro si la ligne existe.
         """
-
         selected_text = self.conso_filtered_combo.currentText()
         if not selected_text or selected_text == "non renseignée":
             self.quantity_label.setVisible(False)
@@ -779,55 +777,74 @@ class MainWindow(QMainWindow):
             # Forcer subsub_name à "non renseignée"
             self.subsub_name_combo.blockSignals(True)
             idx_nr = self.subsub_name_combo.findText("non renseignée")
-            if idx_nr != -1:
-                self.subsub_name_combo.setCurrentIndex(idx_nr)
-            else:
-                self.subsub_name_combo.setCurrentIndex(-1)
+            self.subsub_name_combo.setCurrentIndex(idx_nr if idx_nr != -1 else -1)
             self.subsub_name_combo.blockSignals(False)
-            self.update_unit()
+
+            self.update_unit()  # désactiver le champ euro
             return
 
-        # Ici, on a un consommable NACRES sélectionné (ex. "NB13 - Culture cellulaire...")
-        # => On force la Catégorie = "Achats"
+        # On parse les 4 premiers caractères comme "code_nacres_4"
+        # Ex: "NB13 - Culture cellulaire" => code_nacres_4 = "NB13"
+        code_nacres_4 = selected_text[:4]
+
+        # Forcer la Catégorie = "Achats"
         idx_cat = self.category_combo.findText("Achats")
         if idx_cat >= 0:
             self.category_combo.blockSignals(True)
             self.category_combo.setCurrentIndex(idx_cat)
             self.category_combo.blockSignals(False)
 
-        # On cherche une sous-catégorie qui contient "Consommables"
-        # (par ex. "Consommables (Matières premières...)")
+        # Forcer la Sous-catégorie contenant "Consommables"
         target_subcat = None
         for i in range(self.subcategory_combo.count()):
             txt = self.subcategory_combo.itemText(i)
             if "Consommables" in txt:
                 target_subcat = txt
                 break
-
         if target_subcat is not None:
             idx_sub = self.subcategory_combo.findText(target_subcat)
             if idx_sub != -1:
                 self.subcategory_combo.blockSignals(True)
                 self.subcategory_combo.setCurrentIndex(idx_sub)
                 self.subcategory_combo.blockSignals(False)
+
+        # Actualiser la combo subsub_name en fonction de cat & subcat
+        self.update_subsubcategory_names()
+
+        # On cherche la (première) ligne subsubcategory[:4] == code_nacres_4
+        filtered_data = self.data[
+            (self.data['category'] == "Achats") &
+            (self.data['subcategory'].str.contains("Consommables", na=False)) &
+            (self.data['subsubcategory'].fillna('').str[:4] == code_nacres_4)
+        ]
+        if filtered_data.empty:
+            # Rien trouvé => subsub_name = "non renseignée"
+            self.subsub_name_combo.blockSignals(True)
+            idx_nr = self.subsub_name_combo.findText("non renseignée")
+            self.subsub_name_combo.setCurrentIndex(idx_nr if idx_nr != -1 else -1)
+            self.subsub_name_combo.blockSignals(False)
         else:
-            # Si vous n'en trouvez pas, on peut en ajouter une
-            self.subcategory_combo.blockSignals(True)
-            self.subcategory_combo.addItem("Consommables (Matières premières...)")
-            self.subcategory_combo.setCurrentText("Consommables (Matières premières...)")
-            self.subcategory_combo.blockSignals(False)
+            row = filtered_data.iloc[0]
+            real_subsub = row['subsubcategory'] or ''
+            real_name = row['name'] or ''
+            new_subsub_text = f"{real_subsub} - {real_name}".strip(" - ")
 
-        # Maintenant que category et subcategory sont fixés sur Achats + Consommables,
-        # on met à jour la liste subsub_name
-        self.update_subsubcategory_names()  # => Remplit subsub_name_combo
-        # On peut éventuellement synchroniser subsub_name si on veut :
-        #   - Soit on fait comme avant : on cherche subsub dans self.data
-        #   - Soit on laisse l'utilisateur choisir
+            # Essayer de sélectionner cette valeur dans subsub_name_combo
+            self.subsub_name_combo.blockSignals(True)
+            idx_ss = self.subsub_name_combo.findText(new_subsub_text)
+            if idx_ss != -1:
+                self.subsub_name_combo.setCurrentIndex(idx_ss)
+            else:
+                # Sinon, on l'ajoute
+                self.subsub_name_combo.addItem(new_subsub_text)
+                self.subsub_name_combo.setCurrentIndex(self.subsub_name_combo.count() - 1)
+            self.subsub_name_combo.blockSignals(False)
 
-        # On active la quantité
-        self.update_quantity_visibility()
+        # Afficher la quantité
+        self.quantity_label.setVisible(True)
+        self.quantity_input.setVisible(True)
 
-        # Puis on appelle update_unit()
+        # Appel final de update_unit (pour activer le champ euro si la ligne existe)
         self.update_unit()
 
     def update_quantity_visibility(self):
