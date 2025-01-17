@@ -748,17 +748,55 @@ class MainWindow(QMainWindow):
 
     def on_subsub_name_changed(self):
         """
-        Lorsqu'une sous-sous-catégorie est sélectionnée, 
-        réinitialise le champ NACRES à "non renseignée" 
-        pour éviter une synchronisation inverse automatique.
+        Lorsqu'une sous-sous-catégorie est sélectionnée,
+        on récupère le code NACRES (les 4 premiers caractères du subsubcategory)
+        et on ne garde dans la combo NACRES que les consommables qui correspondent.
         """
-        # Forcer le champ NACRES à "non renseignée"
+
+        subsub_name = self.subsub_name_combo.currentText()
+        
+        # Cas "non renseignée"
+        if not subsub_name or subsub_name == "non renseignée":
+            self.conso_filtered_combo.blockSignals(True)
+            self.conso_filtered_combo.clear()
+            self.conso_filtered_combo.addItem("non renseignée")
+            self.conso_filtered_combo.blockSignals(False)
+
+            # Masquer ou réinitialiser la quantité
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+            return
+
+        # Extraire le "code NACRES" sur les 4 premiers caractères
+        # Exemple: "NB13 - Culture cellulaire" => code_nacres_4 = "NB13"
+        code_nacres_4 = subsub_name[:4]
+
+        # On va reconstruire la combo conso_filtered_combo en filtrant self.data_masse
+        filtered_items = []
+        for idx, row in self.data_masse.iterrows():
+            full_code = row.get('Code NACRES', '').strip()  # ex. "NB13"
+            consommable = row.get('Consommable', '').strip()
+            display_text = f"{full_code} - {consommable}"
+
+            # On compare le début du code NACRES
+            if full_code.startswith(code_nacres_4):
+                filtered_items.append(display_text)
+
+        # Actualiser la combo NACRES avec les seuls éléments filtrés
         self.conso_filtered_combo.blockSignals(True)
-        if self.conso_filtered_combo.findText("non renseignée") != -1:
-            self.conso_filtered_combo.setCurrentText("non renseignée")
+        self.conso_filtered_combo.clear()
+        self.conso_filtered_combo.addItem("non renseignée")
+        for item_text in sorted(filtered_items):
+            self.conso_filtered_combo.addItem(item_text)
         self.conso_filtered_combo.blockSignals(False)
 
-        # Mise à jour de la visibilité du champ quantité si nécessaire
+        # Optionnel : si un seul consommable correspond, on peut l’auto-sélectionner :
+        if len(filtered_items) == 1:
+            self.conso_filtered_combo.setCurrentIndex(1)
+        else:
+            self.conso_filtered_combo.setCurrentIndex(0)
+
+        # Afficher la quantité si on n’est pas sur "non renseignée"
         self.update_quantity_visibility()
 
     def on_conso_filtered_changed(self):
