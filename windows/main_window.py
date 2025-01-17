@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
         self.data = load_data()
 
         # Charger les données massiques consommables
-        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'mock_consumables_50.hdf5')#'data_eCO2_masse_consommable.hdf5')
+        data_masse_path = os.path.join(base_path, 'data_masse_eCO2', 'mock_consumables_100.hdf5')#'data_eCO2_masse_consommable.hdf5')
         if not os.path.exists(data_masse_path):
             QMessageBox.critical(self, "Erreur", f"Fichier {data_masse_path} introuvable.")
             sys.exit(1)
