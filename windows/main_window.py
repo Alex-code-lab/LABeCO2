@@ -26,10 +26,25 @@ from windows.nacres_bar_chart import NacresBarChartWindow
 class MainWindow(QMainWindow):
     """
     Fenêtre principale de l'application LABeCO₂.
+
+    Gère l'interface, l'historique, les calculs, ainsi que les fenêtres de graphiques.
     """
+
     data_changed = Signal()
 
     def __init__(self):
+        """
+        Initialise la fenêtre principale.
+
+        - Définit le titre.
+        - Charge les données principales et massiques.
+        - Crée les variables d'état (fenêtres filles, historique, etc.).
+        - Lance initUI() pour configurer l'interface.
+
+        :raises SystemExit:
+            Si certains fichiers de données nécessaires (data_masse ou data_materials) 
+            sont introuvables ou incomplets.
+        """
         super().__init__()
         self.setWindowTitle('LABeCO₂ - Calculateur de Bilan Carbone')
 
@@ -116,7 +131,12 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         """
-        Initialise l'interface utilisateur.
+        Initialise l'interface graphique de la fenêtre.
+
+        - Crée un layout vertical principal et y insère différentes sections :
+          header, selectors, machine, historique, boutons de graphiques, zone de résultat.
+        - Place le tout dans un QScrollArea (défilement possible).
+        - Redimensionne la fenêtre et connecte quelques signaux de base.
         """
         main_layout = QVBoxLayout()
         main_layout.setSpacing(5)
@@ -169,8 +189,15 @@ class MainWindow(QMainWindow):
 
     def initUIHeader(self, main_layout):
         """
-        Initialise la partie haute de l'interface.
+        Initialise l'entête (header) de l'IU.
+
+        - Ajoute le logo (self.add_logo())
+        - Ajoute un texte d'introduction pouvant être "déroulé" ou "enroulé".
+
+        :param main_layout: Le layout parent (QVBoxLayout) dans lequel le header est ajouté.
+        :type main_layout: QVBoxLayout
         """
+
         self.add_logo()
         main_layout.addWidget(self.logo_label)
 
@@ -229,8 +256,14 @@ class MainWindow(QMainWindow):
 
     def initUICategorySelectors(self, main_layout):
         """
-        Initialise la partie sélection de catégorie, sous-catégorie, etc.
-        avec des champs alignés.
+        Initialise la section de sélection des catégories, sous-catégories,
+        sous-sous-catégorie (nom), ainsi que la zone "Consommable" (combo + champ de recherche).
+
+        - Utilise un QFormLayout pour aligner les étiquettes et les champs.
+        - Ajoute des widgets pour la quantité, le bouton "Gestion des Consommables", etc.
+
+        :param main_layout: Le layout principal dans lequel on intègre ce formulaire.
+        :type main_layout: QVBoxLayout
         """
         # Création des widgets de sélection
         self.category_label = QLabel('Catégorie:')
@@ -348,7 +381,14 @@ class MainWindow(QMainWindow):
 
     def initUIMachineSection(self, main_layout):
         """
-        Initialise la partie spécifique pour l'ajout d'une "Machine"
+        Initialise la section de l'interface dédiée aux Machines.
+
+        - Crée un formulaire (QFormLayout) avec champs pour la machine (puissance, 
+          temps d'utilisation, jours, type d'électricité, etc.).
+        - Stocke ce formulaire dans self.machine_group, masqué par défaut.
+
+        :param main_layout: Layout principal où insérer la section Machines.
+        :type main_layout: QVBoxLayout
         """
         self.machine_name_label = QLabel('Nom de la machine:')
         self.machine_name_field = QLineEdit()
@@ -392,7 +432,14 @@ class MainWindow(QMainWindow):
 
     def initUIHistory(self, main_layout):
         """
-        Initialise la partie Historique des calculs
+        Initialise l'historique des calculs.
+
+        - Ajoute une QListWidget pour lister les calculs.
+        - Ajoute des boutons de suppression, modification, export et import.
+        - Ajoute un QLabel (self.result_area) pour afficher le total des émissions.
+
+        :param main_layout: Layout vertical principal où insérer l'historique.
+        :type main_layout: QVBoxLayout
         """
         self.history_label = QLabel('Historique des calculs:')
         main_layout.addWidget(self.history_label)
@@ -434,7 +481,13 @@ class MainWindow(QMainWindow):
 
     def initUIGraphButtons(self, main_layout):
         """
-        Initialise la zone avec les boutons pour générer les graphiques.
+        Initialise la zone des boutons de génération de graphiques.
+
+        - Ajoute plusieurs boutons (camembert, barres empilées, etc.) sur deux lignes.
+        - Chaque bouton est relié à une méthode spécifique (generate_*).
+
+        :param main_layout: Layout principal où les boutons sont disposés.
+        :type main_layout: QVBoxLayout
         """
         graph_summary_label = QLabel("Générer des résumés graphiques :")
         main_layout.addWidget(graph_summary_label)
@@ -471,7 +524,13 @@ class MainWindow(QMainWindow):
 
     def initUISignals(self):
         """
-        Connexion des signaux/slots
+        Connecte tous les signaux/slots de l'interface.
+
+        - Liaison des QComboBox (catégorie, sous-catégorie...) à leurs fonctions de mise à jour.
+        - Liaison des boutons (calculate_button, export_button, etc.) à leurs callbacks.
+        - Liaison des double-clics dans l'historique pour modifier un item.
+        - Liaison du champ de recherche "search_field" et conso_search_field.
+        - Liaison du bouton "Ajouter la machine".
         """
         # Lien du header "voir plus/voir moins"
         self.header_label.linkActivated.connect(self.toggle_text_display)
@@ -526,9 +585,14 @@ class MainWindow(QMainWindow):
 
     def on_search_text_changed(self, text):
         """
-        Se déclenche à chaque modification du champ de recherche.
-        On met à jour subsubcategory + NACRES, puis on tente de sélectionner
-        automatiquement l'élément s'il n'y a qu'une seule correspondance.
+        Gère le changement de texte dans la barre de recherche principale (search_field).
+
+        - Met à jour les sous-sous-catégories (update_subsubcategory_names).
+        - Met à jour la liste des consommables (update_conso_filtered_combo).
+        - Synchronise l'interface (synchronize_after_search).
+
+        :param text: Texte actuel saisi dans le champ de recherche.
+        :type text: str
         """
         self.update_subsubcategory_names()
         self.update_conso_filtered_combo(filter_text=None)
@@ -536,8 +600,12 @@ class MainWindow(QMainWindow):
 
     def synchronize_after_search(self):
         """
-        Si, après la recherche, il n'y a qu'une seule correspondance (outre "non renseignée")
-        dans subsub_name_combo ou conso_filtered_combo, on la sélectionne automatiquement.
+        Synchronise l'IU après une recherche.
+
+        - Si la combo subsub_name_combo ne contient qu'une seule option (outre "non renseignée"), 
+          la sélectionne automatiquement.
+        - Même logique pour conso_filtered_combo (consommables).
+        - Met à jour la visibilité du champ "quantité".
         """
         # SUBSUB
         count_subsub = self.subsub_name_combo.count()
@@ -555,58 +623,75 @@ class MainWindow(QMainWindow):
         self.update_quantity_visibility()
 
     def update_subcategories(self):
+        """
+        Met à jour la liste des sous-catégories en fonction de la catégorie sélectionnée.
+
+        - Si la catégorie = "Machine", masque les champs relatifs aux consommables/achats/etc. 
+          et affiche la section Machine.
+        - Sinon, réaffiche les champs généraux, met à jour la combo subcategory_combo 
+          depuis self.data, et appelle update_subsubcategory_names() + update_nacres_visibility().
+        - Gère aussi l'affichage/masquage du champ days (véhicules).
+        """
         category = self.category_combo.currentText()
+
         if category == 'Machine':
-            # Masquer la zone "Achats/Véhicules/etc." pour Machine
+            # Masquer les champs "Achats/Véhicules/etc." non pertinents pour Machine
             self.subcategory_label.setVisible(False)
             self.subcategory_combo.setVisible(False)
             self.search_label.setVisible(False)
             self.search_field.setVisible(False)
             self.subsub_name_label.setVisible(False)
             self.subsub_name_combo.setVisible(False)
-            # self.year_label.setVisible(False)
             self.year_combo.setVisible(False)
             self.input_label.setVisible(False)
             self.input_field.setVisible(False)
             self.days_label.setVisible(False)
             self.days_field.setVisible(False)
             self.calculate_button.setVisible(False)
+
+            # Afficher le formulaire "Machine"
             self.machine_group.setVisible(True)
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+
+            # Cacher le bouton « Gestion des Consommables »
             self.manage_consumables_button.setVisible(False)
 
-            # Pour Machine, rendre NACRES visible mais la vider
-            self.conso_filtered_label.setVisible(True)
-            self.conso_filtered_combo.setVisible(True)
-            self.conso_filtered_combo.clear()
-            self.conso_filtered_combo.addItem("non renseignée")
+            # Cacher intégralement la zone "Consommable" (liste et barre de recherche)
+            self.conso_filtered_label.setVisible(False)
+            self.conso_filtered_combo.setVisible(False)
+            self.conso_search_label.setVisible(False)
+            self.conso_search_field.setVisible(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+
         else:
-            # Réafficher les éléments pour les autres catégories
+            # Réafficher les widgets pour les autres catégories
             self.subcategory_label.setVisible(True)
             self.subcategory_combo.setVisible(True)
             self.search_label.setVisible(True)
             self.search_field.setVisible(True)
             self.subsub_name_label.setVisible(True)
             self.subsub_name_combo.setVisible(True)
-            # self.year_label.setVisible(True)
             self.year_combo.setVisible(True)
             self.input_label.setVisible(True)
             self.input_field.setVisible(True)
             self.calculate_button.setVisible(True)
+
+            # Cacher la zone "Machine"
             self.machine_group.setVisible(False)
             self.machine_group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.manage_consumables_button.setVisible(True)
 
-            # Mise à jour de la combo sous-catégories
+            # Mettre à jour la combo sous-catégorie
             subcategories = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
             self.subcategory_combo.clear()
             self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
+
+            # Met à jour la sous-sous-catégorie et la visibilité NACRES (pour "Achats"+"Consommables" etc.)
             self.update_subsubcategory_names()
             self.update_nacres_visibility()
 
-            # Gestion spécifique pour "Véhicules"
+            # Cas particulier : Véhicules => on affiche le champ "nombre de jours"
             if category == "Véhicules":
                 self.days_label.setVisible(True)
                 self.days_field.setVisible(True)
@@ -616,23 +701,15 @@ class MainWindow(QMainWindow):
                 self.days_field.setVisible(False)
                 self.days_field.setEnabled(False)
 
-        # Gestion de l'affichage Conso selon la catégorie
-        # if category == 'Achats':
-        #     # Afficher et mettre à jour la section NACRES pour Achats
-        #     self.conso_filtered_label.setVisible(True)
-        #     self.conso_filtered_combo.setVisible(True)
-        #     self.update_conso_filtered_combo()
-        # else:
-        #     # Masquer la section NACRES pour les autres catégories
-        #     self.conso_filtered_label.setVisible(False)
-        #     self.conso_filtered_combo.setVisible(False)
-        #     self.quantity_label.setVisible(False)
-        #     self.quantity_input.setVisible(False)
-
-        # # On force la mise à jour NACRES dans tous les cas
-        # self.update_nacres_filtered_combo()
-
     def update_subsubcategory_names(self):
+        """
+        Met à jour la combo subsub_name_combo (sous-sous-catégorie) en fonction 
+        de la catégorie, sous-catégorie et éventuellement d'un texte de recherche.
+
+        - Construit une liste "subsubcategory - name" pour chaque ligne correspondante de self.data.
+        - Insère "non renseignée" en premier.
+        - Appelle ensuite self.update_years() pour alimenter year_combo.
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         search_text = self.search_field.text().lower()
@@ -673,6 +750,14 @@ class MainWindow(QMainWindow):
         self.update_years()
 
     def update_years(self):
+        """
+        Met à jour la combo year_combo en fonction de la catégorie, sous-catégorie 
+        et sous-sous-catégorie sélectionnées.
+
+        - Construit un masque sur self.data et récupère la colonne 'year'.
+        - Insère ces années dans year_combo, puis appelle update_unit() 
+          pour ajuster le champ "Entrez la valeur".
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -693,6 +778,15 @@ class MainWindow(QMainWindow):
         self.update_unit()
 
     def update_unit(self):
+        """
+        Met à jour l'unité (self.current_unit) et active/désactive le champ input_field 
+        selon la correspondance trouvée dans self.data.
+
+        - Construit un masque (catégorie, sous-catégorie, sub-sub-cat, name, year).
+        - Si une ligne est trouvée, self.current_unit devient l'unité (ex: euro, km...).
+          Le champ input_field est activé et son label est mis à jour.
+        - Sinon, le champ input_field reste désactivé.
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -703,9 +797,13 @@ class MainWindow(QMainWindow):
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
             (self.data['subsubcategory'].fillna('') == subsubcategory) &
-            (self.data['name'].fillna('') == name) &
-            (self.data['year'].astype(str) == year)
+            (self.data['name'].fillna('') == name)#&
+            # (self.data['year'].astype(str) == year)
         )
+         # Si on a un year non vide, on ajoute la condition
+        if year:
+            mask &= (self.data['year'].astype(str) == year)
+
 
         filtered_data = self.data[mask]
         if not filtered_data.empty:
@@ -720,7 +818,16 @@ class MainWindow(QMainWindow):
 
     def update_conso_filtered_combo(self, filter_text=None):
         """
-        Met à jour la liste déroulante NACRES/Consommable en fonction d'un texte de recherche.
+        Met à jour la combo conso_filtered_combo (liste des consommables NACRES) 
+        en fonction d'un texte de filtre (filter_text).
+
+        - Vide la combo et ajoute "non renseignée".
+        - Parcourt self.data_masse et insère dans la combo tous les consommables 
+          dont le display_text correspond au filtre (s'il existe).
+        - Met à jour la visibilité de la quantité.
+
+        :param filter_text: Texte de recherche optionnel. Si None, pas de filtrage.
+        :type filter_text: str or None
         """
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
@@ -748,9 +855,13 @@ class MainWindow(QMainWindow):
 
     def on_subsub_name_changed(self):
         """
-        Lorsqu'une sous-sous-catégorie est sélectionnée,
-        on récupère le code NACRES (les 4 premiers caractères du subsubcategory)
-        et on ne garde dans la combo NACRES que les consommables qui correspondent.
+        Gère la sélection d'une sous-sous-catégorie (subsub_name).
+
+        - Récupère les 4 premiers caractères comme code NACRES approximatif.
+        - Filtre self.data_masse pour ne garder que les consommables 
+          dont 'Code NACRES' commence par ce code.
+        - Met à jour la combo conso_filtered_combo avec cette liste restreinte.
+        - Affiche le champ quantité si nécessaire.
         """
 
         subsub_name = self.subsub_name_combo.currentText()
@@ -801,12 +912,13 @@ class MainWindow(QMainWindow):
 
     def on_conso_filtered_changed(self):
         """
-        Lorsqu'on sélectionne un consommable NACRES dans conso_filtered_combo :
-        - Si "non renseignée", on masque quantité et on désactive la valeur en euro.
-        - Sinon, on force la catégorie "Achats" + sous-catégorie "Consommables(...)",
-        on met à jour la combo subsub_name, et on tente de sélectionner la bonne
-        sous-sous-catégorie via subsubcategory[:4] == code_nacres_4.
-        - Enfin, on appelle update_unit() pour activer le champ euro si la ligne existe.
+        Quand on change de consommable NACRES dans conso_filtered_combo :
+
+        - Si "non renseignée", on masque quantité et désactive le champ euro.
+        - Sinon, on force la catégorie "Achats" et la sous-catégorie contenant "Consommables",
+          on actualise subsub_name_combo (via update_subsubcategory_names),
+          on tente de sélectionner la sous-sous-catégorie correspondant au code NACRES,
+          puis on appelle update_unit() pour activer le champ euro si une ligne existe.
         """
         selected_text = self.conso_filtered_combo.currentText()
         if not selected_text or selected_text == "non renseignée":
@@ -887,8 +999,8 @@ class MainWindow(QMainWindow):
 
     def update_quantity_visibility(self):
         """
-        Montre ou cache le champ 'quantité' selon si on a sélectionné un consommable
-        spécifique (≠ 'non renseignée') dans la combo NACRES.
+        Affiche ou masque les champs "Quantité" (quantity_label, quantity_input) 
+        selon la sélection actuelle dans conso_filtered_combo.
         """
         current_nacres = self.conso_filtered_combo.currentText()
         if (not current_nacres) or (current_nacres == "non renseignée"):
@@ -899,6 +1011,13 @@ class MainWindow(QMainWindow):
             self.quantity_input.setVisible(True)
 
     def add_logo(self):
+        """
+        Charge et affiche le logo dans self.logo_label.
+
+        - Utilise load_logo() pour obtenir le chemin du logo.
+        - Redimensionne l'image à 150×150 en conservant les proportions.
+        - Affiche un QMessageBox d'avertissement si l'image est introuvable.
+        """
         logo_path = load_logo()
         self.logo_label = QLabel()
         pixmap = QPixmap(logo_path)
@@ -910,12 +1029,26 @@ class MainWindow(QMainWindow):
             self.logo_label.setAlignment(Qt.AlignCenter)
 
     def toggle_text_display(self):
+        """
+        Alterne le texte d'introduction entre une version "réduite" et une version "complète".
+
+        - Se base sur self.collapsed_text et self.full_text pour remplacer le contenu 
+          de self.header_label.
+        """
         if self.header_label.text() == self.collapsed_text:
             self.header_label.setText(self.full_text)
         else:
             self.header_label.setText(self.collapsed_text)
 
     def split_subsub_name(self, subsub_name):
+        """
+        Sépare une chaîne de type "subsubcategory - name" en deux parties.
+
+        :param subsub_name: Le texte à scinder (ex. "NB13 - Culture cellulaire").
+        :type subsub_name: str
+        :return: Un tuple (subsubcategory, name).
+        :rtype: tuple(str, str)
+        """
         if ' - ' in subsub_name:
             subsubcategory, name = subsub_name.split(' - ', 1)
         else:
@@ -925,8 +1058,16 @@ class MainWindow(QMainWindow):
 
     def calculate_emission(self):
         """
-        Calcule les émissions carbone en fonction des données saisies et sélectionnées par l'utilisateur.
-        Ajoute également les informations NACRES (si disponibles) dans l'historique.
+        Calcule les émissions carbone en fonction de la catégorie/sous-catégorie/sub-sous-catégorie 
+        et la valeur saisie.
+
+        - Si la catégorie est 'Machine', redirige vers add_machine().
+        - Sinon, récupère l'unité, le facteur d'émission dans self.data, et effectue un calcul 
+          (émissions_price).
+        - Si NACRES (consommable) est renseigné, appelle calculate_mass_based_emissions() 
+          pour obtenir emissions_mass.
+        - Stocke le tout dans l'historique (create_or_update_history_item) 
+          et met à jour le total (update_total_emissions).
         """
         print("calculate_emission appelé")
 
@@ -1031,6 +1172,13 @@ class MainWindow(QMainWindow):
         self.data_changed.emit()
 
     def update_total_emissions(self):
+        """
+        Recalcule et affiche la somme totale des émissions (en kg CO₂e) figurant dans l'historique.
+
+        - Parcourt self.history_list, lit 'emissions_price' et accumule.
+        - Sépare la partie "mass" pour les consommables NACRES (emission_mass).
+        - Met à jour self.result_area avec plusieurs lignes de résumé.
+        """
         total_emissions = 0.0
         total_mass_emissions_conso = 0.0
         total_price_emissions_conso = 0.0
@@ -1059,6 +1207,13 @@ class MainWindow(QMainWindow):
         )
 
     def delete_selected_calculation(self):
+        """
+        Supprime l'entrée actuellement sélectionnée dans l'historique (history_list).
+
+        - Si aucune entrée n'est sélectionnée, ne fait rien.
+        - Met à jour ensuite le total des émissions (update_total_emissions).
+        - Émet le signal data_changed.
+        """
         selected_row = self.history_list.currentRow()
         if selected_row >= 0:
             self.history_list.takeItem(selected_row)
@@ -1066,6 +1221,15 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
 
     def modify_selected_calculation(self):
+        """
+        Ouvre un EditCalculationDialog pour modifier l'entrée actuellement sélectionnée 
+        dans l'historique.
+
+        - Si aucun item n'est sélectionné, affiche un avertissement.
+        - Sinon, récupère les données, ouvre le dialog, 
+          puis réinsère l'item mis à jour dans l'historique.
+        - Met à jour le total des émissions et émet data_changed.
+        """
         selected_item = self.history_list.currentItem()
         if not selected_item:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')

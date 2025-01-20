@@ -6,4 +6,8 @@
                 - camebert en proportion consommable individuellement
                 - Cammembert fonction code NACRES
                 - Différence entre quantité CO2 prix vs quantité CO2 massique. 
-3. Remplir le tableau (création d'un tableau?) --> Trouver comment normaliser la nommenclature
+2. Identifier top 50 NACRES (Cathie ou Kolante)
+3. Problème si on choisis d'abord un conso -> on peut pas mettre prix.
+4. Changer et ajouter graphs avec masse.
+5. Ajouter une barre d'incertitude sur tous les grpahs (en barre) et faire le calcul en amont. La colonne uncertainty existe déjà et je l'ai faite pour la consommation massique.
+
