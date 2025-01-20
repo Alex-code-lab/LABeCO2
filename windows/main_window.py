@@ -1394,154 +1394,136 @@ class MainWindow(QMainWindow):
 
     def export_data(self):
         """
-        Exporte les données de l'historique (history_list) vers un fichier choisi (CSV, Excel, HDF5).
+        Exporte les données de l'historique (self.history_list) vers un fichier (CSV, Excel ou HDF5).
 
-        - Construit un DataFrame temporaire.
-        - Ouvre une boîte de dialogue pour choisir le nom et le format (csv, xlsx, h5).
+        - Ouvre une boîte de dialogue pour choisir le chemin et le format.
+        - Construit un DataFrame pandas à partir des items de l'historique.
         - Sauvegarde le fichier.
-        - Affiche un message de confirmation ou d'erreur.
         """
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        import pandas as pd
+        import os
+
         if self.history_list.count() == 0:
-            QMessageBox.information(self, 'Information', 'Aucune donnée à exporter.')
+            QMessageBox.information(self, "Export", "L'historique est vide, rien à exporter.")
             return
 
-        data_to_export = []
+        # Boîte de dialogue pour sauvegarder
+        file_name, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Enregistrer l'historique",
+            "",
+            "Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5);;Tous les fichiers (*)"
+        )
+        if not file_name:
+            return  # l'utilisateur a annulé
+
+        # Construire une liste de dictionnaires (chacune représentant un item)
+        rows = []
         for i in range(self.history_list.count()):
             item = self.history_list.item(i)
             data = item.data(Qt.UserRole)
-            if data:
-                data_to_export.append({
-                    'Catégorie': data.get('category', ''),
-                    'Sous-catégorie': data.get('subcategory', ''),
-                    'Sous-sous-catégorie': data.get('subsubcategory', ''),
-                    'Nom': data.get('name', ''),
-                    'Valeur': data.get('value', 0),
-                    'Unité': data.get('unit', ''),
-                    'Émissions (kg CO₂e)': data.get('emissions_price', 0),
-                    'Code NACRES': data.get('code_nacres', 'NA'),
-                    'Consommable': data.get('consommable', 'NA')
-                })
+            if not data:
+                continue
+            rows.append(data)
 
-        df = pd.DataFrame(data_to_export)
-        if df.empty:
-            QMessageBox.information(self, 'Information', 'Aucune donnée valide à exporter.')
-            return
+        # Convertir en DataFrame
+        df = pd.DataFrame(rows)
 
-        default_file_name = os.path.join(os.getcwd(), 'bilan_carbone_export')
-        options = QFileDialog.Options()
-        file_name, selected_filter = QFileDialog.getSaveFileName(
-            self,
-            "Exporter les données",
-            default_file_name,
-            "Fichiers CSV (*.csv);;Fichiers Excel (*.xlsx);;Fichiers HDF5 (*.h5);;Tous les fichiers (*)",
-            options=options
-        )
-
-        if not file_name:
-            QMessageBox.information(self, 'Annulation', 'Exportation annulée.')
-            return
-
-        # Ajout extension si besoin
-        if selected_filter == "Fichiers CSV (*.csv)" and not file_name.endswith('.csv'):
-            file_name += '.csv'
-        elif selected_filter == "Fichiers Excel (*.xlsx)" and not file_name.endswith('.xlsx'):
-            file_name += '.xlsx'
-        elif selected_filter == "Fichiers HDF5 (*.h5)" and not file_name.endswith('.h5'):
-            file_name += '.h5'
+        # Vérifier l'extension du fichier
+        _, extension = os.path.splitext(file_name)
+        extension = extension.lower()
 
         try:
-            if file_name.endswith('.csv'):
-                df.to_csv(file_name, index=False, encoding='utf-8-sig')
-            elif file_name.endswith('.xlsx'):
-                df.to_excel(file_name, index=False, engine='openpyxl')
-            elif file_name.endswith('.h5'):
-                df.to_hdf(file_name, key='bilan_carbone', mode='w')
-            QMessageBox.information(self, 'Succès', f'Données exportées avec succès dans {file_name}')
+            if extension == '.csv':
+                df.to_csv(file_name, index=False, sep=';')
+            elif extension == '.xlsx':
+                df.to_excel(file_name, index=False)
+            elif extension == '.h5':
+                df.to_hdf(file_name, key='history', mode='w')
+            else:
+                # Par défaut, on tente CSV
+                df.to_csv(file_name, index=False, sep=';')
+            QMessageBox.information(self, "Export", f"Historique exporté avec succès dans {file_name}")
         except Exception as e:
-            QMessageBox.warning(self, 'Erreur', f'Une erreur est survenue lors de l\'exportation : {e}')
+            QMessageBox.warning(self, "Erreur Export", f"Une erreur est survenue lors de l'export : {e}")
 
     def import_data(self):
         """
-        Exporte les données de l'historique (history_list) vers un fichier choisi (CSV, Excel, HDF5).
+        Importe un fichier (CSV, Excel ou HDF5) contenant l'historique,
+        puis recrée les items dans self.history_list.
 
-        - Construit un DataFrame temporaire.
-        - Ouvre une boîte de dialogue pour choisir le nom et le format (csv, xlsx, h5).
-        - Sauvegarde le fichier.
-        - Affiche un message de confirmation ou d'erreur.
+        - Ouvre une boîte de dialogue pour sélectionner le fichier.
+        - Lit le fichier dans un DataFrame pandas.
+        - Convertit les colonnes clés au bon type (float/int/str).
+        - Insère chaque ligne dans self.history_list sous forme d'un dictionnaire data.
+        - Met à jour le total des émissions.
         """
-        print("Début de la méthode d'importation")
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        import pandas as pd
+        import os
 
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(
+        file_name, selected_filter = QFileDialog.getOpenFileName(
             self,
-            "Importer les données",
+            "Importer l'historique",
             "",
-            "Fichiers supportés (*.csv *.xlsx *.h5);;Tous les fichiers (*)",
-            options=options
+            "Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5);;Tous les fichiers (*)"
         )
-
         if not file_name:
-            print("Aucun fichier sélectionné")
-            return
+            return  # l'utilisateur a annulé
+
+        _, extension = os.path.splitext(file_name)
+        extension = extension.lower()
 
         try:
-            if file_name.endswith('.csv'):
-                df = pd.read_csv(file_name)
-            elif file_name.endswith('.xlsx'):
-                df = pd.read_excel(file_name, engine='openpyxl')
-            elif file_name.endswith('.h5'):
-                df = pd.read_hdf(file_name, key='bilan_carbone')
+            if extension == '.csv':
+                # Par défaut, on suppose un séparateur ; (selon votre export)
+                df = pd.read_csv(file_name, sep=';')
+            elif extension == '.xlsx':
+                df = pd.read_excel(file_name)
+            elif extension == '.h5':
+                df = pd.read_hdf(file_name, key='history')
             else:
-                QMessageBox.warning(self, 'Erreur', 'Type de fichier non pris en charge.')
-                return
-
-            required_columns = {'Catégorie', 'Sous-catégorie', 'Valeur', 'Émissions (kg CO₂e)', 'Code NACRES', 'Consommable'}
-            if not required_columns.issubset(df.columns):
-                QMessageBox.warning(self, 'Erreur', 'Le fichier importé ne contient pas les colonnes nécessaires.')
-                return
-
-            for index, row in df.iterrows():
-                category = row.get('Catégorie', '')
-                subcategory = row.get('Sous-catégorie', '')
-                subsubcategory = row.get('Sous-sous-catégorie', '')
-                name = row.get('Nom', '')
-                value = row.get('Valeur', 0)
-                unit = row.get('Unité', '')
-                emissions = row.get('Émissions (kg CO₂e)', 0)
-                code_nacres = row.get('Code NACRES', 'NA')
-                consommable = row.get('Consommable', 'NA')
-
-                if category == 'Machine':
-                    item_text = f'Machine - {subcategory} - {value:.2f} {unit} : {emissions:.4f} kg CO₂e'
-                else:
-                    subsub_name = f'{subsubcategory} - {name}' if subsubcategory else name
-                    item_text = f'{category} - {subcategory} - {subsub_name} - {value} {unit} : {emissions:.4f} kg CO₂e'
-                    if code_nacres != 'NA':
-                        item_text += f" - Code NACRES: {code_nacres}"
-                    if consommable != 'NA':
-                        item_text += f" - Consommable: {consommable}"
-
-                item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, {
-                    'category': category,
-                    'subcategory': subcategory,
-                    'subsubcategory': subsubcategory,
-                    'name': name,
-                    'value': value,
-                    'unit': unit,
-                    'emissions': emissions,
-                    'code_nacres': code_nacres,
-                    'consommable': consommable
-                })
-                self.history_list.addItem(item)
-
-            self.update_total_emissions()
-            print("Fin de l'importation")
-            QMessageBox.information(self, 'Succès', 'Données importées avec succès.')
-            self.data_changed.emit()
+                # Par défaut, tenter CSV
+                df = pd.read_csv(file_name, sep=';')
 
         except Exception as e:
-            QMessageBox.warning(self, 'Erreur', f'Erreur lors de la lecture du fichier : {e}')
+            QMessageBox.warning(self, "Erreur Import", f"Impossible de lire le fichier : {e}")
+            return
+
+        # -- Convertir les colonnes importantes au bon format --
+        # Par exemple, si vous utilisez ces champs numériques :
+
+        for col in ["value", "quantity", "days", "emissions_price", "emission_mass", "total_mass"]:
+            if col in df.columns:
+                # Convertir en numérique (entier ou float), ignorer erreurs
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+        # Nettoyer les colonnes textuelles (si besoin)
+        for col in ["category", "subcategory", "subsubcategory", "name", "code_nacres", "consommable", "unit"]:
+            if col in df.columns:
+                # Enlever espaces en trop
+                df[col] = df[col].astype(str).str.strip()
+
+        # -- Ajouter chaque ligne dans l'historique --
+        # On vide l'historique actuel ou on cumule (selon le comportement désiré).
+        # Si vous voulez tout cumuler, ne videz pas. Sinon, faites :
+        # self.history_list.clear()
+
+        count_imported = 0
+        for idx, row in df.iterrows():
+            # Construire un dictionnaire similaire à ce que vous faites dans calculate_emission()
+            new_data = row.to_dict()
+
+            # Insérer dans l'historique
+            self.create_or_update_history_item(new_data)
+            count_imported += 1
+
+        QMessageBox.information(self, "Import", f"{count_imported} élément(s) importé(s) depuis {file_name}.")
+
+        # Mettre à jour le total des émissions
+        self.update_total_emissions()
+        self.data_changed.emit()
 
     def add_machine(self):
         """

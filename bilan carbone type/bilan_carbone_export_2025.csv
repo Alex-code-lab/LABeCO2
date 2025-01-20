@@ -1,9 +1,6 @@
-﻿Catégorie,Sous-catégorie,Sous-sous-catégorie,Nom,Valeur,Unité,Émissions (kg CO₂e),Code NACRES,Consommable
-Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB14,Bacteriologie : consommables en plastique specifiques,20.0,euro,8.4,NB14,Consommable 51
-Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB14,Bacteriologie : consommables en plastique specifiques,200.0,euro,84.0,NB14,Consommable 79
-Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NA56,Kits et reactifs pour l'isolement et la purification des proteines,200.0,euro,30.0,NA56,NA
-Machine,Autoclave,,,34.0,kWh,1.768,NA,NA
-Machine,centrifugeuse,,,28.0,kWh,1.456,NA,NA
-Machine,Microscope,,,60.0,kWh,3.1199999999999997,NA,NA
-Véhicules,ferroviaire,TGV > 200 km,TGV,26460.0,km,87.318,NA,NA
-Véhicules,Voiture,Diesel,"Voiture particulière , moyenne parc, motorisation gazole",837.0000000000001,km,177.52770000000004,NA,NA
+category;code_nacres;consommable;days;emission_mass;emissions_price;name;quantity;subcategory;subsubcategory;total_mass;unit;value;days_machine;electricity_type;power;usage_time
+Achats;NB21;Consommable 18;1.0;4.988999999999999;12.2;Consommables de chromatographie et d'extraction non dedies aux instruments;100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB21;1.6629999999999998;euro;20.0;;;;
+Achats;NB17;Consommable 7;1.0;1.5584000000000002;16.38;Autres consommables en plastique et en verre hors culture cell. et bacterio;100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB17;1.9480000000000002;euro;39.0;;;;
+Achats;NB23;Consommable 3;1.0;11.3015;117.73;Membranes et kits pour le transfert d'acides nucleiques et des proteines (blot);100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB23;3.229;euro;193.0;;;;
+Machine;;;;;1.04;;;coco;;;kWh;20.0;2.0;Electricité France continentale;1.0;10.0
+Véhicules;NA;NA;4.0;;7.7616;TGV;0.0;ferroviaire;TGV > 200 km;;km;2352.0;;;;
