@@ -1,0 +1,101 @@
+Consommable,Marque,Référence,Code NACRES,Masse unitaire (g),Matériau,Source/Signature
+Consommable 1,Marque A,REF001,NB23,45.14,Polypropylène (PP),ChatGPT
+Consommable 2,Marque B,REF002,NB14,29.63,Polystyrène (PS),ChatGPT
+Consommable 3,Marque C,REF003,NB23,32.29,Polystyrène (PS),ChatGPT
+Consommable 4,Marque D,REF004,NB03,59.79,Verre,ChatGPT
+Consommable 5,Marque E,REF005,NB15,59.23,Polystyrène (PS),ChatGPT
+Consommable 6,Marque F,REF006,NB04,47.19,Polypropylène (PP),ChatGPT
+Consommable 7,Marque G,REF007,NB17,19.48,Verre,ChatGPT
+Consommable 8,Marque H,REF008,NB14,46.9,Polystyrène (PS),ChatGPT
+Consommable 9,Marque I,REF009,NB24,17.01,Polypropylène (PP),ChatGPT
+Consommable 10,Marque J,REF010,NB16,24.35,Verre,ChatGPT
+Consommable 11,Marque K,REF011,NB21,39.73,Polypropylène (PP),ChatGPT
+Consommable 12,Marque L,REF012,NB24,27.58,Polystyrène (PS),ChatGPT
+Consommable 13,Marque M,REF013,NB22,59.77,Polypropylène (PP),ChatGPT
+Consommable 14,Marque N,REF014,NB12,34.97,Polypropylène (PP),ChatGPT
+Consommable 15,Marque O,REF015,NB14,9.03,Polystyrène (PS),ChatGPT
+Consommable 16,Marque P,REF016,NB03,33.99,Polystyrène (PS),ChatGPT
+Consommable 17,Marque Q,REF017,NB16,48.2,Polystyrène (PS),ChatGPT
+Consommable 18,Marque R,REF018,NB21,16.63,Polypropylène (PP),ChatGPT
+Consommable 19,Marque S,REF019,NB13,15.18,Verre,ChatGPT
+Consommable 20,Marque T,REF020,NB17,10.87,Polypropylène (PP),ChatGPT
+Consommable 21,Marque U,REF021,NB03,9.23,Polystyrène (PS),ChatGPT
+Consommable 22,Marque V,REF022,NB24,7.01,Verre,ChatGPT
+Consommable 23,Marque W,REF023,NB13,52.14,Polypropylène (PP),ChatGPT
+Consommable 24,Marque X,REF024,NB21,19.05,Polystyrène (PS),ChatGPT
+Consommable 25,Marque Y,REF025,NB02,49.84,Polystyrène (PS),ChatGPT
+Consommable 26,Marque Z,REF026,NB02,52.14,Verre,ChatGPT
+Consommable 27,Marque A,REF027,NB15,53.45,Verre,ChatGPT
+Consommable 28,Marque B,REF028,NB11,22.08,Polystyrène (PS),ChatGPT
+Consommable 29,Marque C,REF029,NB11,35.5,Verre,ChatGPT
+Consommable 30,Marque D,REF030,NB14,8.54,Polypropylène (PP),ChatGPT
+Consommable 31,Marque E,REF031,NB11,13.72,Polystyrène (PS),ChatGPT
+Consommable 32,Marque F,REF032,NB12,35.29,Polystyrène (PS),ChatGPT
+Consommable 33,Marque G,REF033,NB16,11.25,Verre,ChatGPT
+Consommable 34,Marque H,REF034,NB16,21.97,Polystyrène (PS),ChatGPT
+Consommable 35,Marque I,REF035,NB22,50.64,Polypropylène (PP),ChatGPT
+Consommable 36,Marque J,REF036,NB13,9.73,Polystyrène (PS),ChatGPT
+Consommable 37,Marque K,REF037,NB16,49.11,Verre,ChatGPT
+Consommable 38,Marque L,REF038,NB16,40.66,Polypropylène (PP),ChatGPT
+Consommable 39,Marque M,REF039,NB23,39.83,Polypropylène (PP),ChatGPT
+Consommable 40,Marque N,REF040,NB14,32.75,Polypropylène (PP),ChatGPT
+Consommable 41,Marque O,REF041,NB23,7.5,Polystyrène (PS),ChatGPT
+Consommable 42,Marque P,REF042,NB14,48.1,Polypropylène (PP),ChatGPT
+Consommable 43,Marque Q,REF043,NB03,33.27,Polystyrène (PS),ChatGPT
+Consommable 44,Marque R,REF044,NB15,43.9,Polypropylène (PP),ChatGPT
+Consommable 45,Marque S,REF045,NB23,58.86,Polypropylène (PP),ChatGPT
+Consommable 46,Marque T,REF046,NB21,46.34,Verre,ChatGPT
+Consommable 47,Marque U,REF047,NB14,46.44,Polypropylène (PP),ChatGPT
+Consommable 48,Marque V,REF048,NB03,51.46,Polypropylène (PP),ChatGPT
+Consommable 49,Marque W,REF049,NB03,5.44,Verre,ChatGPT
+Consommable 50,Marque X,REF050,NB04,22.22,Polystyrène (PS),ChatGPT
+Consommable 51,Marque Y,REF051,NB12,30.0,Polypropylène (PP),ChatGPT
+Consommable 52,Marque Z,REF052,NB12,47.92,Verre,ChatGPT
+Consommable 53,Marque A,REF053,NB03,37.92,Polystyrène (PS),ChatGPT
+Consommable 54,Marque B,REF054,NB16,59.1,Polystyrène (PS),ChatGPT
+Consommable 55,Marque C,REF055,NB12,33.35,Verre,ChatGPT
+Consommable 56,Marque D,REF056,NB11,42.74,Polypropylène (PP),ChatGPT
+Consommable 57,Marque E,REF057,NB22,14.66,Verre,ChatGPT
+Consommable 58,Marque F,REF058,NB22,50.73,Verre,ChatGPT
+Consommable 59,Marque G,REF059,NB17,23.88,Verre,ChatGPT
+Consommable 60,Marque H,REF060,NB22,53.48,Verre,ChatGPT
+Consommable 61,Marque I,REF061,NB15,17.79,Polystyrène (PS),ChatGPT
+Consommable 62,Marque J,REF062,NB24,27.74,Verre,ChatGPT
+Consommable 63,Marque K,REF063,NB04,50.08,Verre,ChatGPT
+Consommable 64,Marque L,REF064,NB04,46.12,Verre,ChatGPT
+Consommable 65,Marque M,REF065,NB21,34.75,Verre,ChatGPT
+Consommable 66,Marque N,REF066,NB14,50.54,Polypropylène (PP),ChatGPT
+Consommable 67,Marque O,REF067,NB15,34.29,Verre,ChatGPT
+Consommable 68,Marque P,REF068,NB13,59.66,Verre,ChatGPT
+Consommable 69,Marque Q,REF069,NB02,57.24,Polystyrène (PS),ChatGPT
+Consommable 70,Marque R,REF070,NB02,58.43,Polypropylène (PP),ChatGPT
+Consommable 71,Marque S,REF071,NB22,7.41,Verre,ChatGPT
+Consommable 72,Marque T,REF072,NB11,23.72,Verre,ChatGPT
+Consommable 73,Marque U,REF073,NB21,15.3,Polypropylène (PP),ChatGPT
+Consommable 74,Marque V,REF074,NB16,54.58,Verre,ChatGPT
+Consommable 75,Marque W,REF075,NB24,43.51,Verre,ChatGPT
+Consommable 76,Marque X,REF076,NB14,50.44,Polypropylène (PP),ChatGPT
+Consommable 77,Marque Y,REF077,NB04,8.75,Polypropylène (PP),ChatGPT
+Consommable 78,Marque Z,REF078,NB02,52.79,Polystyrène (PS),ChatGPT
+Consommable 79,Marque A,REF079,NB23,23.45,Polypropylène (PP),ChatGPT
+Consommable 80,Marque B,REF080,NB13,59.63,Polystyrène (PS),ChatGPT
+Consommable 81,Marque C,REF081,NB22,15.97,Polystyrène (PS),ChatGPT
+Consommable 82,Marque D,REF082,NB24,27.91,Polypropylène (PP),ChatGPT
+Consommable 83,Marque E,REF083,NB04,12.29,Polystyrène (PS),ChatGPT
+Consommable 84,Marque F,REF084,NB13,29.37,Polystyrène (PS),ChatGPT
+Consommable 85,Marque G,REF085,NB15,34.2,Polypropylène (PP),ChatGPT
+Consommable 86,Marque H,REF086,NB23,6.73,Polystyrène (PS),ChatGPT
+Consommable 87,Marque I,REF087,NB14,58.72,Polystyrène (PS),ChatGPT
+Consommable 88,Marque J,REF088,NB23,46.0,Verre,ChatGPT
+Consommable 89,Marque K,REF089,NB13,39.34,Verre,ChatGPT
+Consommable 90,Marque L,REF090,NB03,53.75,Verre,ChatGPT
+Consommable 91,Marque M,REF091,NB16,31.19,Polystyrène (PS),ChatGPT
+Consommable 92,Marque N,REF092,NB14,48.92,Polypropylène (PP),ChatGPT
+Consommable 93,Marque O,REF093,NB14,12.19,Polypropylène (PP),ChatGPT
+Consommable 94,Marque P,REF094,NB04,44.95,Verre,ChatGPT
+Consommable 95,Marque Q,REF095,NB03,19.88,Polystyrène (PS),ChatGPT
+Consommable 96,Marque R,REF096,NB03,5.83,Polypropylène (PP),ChatGPT
+Consommable 97,Marque S,REF097,NB04,26.89,Polystyrène (PS),ChatGPT
+Consommable 98,Marque T,REF098,NB13,30.38,Polystyrène (PS),ChatGPT
+Consommable 99,Marque U,REF099,NB14,50.82,Polystyrène (PS),ChatGPT
+Consommable 100,Marque V,REF100,NB04,41.31,Polypropylène (PP),ChatGPT

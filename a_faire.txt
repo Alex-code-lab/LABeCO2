@@ -10,4 +10,4 @@
 3. Problème si on choisis d'abord un conso -> on peut pas mettre prix.
 4. Changer et ajouter graphs avec masse.
 5. Ajouter une barre d'incertitude sur tous les grpahs (en barre) et faire le calcul en amont. La colonne uncertainty existe déjà et je l'ai faite pour la consommation massique.
-
+6. Faire en sorte que . ou , soient traités pareils (dans machine notamment)

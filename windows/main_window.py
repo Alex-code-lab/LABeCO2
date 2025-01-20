@@ -1123,8 +1123,8 @@ class MainWindow(QMainWindow):
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
             (self.data['subsubcategory'].fillna('') == subsubcategory) &
-            (self.data['name'].fillna('') == category_nacres) &
-            (self.data['year'].astype(str) == year)
+            (self.data['name'].fillna('') == category_nacres) # &
+            # (self.data['year'].astype(str) == year)
         )
         filtered_data = self.data[mask]
         if filtered_data.empty:
@@ -1262,7 +1262,16 @@ class MainWindow(QMainWindow):
 
     def recalculate_emissions(self, data):
         """
-        Recalcule les émissions carbone en fonction des données fournies.
+        Recalcule les émissions CO₂ à partir d'un dictionnaire de données (data).
+
+        - Si la catégorie == 'Machine', recalcule en fonction des kWh (usage * emission_factor).
+        - Sinon, reconstruit un masque sur self.data pour trouver le facteur d'émission 'total'.
+        - Calcule emission_price, puis eventuellement emission_massique si NACRES.
+
+        :param data: Le dictionnaire contenant les clés (category, subcategory, subsubcategory, etc.).
+        :type data: dict
+        :return: Un tuple (emissions_price, emission_massique, total_mass).
+        :rtype: tuple(float or None, float or None, float or None)
         """
         print("Recalcul des émissions avec les données :", data)
 
@@ -1297,8 +1306,8 @@ class MainWindow(QMainWindow):
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
             (self.data['subsubcategory'].fillna('') == subsub_name) &
-            (self.data['name'].fillna('') == name) &
-            (self.data['year'].astype(str) == str(year))
+            (self.data['name'].fillna('') == name) #&
+            # (self.data['year'].astype(str) == str(year))
         )
         filtered_data = self.data[mask]
         if filtered_data.empty:
@@ -1318,7 +1327,18 @@ class MainWindow(QMainWindow):
 
     def create_or_update_history_item(self, data, item=None):
         """
-        Crée ou met à jour un élément dans l'historique avec les données fournies.
+        Crée ou met à jour un élément dans la QListWidget d'historique.
+
+        - Construit le texte à afficher en fonction de la catégorie 
+          (Machine, Véhicules, Achats, etc.).
+        - Stocke le dictionnaire `data` dans l'UserRole de l'item.
+
+        :param data: Le dictionnaire de données calculées (category, subcategory, emissions, etc.).
+        :type data: dict
+        :param item: L'item éventuellement existant à mettre à jour (sinon None).
+        :type item: QListWidgetItem or None
+        :return: L'item nouvellement créé ou mis à jour.
+        :rtype: QListWidgetItem
         """
         category = data.get('category', '')
         subcategory = data.get('subcategory', '')
@@ -1374,7 +1394,12 @@ class MainWindow(QMainWindow):
 
     def export_data(self):
         """
-        Exporte les données de l'historique dans un fichier (CSV, Excel ou HDF5).
+        Exporte les données de l'historique (history_list) vers un fichier choisi (CSV, Excel, HDF5).
+
+        - Construit un DataFrame temporaire.
+        - Ouvre une boîte de dialogue pour choisir le nom et le format (csv, xlsx, h5).
+        - Sauvegarde le fichier.
+        - Affiche un message de confirmation ou d'erreur.
         """
         if self.history_list.count() == 0:
             QMessageBox.information(self, 'Information', 'Aucune donnée à exporter.')
@@ -1437,7 +1462,12 @@ class MainWindow(QMainWindow):
 
     def import_data(self):
         """
-        Importe les données à partir d'un fichier (CSV, Excel ou HDF5) et les ajoute à l'historique.
+        Exporte les données de l'historique (history_list) vers un fichier choisi (CSV, Excel, HDF5).
+
+        - Construit un DataFrame temporaire.
+        - Ouvre une boîte de dialogue pour choisir le nom et le format (csv, xlsx, h5).
+        - Sauvegarde le fichier.
+        - Affiche un message de confirmation ou d'erreur.
         """
         print("Début de la méthode d'importation")
 
@@ -1515,8 +1545,12 @@ class MainWindow(QMainWindow):
 
     def add_machine(self):
         """
-        Gère l'ajout d'une machine dans l'historique, 
-        en calculant son Bilan Carbone selon la puissance, le temps d'usage, etc.
+        Gère l'ajout d'une machine dans l'historique (cas catégorie = 'Machine').
+
+        - Lit la puissance (kW), le temps d'utilisation (heures/jour) et le nombre de jours.
+        - Calcule total_usage (kWh) = puissance × temps × jours.
+        - Récupère le facteur d'émission électrique (self.data['Électricité']).
+        - Calcule les émissions totales, crée l'item d'historique et met à jour le total.
         """
         try:
             machine_name = self.machine_name_field.text().strip()
@@ -1566,6 +1600,13 @@ class MainWindow(QMainWindow):
             return
 
     def generate_pie_chart(self):
+        """
+        Ouvre ou actualise la fenêtre PieChartWindow (diagramme en secteurs).
+
+        - Si la fenêtre n'existe pas, la crée et connecte son signal finished.
+        - Sinon, appelle refresh_data().
+        - Affiche la fenêtre en premier plan.
+        """
         if self.pie_chart_window is None:
             self.pie_chart_window = PieChartWindow(self)
             self.pie_chart_window.finished.connect(self.on_pie_chart_window_closed)
@@ -1576,6 +1617,11 @@ class MainWindow(QMainWindow):
         self.pie_chart_window.activateWindow()
 
     def generate_bar_chart(self):
+        """
+        Ouvre ou actualise la fenêtre BarChartWindow (barres empilées à 100%).
+
+        - Même logique que generate_pie_chart, mais pour le bar chart.
+        """
         if self.bar_chart_window is None:
             self.bar_chart_window = BarChartWindow(self)
             self.bar_chart_window.finished.connect(self.on_bar_chart_window_closed)
@@ -1586,6 +1632,12 @@ class MainWindow(QMainWindow):
         self.bar_chart_window.activateWindow()
 
     def generate_proportional_bar_chart(self):
+        """
+        Ouvre ou actualise la fenêtre ProportionalBarChartWindow (barres empilées non normalisées).
+
+        - Crée la fenêtre si besoin, sinon appelle refresh_data().
+        - Montre la fenêtre.
+        """
         if self.proportional_bar_chart_window is None:
             self.proportional_bar_chart_window = ProportionalBarChartWindow(self)
             self.proportional_bar_chart_window.finished.connect(self.on_proportional_bar_chart_window_closed)
@@ -1597,9 +1649,13 @@ class MainWindow(QMainWindow):
 
     def generate_stacked_bar_consumables(self):
         """
-        Ouvre (ou rafraîchit) la fenêtre StackedBarConsumablesWindow,
-        qui affiche un graphique de barres empilées pour
-        les consommables (Achats + 'Consommables') ayant quantité > 0.
+        Ouvre ou rafraîchit la fenêtre StackedBarConsumablesWindow,
+        affichant un bar chart empilé pour les consommables (Achats + 'Consommables') 
+        ayant quantité > 0.
+
+        - Si la fenêtre n'existe pas, l'instancie et connecte le signal finished.
+        - Sinon, rafraîchit simplement ses données.
+        - Affiche la fenêtre.
         """
         # Si la fenêtre n'existe pas encore ou a été fermée, on la recrée
         if self.stacked_bar_consumables_window is None:
@@ -1615,9 +1671,11 @@ class MainWindow(QMainWindow):
 
     def generate_nacres_bar_chart(self):
         """
-        Ouvre (ou rafraîchit) une fenêtre affichant un Bar Chart dédié à l'analyse 
-        par code NACRES, regroupant et/ou empilant les émissions. 
-        Vous pouvez adapter la logique interne selon vos besoins (filtrage, etc.).
+        Ouvre ou rafraîchit une fenêtre NacresBarChartWindow, 
+        permettant de visualiser les émissions par code NACRES.
+
+        - Crée la fenêtre si elle n'existe pas, sinon appelle refresh_data().
+        - L'affiche et la met au premier plan.
         """
         if not hasattr(self, 'nacres_bar_chart_window') or self.nacres_bar_chart_window is None:
             # Si la fenêtre n'existe pas encore, on la crée
@@ -1634,29 +1692,53 @@ class MainWindow(QMainWindow):
 
     def on_nacres_bar_chart_window_closed(self):
         """
-        Slot appelé quand la fenêtre NacresBarChartWindow se ferme.
-        Permet de remettre l'attribut nacres_bar_chart_window à None
-        pour pouvoir la recréer plus tard.
+        Ouvre ou rafraîchit une fenêtre NacresBarChartWindow, 
+        permettant de visualiser les émissions par code NACRES.
+
+        - Crée la fenêtre si elle n'existe pas, sinon appelle refresh_data().
+        - L'affiche et la met au premier plan.
         """
         self.nacres_bar_chart_window = None
 
     def on_stacked_bar_consumables_window_closed(self):
         """
-        Slot appelé quand la fenêtre de barres empilées se ferme.
-        On met l'attribut à None pour pouvoir la recréer plus tard.
+        Slot appelé lorsque la fenêtre StackedBarConsumablesWindow se ferme.
+
+        - Met self.stacked_bar_consumables_window à None.
         """
         self.stacked_bar_consumables_window = None
 
     def on_pie_chart_window_closed(self):
+        """
+        Slot appelé lorsque la fenêtre StackedBarConsumablesWindow se ferme.
+
+        - Met self.stacked_bar_consumables_window à None.
+        """
         self.pie_chart_window = None
 
     def on_bar_chart_window_closed(self):
+        """
+        Slot appelé lorsque la fenêtre BarChartWindow se ferme.
+
+        - Met self.bar_chart_window à None.
+        """
         self.bar_chart_window = None
 
     def on_proportional_bar_chart_window_closed(self):
+        """
+        Slot appelé lorsque la fenêtre ProportionalBarChartWindow se ferme.
+
+        - Met self.proportional_bar_chart_window à None.
+        """
         self.proportional_bar_chart_window = None
 
     def open_data_mass_window(self):
+        """
+        Ouvre la fenêtre DataMassWindow (gestion des consommables massiques) 
+        ou la met au premier plan si elle existe déjà.
+
+        - Connecte data_mass_window.data_added à reload_data_masse.
+        """
         if self.data_mass_window is None or not self.data_mass_window.isVisible():
             self.data_mass_window = DataMassWindow(parent=self, data_materials=self.data_materials)
             self.data_mass_window.data_added.connect(self.reload_data_masse)
@@ -1667,7 +1749,12 @@ class MainWindow(QMainWindow):
 
     def reload_data_masse(self):
         """
-        Recharge les données massiques après l'ajout d'un nouveau consommable.
+        Recharge self.data_masse après l'ajout d'un nouveau consommable 
+        dans la DataMassWindow.
+
+        - Relit le fichier HDF5 correspondant.
+        - Met à jour la combo conso_filtered_combo.
+        - Affiche un message d'information ou d'erreur si nécessaire.
         """
         data_masse_path = resource_path(os.path.join('data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5'))
         try:
@@ -1682,7 +1769,19 @@ class MainWindow(QMainWindow):
 
     def calculate_mass_based_emissions(self, code_nacres, quantity=None):
         """
-        Calcule les émissions massiques basées sur le code NACRES et la quantité.
+        Calcule les émissions basées sur la masse (via le code NACRES et la quantité).
+
+        - Cherche la ligne correspondante dans self.data_masse (Code NACRES + Consommable).
+        - Calcule masse_totale = masse_unitaire_kg * quantité.
+        - Recherche le matériau dans self.data_materials pour obtenir eCO2_par_kg.
+        - Retourne (eCO2_total, masse_totale_kg).
+
+        :param code_nacres: Le code NACRES (ex: "NB13").
+        :type code_nacres: str
+        :param quantity: Quantité saisie (entier), ou None pour la lire dans self.quantity_input.
+        :type quantity: int or None
+        :return: (émissions totales en kg CO₂e, masse totale en kg).
+        :rtype: tuple(float or None, float or None)
         """
         if quantity is None:
             quantite_text = self.quantity_input.text().strip()
@@ -1741,10 +1840,12 @@ class MainWindow(QMainWindow):
     
     def update_nacres_visibility(self):
         """
-        Affiche ou masque la ligne 'Consommable' + 'Rechercher Consommable'
-        uniquement si :
-            - la catégorie est 'Achats'
-            - la sous-catégorie contient le mot 'Consommables'
+        Affiche ou masque la zone "Consommable" et sa barre de recherche 
+        en fonction de la catégorie et de la sous-catégorie sélectionnées.
+
+        - Si category == "Achats" et subcategory contient "Consommables", 
+          on rend la zone visible et on appelle self.update_conso_filtered_combo().
+        - Sinon, on masque tout (label, combo, search, quantité).
         """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()

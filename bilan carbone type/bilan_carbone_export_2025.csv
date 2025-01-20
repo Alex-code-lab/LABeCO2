@@ -1,0 +1,9 @@
+﻿Catégorie,Sous-catégorie,Sous-sous-catégorie,Nom,Valeur,Unité,Émissions (kg CO₂e),Code NACRES,Consommable
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB14,Bacteriologie : consommables en plastique specifiques,20.0,euro,8.4,NB14,Consommable 51
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB14,Bacteriologie : consommables en plastique specifiques,200.0,euro,84.0,NB14,Consommable 79
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NA56,Kits et reactifs pour l'isolement et la purification des proteines,200.0,euro,30.0,NA56,NA
+Machine,Autoclave,,,34.0,kWh,1.768,NA,NA
+Machine,centrifugeuse,,,28.0,kWh,1.456,NA,NA
+Machine,Microscope,,,60.0,kWh,3.1199999999999997,NA,NA
+Véhicules,ferroviaire,TGV > 200 km,TGV,26460.0,km,87.318,NA,NA
+Véhicules,Voiture,Diesel,"Voiture particulière , moyenne parc, motorisation gazole",837.0000000000001,km,177.52770000000004,NA,NA

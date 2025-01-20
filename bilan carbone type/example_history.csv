@@ -1,0 +1,16 @@
+category,subcategory,subsubcategory,name,value,unit,emissions_price,emission_mass,total_mass,code_nacres,consommable,days,quantity,year
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB13,Culture cellulaire eucaryote : consommables en plastique,100,euro,42,1.38,0.46,NB13,Tube centrifuge 50 mL,1,100,2023
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB13,Culture cellulaire eucaryote : consommables en plastique,10,euro,4.2,73.2963,20.9418,NB13,T-25 Tissue Culture Flask,1,1002,2023
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",KA03,Cobayes et lignées de cobayes,200,euro,60,3,1,KA03,Boîtes de Pétri,1,50,2023
+Machine,Microscope,,Usage Microscope,30,kWh,3.5,,,,,5,,2023
+Véhicules,Voiture particulière,Car123,Trajet urbain,50,euro,15,,,,,10,,2022
+Achats,Informatique-audiovisuel,Laptop,Ordinateur portable standard,800,euro,200,,,,,1,,2022
+Machine,Microtome,,Usage Microtome,20,kWh,2.5,,,,,5,,2023
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB13,Culture cellulaire eucaryote : consommables en plastique,12,euro,3,0.5,0.17,NB13,Pipettes 10 mL,1,30,2023
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB13,Solutions tampons,50,euro,20,1.2,0.4,NB13,Tampon PBS,1,200,2023
+Véhicules,Moto,TwoWheels,Trajet extra-urbain,20,euro,6,,,,,2,,2023
+Achats,Matériel et instruments de laboratoire,XYZ12,Spectrophotomètre,2000,euro,500,,,,,1,,2022
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NM25,Anticorps monoclonaux,150,euro,45,2.4,0.8,NM25,Flacons d'anticorps,1,60,2023
+Machine,Imprimante 3D,,Usage Imprimante 3D,10,kWh,1.2,,,,,2,,2023
+Achats,"Consommables (Matières premières, produits chimiques/biologiques et organismes vivants)",NB14,Milieux de culture,80,euro,25,4.2,1.2,NB14,Milieu DMEM,1,40,2023
+Véhicules,Bus,LineXYZ,Transport collectif,15,euro,4.5,,,,,1,,2023
