@@ -7,7 +7,8 @@
                 - Cammembert fonction code NACRES
                 - Différence entre quantité CO2 prix vs quantité CO2 massique. 
 2. Identifier top 50 NACRES (Cathie ou Kolante)
-3. Problème si on choisis d'abord un conso -> on peut pas mettre prix.
 4. Changer et ajouter graphs avec masse.
 5. Ajouter une barre d'incertitude sur tous les grpahs (en barre) et faire le calcul en amont. La colonne uncertainty existe déjà et je l'ai faite pour la consommation massique.
 6. Faire en sorte que . ou , soient traités pareils (dans machine notamment)
+7. lors de la modification des véhicules (train) j'ai la date qui ne devrait pas apparaitre et 
+ça me mets que j'ai pas une bonne valeur valide si j'ai un point ou une virgule??
