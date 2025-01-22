@@ -16,12 +16,12 @@ data_materiau = {
         11.0, 1.05, 0.95,
         0.8, 6.4
     ],
-    "Precision (%)": [
-        "±10%", "±10%", "±10%",
-        "±15%", "±10%", "±20%",
-        "±15%", "±15%", "±15%",
-        "±20%", "±5%", "±5%",
-        "±10%", "±20%"
+    "uncertainty": [
+        "0.1", "0.1", "0.1",
+        "0.15", "0.1", "0.2",
+        "0.15", "0.15", "0.15",
+        "0.2", "0.05", "0.05",
+        "0.1%", "0.2"
     ],
     "Source": [
         "Base Empreinte® - ADEME", "Base Empreinte® - ADEME", "Base Empreinte® - ADEME",
@@ -47,11 +47,11 @@ data_solvant = {
         1.6, 5.0, 1.8,
         4.8, 1.1
     ],
-    "Precision (%)": [
-        "±15%", "±15%", "±15%",
-        "±15%", "±15%", "±15%",
-        "±15%", "±15%", "±15%",
-        "±15%", "±15%",
+    "uncertainty": [
+        "0.15", "0.15", "0.15",
+        "0.15", "0.15", "0.15",
+        "0.15", "0.15", "0.15",
+        "0.15", "0.15",
     ],
     "Source": [
         "Using life cycle assessments to guide reduction in the carbon footprint of single-use lab consum DOI: 10.1371/journal.pstr.0000080",

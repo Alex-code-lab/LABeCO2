@@ -160,12 +160,22 @@ class MainWindow(QMainWindow):
         # 6. Affichage du total des émissions et source
         main_layout.addWidget(self.result_area)
 
-        self.source_label = QLabel(
-            'Les données utilisées ici sont issues de la base de données fournie par <a href="https://labos1point5.org/" style="color:blue; text-decoration:none;">Labo 1point5</a>'
-        )
-        self.source_label.setOpenExternalLinks(True)
-        self.source_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.source_label)
+        # self.source_label = QLabel(
+        #     'Les données utilisées ici sont issues de la base de données fournie par <a href="https://labos1point5.org/" style="color:blue; text-decoration:none;">Labo 1point5</a>'
+        # )
+        # self.source_label.setOpenExternalLinks(True)
+        # self.source_label.setAlignment(Qt.AlignCenter)
+        # main_layout.addWidget(self.source_label)
+
+        # Remplace l'ancien label par:
+        self.sources_label = QLabel("L&#39;ensemble des sources sont à retrouver <a href=\"#\">ici</a>.")
+        self.sources_label.setTextFormat(Qt.RichText)  # Interpréter le HTML
+        self.sources_label.setOpenExternalLinks(False)  # Ne pas ouvrir le lien dans le navigateur
+        self.sources_label.setTextInteractionFlags(Qt.TextBrowserInteraction | Qt.LinksAccessibleByMouse)
+        self.sources_label.setAlignment(Qt.AlignCenter)
+        self.sources_label.linkActivated.connect(self.show_sources_popup)
+        # Ajouter dans le layout
+        main_layout.addWidget(self.sources_label)
 
         # Ajout dans une zone scrollable
         scroll_area = QScrollArea()
@@ -1847,3 +1857,67 @@ class MainWindow(QMainWindow):
             self.conso_search_field.setVisible(False)
             self.quantity_label.setVisible(False)    # On masque aussi la quantité
             self.quantity_input.setVisible(False)
+
+    def show_sources_popup(self, link_str):
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Sources")
+        dialog.setModal(True)
+
+        layout = QVBoxLayout(dialog)
+        sources_text = """
+        <p><b>Sources et Références :</b></p>
+        <ul>
+            <li>
+                <b><a href="https://base-empreinte.ademe.fr/">Base Carbone®</a></b><br>
+                Source officielle pour les données de l'ADEME (Agence de la Transition Écologique).
+            </li>
+            <li>
+                <b><a href="https://labos1point5.org/">Labo 1point5</a></b><br>
+                Plateforme collaborative pour la réduction de l'empreinte carbone dans les laboratoires de recherche.
+            </li>
+            <li>
+                <b><a href="https://plasticseurope.org/fr/">PlasticsEurope</a></b><br>
+                Organisation représentant les fabricants de plastiques en Europe, fournissant des données sur l'industrie.
+            </li>
+            <li>
+                <b><a href="https://www.oecd.org/fr/data/">OCDE</a></b><br>
+                Organisation de Coopération et de Développement Économiques, base de données sur les indicateurs environnementaux.
+            </li>
+            <li>
+                <b><a href="https://440megatonnes.ca/fr/insight/mesurer-lempreinte-carbone-du-plastique/">440 Megatonnes</a></b><br>
+                Analyse des impacts carbone du plastique.
+            </li>
+            <li>
+                <b><a href="https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/safety-briefing-blogs/emea/reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment/safety-briefing_reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment_en.ashx?rev=96e1cea169c54f0b995d5a4c1f2876d0">Ansell - Reducing the impact of disposable glove manufacturing on the environment</a></b><br>
+                Article d'Ansell discutant des mesures pour réduire l'impact environnemental de la fabrication des gants jetables.
+            </li>
+        </ul>
+
+        <p><b>Articles Scientifiques :</b></p>
+        <ul>
+            <li>
+                <b><em>Using life cycle assessments to guide reduction in the carbon footprint of single-use lab consumables</em></b><br>
+                Isabella Ragazzi, publié dans <b><a href="https://doi.org/10.1371/journal.pstr.0000080">PLOS</a></b>, septembre 2023.<br>
+                DOI : <a href="https://doi.org/10.1371/journal.pstr.0000080">10.1371/journal.pstr.0000080</a>.
+            </li>
+            <li>
+                <b><em>The environmental impact of personal protective equipment in the UK healthcare system</em></b><br>
+                Reed, S. et al., publié dans <b><a href="https://journals.sagepub.com/doi/epub/10.1177/01410768211001583">Journal of the Royal Society of Medicine</a></b>, 2021.<br>
+                DOI : <a href="https://journals.sagepub.com/doi/epub/10.1177/01410768211001583">10.1177/01410768211001583</a>.
+            </li>
+        </ul>
+        """
+        label = QLabel()
+        label.setTextFormat(Qt.RichText)
+        label.setOpenExternalLinks(True)
+        label.setText(sources_text)
+        layout.addWidget(label)
+
+        close_button = QPushButton("Fermer")
+        close_button.clicked.connect(dialog.close)
+        layout.addWidget(close_button)
+
+        dialog.setLayout(layout)
+        dialog.exec()
