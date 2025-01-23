@@ -21,7 +21,7 @@ data_materiau = {
         "0.15", "0.1", "0.2",
         "0.15", "0.15", "0.15",
         "0.2", "0.05", "0.05",
-        "0.1%", "0.2"
+        "0.1", "0.2"
     ],
     "Source": [
         "Base Empreinte® - ADEME", "Base Empreinte® - ADEME", "Base Empreinte® - ADEME",

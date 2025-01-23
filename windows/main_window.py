@@ -852,7 +852,7 @@ class MainWindow(QMainWindow):
 
         # Parcourir les données pour remplir la combo selon le filtre
         for idx, row in self.data_masse.iterrows():
-            code_nacres = row.get('Code NACRES', '').strip()
+            code_nacres = row.get('Code NACRES', '').strip()[:4]  # Garde uniquement les 4 premiers caractères
             consommable = row.get('Consommable', '').strip()
             display_text = f"{code_nacres} - {consommable}"
 
@@ -1400,6 +1400,46 @@ class MainWindow(QMainWindow):
             self.update_total_emissions()
             self.data_changed.emit()
 
+    # def modify_selected_calculation(self):
+    #     """
+    #     Ouvre un EditCalculationDialog pour modifier l'entrée actuellement sélectionnée 
+    #     dans l'historique.
+
+    #     - Si aucun item n'est sélectionné, affiche un avertissement.
+    #     - Sinon, récupère les données, ouvre le dialog, 
+    #       puis réinsère l'item mis à jour dans l'historique.
+    #     - Met à jour le total des émissions et émet data_changed.
+    #     """
+    #     selected_item = self.history_list.currentItem()
+    #     if not selected_item:
+    #         QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
+    #         return
+
+    #     data = selected_item.data(Qt.UserRole)
+    #     if not data:
+    #         QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
+    #         return
+
+    #     dialog = EditCalculationDialog(
+    #         parent=self,
+    #         data=data,
+    #         main_data=self.data,
+    #         data_masse=self.data_masse,
+    #         data_materials=self.data_materials
+    #     )
+    #     if dialog.exec() == QDialog.Accepted:
+    #         modified_data = dialog.modified_data
+    #         emissions, emission_massique, total_mass = self.recalculate_emissions(modified_data)
+    #         modified_data['emissions_price'] = emissions
+    #         modified_data['emission_mass'] = emission_massique
+    #         modified_data['total_mass'] = total_mass
+
+    #         self.history_list.takeItem(self.history_list.row(selected_item))
+    #         self.create_or_update_history_item(modified_data)
+    #         self.update_total_emissions()
+
+    #     self.data_changed.emit()
+
     def modify_selected_calculation(self):
         """
         Ouvre un EditCalculationDialog pour modifier l'entrée actuellement sélectionnée 
@@ -1407,7 +1447,7 @@ class MainWindow(QMainWindow):
 
         - Si aucun item n'est sélectionné, affiche un avertissement.
         - Sinon, récupère les données, ouvre le dialog, 
-          puis réinsère l'item mis à jour dans l'historique.
+        puis réinsère l'item mis à jour dans l'historique.
         - Met à jour le total des émissions et émet data_changed.
         """
         selected_item = self.history_list.currentItem()
@@ -1420,6 +1460,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
             return
 
+        # On ouvre la boîte de dialogue d'édition
         dialog = EditCalculationDialog(
             parent=self,
             data=data,
@@ -1429,35 +1470,112 @@ class MainWindow(QMainWindow):
         )
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
-            emissions, emission_massique, total_mass = self.recalculate_emissions(modified_data)
-            modified_data['emissions_price'] = emissions
+            # Recalcul
+            print("Debug - Nouveau self.modified_data :", modified_data)
+
+            emissions_price, emission_massique, total_mass = self.recalculate_emissions(modified_data)
+            if emissions_price is None:
+                # Une erreur s'est produite => on annule
+                return
+
+            # On stocke les valeurs recalculées
+            modified_data['emissions_price'] = emissions_price
             modified_data['emission_mass'] = emission_massique
             modified_data['total_mass'] = total_mass
 
+            # On retire l'ancien item et on en crée un nouveau
             self.history_list.takeItem(self.history_list.row(selected_item))
             self.create_or_update_history_item(modified_data)
-            self.update_total_emissions()
 
-        self.data_changed.emit()
+            self.update_total_emissions()
+            self.data_changed.emit()
+
+    # def recalculate_emissions(self, data):
+    #     """
+    #     Recalcule les émissions CO₂ à partir d'un dictionnaire de données (data).
+
+    #     - Si la catégorie == 'Machine', recalcule en fonction des kWh (usage * emission_factor).
+    #     - Sinon, reconstruit un masque sur self.data pour trouver le facteur d'émission 'total'.
+    #     - Calcule emission_price, puis eventuellement emission_massique si NACRES.
+
+    #     :param data: Le dictionnaire contenant les clés (category, subcategory, subsubcategory, etc.).
+    #     :type data: dict
+    #     :return: Un tuple (emissions_price, emission_massique, total_mass).
+    #     :rtype: tuple(float or None, float or None, float or None)
+    #     """
+    #     print("Recalcul des émissions avec les données :", data)
+
+    #     category = data.get('category', '')
+    #     if category == 'Machine':
+    #         # Cas Machine
+    #         machine_name = data.get('subcategory', '')
+    #         total_usage = data.get('value', 0.0)
+    #         electricity_type = data.get('electricity_type', '')
+    #         if not electricity_type:
+    #             QMessageBox.warning(self, 'Erreur', "Type d'électricité manquant pour la machine.")
+    #             return None, None, None
+
+    #         mask = (self.data['category'] == 'Électricité') & (self.data['name'] == electricity_type)
+    #         filtered_data = self.data[mask]
+    #         if filtered_data.empty:
+    #             QMessageBox.warning(self, 'Erreur', "Impossible de trouver le facteur d'émission pour ce type d'électricité.")
+    #             return None, None, None
+
+    #         emission_factor = filtered_data['total'].values[0]
+    #         emissions = total_usage * emission_factor
+    #         return emissions, None, None
+
+    #     # Autres catégories
+    #     subcategory = data.get('subcategory', '')
+    #     subsub_name = data.get('subsubcategory', '')
+    #     name = data.get('name', '')
+    #     year = data.get('year', '')
+    #     value = data.get('value', 0)
+
+    #     mask = (
+    #         (self.data['category'] == category) &
+    #         (self.data['subcategory'] == subcategory) &
+    #         (self.data['subsubcategory'].fillna('') == subsub_name) &
+    #         (self.data['name'].fillna('') == name) #&
+    #         # (self.data['year'].astype(str) == str(year))
+    #     )
+    #     filtered_data = self.data[mask]
+    #     if filtered_data.empty:
+    #         QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
+    #         return None, None, None
+
+    #     total_emission_factor = filtered_data['total'].values[0]
+    #     emissions = float(value) * float(total_emission_factor)
+
+    #     code_nacres = data.get('code_nacres', 'NA')
+    #     emission_massique, total_mass = None, None
+    #     if category == 'Achats' and code_nacres != 'NA':
+    #         quantity = data.get('quantity', 1)
+    #         emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres, quantity=quantity)
+
+    #     return emissions, emission_massique, total_mass
 
     def recalculate_emissions(self, data):
         """
         Recalcule les émissions CO₂ à partir d'un dictionnaire de données (data).
 
-        - Si la catégorie == 'Machine', recalcule en fonction des kWh (usage * emission_factor).
-        - Sinon, reconstruit un masque sur self.data pour trouver le facteur d'émission 'total'.
-        - Calcule emission_price, puis eventuellement emission_massique si NACRES.
+        - Si category == 'Machine', recalcule en fonction des kWh.
+        - Sinon, retrouve le facteur d'émission "prix" dans self.data.
+        - Gère le code NACRES en ne gardant que la partie 'NB13' (pas le texte complet).
+        - Calcule emission_massique si besoin, en récupérant 3 valeurs 
+        (mass, total_mass, mass_error) de calculate_mass_based_emissions.
 
-        :param data: Le dictionnaire contenant les clés (category, subcategory, subsubcategory, etc.).
-        :type data: dict
-        :return: Un tuple (emissions_price, emission_massique, total_mass).
-        :rtype: tuple(float or None, float or None, float or None)
+        :param data: Dict contenant category, subcategory, subsubcategory, name, code_nacres, etc.
+        :return: (emissions_price, emission_massique, total_mass)
         """
         print("Recalcul des émissions avec les données :", data)
 
+        import math
+
         category = data.get('category', '')
+
+        # Cas Machine
         if category == 'Machine':
-            # Cas Machine
             machine_name = data.get('subcategory', '')
             total_usage = data.get('value', 0.0)
             electricity_type = data.get('electricity_type', '')
@@ -1472,38 +1590,55 @@ class MainWindow(QMainWindow):
                 return None, None, None
 
             emission_factor = filtered_data['total'].values[0]
-            emissions = total_usage * emission_factor
-            return emissions, None, None
+            emissions_machine = total_usage * emission_factor
+            return emissions_machine, None, None
 
         # Autres catégories
         subcategory = data.get('subcategory', '')
         subsub_name = data.get('subsubcategory', '')
         name = data.get('name', '')
         year = data.get('year', '')
-        value = data.get('value', 0)
+        value = float(data.get('value', 0))
+        quantity = data.get('quantity', 0)
 
+        code_nacres_full = data.get('code_nacres', 'NA')
+        # Couper si on a un code style "NB13 Culture cell" => ne garder que "NB13"
+        # On peut couper au 1er espace, ou sur 4 caractères si c'est toujours 4 chars
+        if ' ' in code_nacres_full:
+            code_nacres = code_nacres_full.split(' ', 1)[0]
+        else:
+            code_nacres = code_nacres_full[:4]  # Au cas où
+
+        # Calcul Emissions par le prix
         mask = (
             (self.data['category'] == category) &
             (self.data['subcategory'] == subcategory) &
             (self.data['subsubcategory'].fillna('') == subsub_name) &
-            (self.data['name'].fillna('') == name) #&
-            # (self.data['year'].astype(str) == str(year))
+            (self.data['name'].fillna('') == name)
         )
+        if year:
+            mask &= (self.data['year'].astype(str) == str(year))
+
         filtered_data = self.data[mask]
         if filtered_data.empty:
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cette sélection.')
             return None, None, None
 
         total_emission_factor = filtered_data['total'].values[0]
-        emissions = float(value) * float(total_emission_factor)
+        emissions_price = value * total_emission_factor  # nb: days déjà inclus dans "value"?
 
-        code_nacres = data.get('code_nacres', 'NA')
-        emission_massique, total_mass = None, None
+        # Gérer mass-based si Achats + code_nacres != 'NA'
+        emission_massique, total_mass, emission_mass_error = (None, None, None)
         if category == 'Achats' and code_nacres != 'NA':
-            quantity = data.get('quantity', 1)
-            emission_massique, total_mass = self.calculate_mass_based_emissions(code_nacres, quantity=quantity)
+            # Appel à la méthode massique
+            emission_massique, total_mass, emission_mass_error = self.calculate_mass_based_emissions(
+                code_nacres, quantity=quantity
+            )
 
-        return emissions, emission_massique, total_mass
+        # On ne renvoie que 3 valeurs, 
+        # si vous souhaitez renvoyer l'erreur massique, soit vous ajoutez un 4ème retour 
+        # ou vous l'ignorez
+        return emissions_price, emission_massique, total_mass
 
     # def create_or_update_history_item(self, data, item=None):
     #     """
@@ -1575,12 +1710,7 @@ class MainWindow(QMainWindow):
     def create_or_update_history_item(self, data, item=None):
         """
         Crée ou met à jour un élément dans la QListWidget d'historique.
-
-        - Construit le texte à afficher en fonction de la catégorie 
-        (Machine, Véhicules, Achats, etc.).
-        - Affiche l'incertitude sous forme "± X.XXXX" si dispo.
-        - Affiche également le nom du consommable le cas échéant.
-        - Stocke le dictionnaire `data` dans l'UserRole de l'item.
+        ...
         """
         category = data.get('category', '')
         subcategory = data.get('subcategory', '')
@@ -1593,59 +1723,64 @@ class MainWindow(QMainWindow):
         emission_mass = data.get('emission_mass', None)
         emission_mass_error = data.get('emission_mass_error', 0.0)
         total_mass = data.get('total_mass', None)
-        code_nacres = data.get('code_nacres', 'NA')
+        code_nacres_full = data.get('code_nacres', 'NA')
         consommable = data.get('consommable', 'NA')
 
-        # Petite fonction utilitaire pour afficher valeur ± incertitude
+        # EXTRACTION DES 4 PREMIERS CARACTÈRES
+        code_nacres_short = code_nacres_full[:4] if len(code_nacres_full) >= 4 else code_nacres_full
+
         def fmt_err(val, err):
-            """Retourne 'val ± err' si err != 0, sinon juste val."""
-            if err is not None and err > 0:
+            """Retourne 'val ± err' si err > 0, sinon juste val."""
+            if err and err > 0:
                 return f"{val:.4f} ± {err:.4f}"
             else:
                 return f"{val:.4f}"
 
         if category == 'Machine':
+            # inchangé
             item_text = (
                 f"Machine - {subcategory} - {value:.2f} kWh : "
                 f"{fmt_err(emissions_price, emissions_price_error)} kg CO₂e"
             )
         elif category == 'Véhicules':
+            # inchangé
             days = data.get('days', 1)
-            total_km = data.get('value', 0.0)
-            try:
-                km_per_day = float(total_km) / days if days else float(total_km)
-            except (ValueError, ZeroDivisionError):
-                km_per_day = 0
+            total_km = data.get('value', 0)
+            km_per_day = 0
+            if days > 0:
+                km_per_day = float(total_km) / days
             item_text = (
-                f"{category} - {subcategory} - {code_nacres} - {name} : "
+                f"{category} - {subcategory} - {code_nacres_short} - {name} : "
                 f"{km_per_day:.2f} km/jour sur {days} jours, total {total_km} {unit} : "
                 f"{fmt_err(emissions_price, emissions_price_error)} kg CO₂e"
             )
         else:
-            # Exemple : Achats
+            # CAS “ACHATS” ET AUTRES
+            # Ici, on affiche le code NACRES court + consommable
+
             prix_str = fmt_err(emissions_price, emissions_price_error)
+
+            # Commencer la ligne
             item_text = (
-                f"{category} - {subcategory[:12]} - {code_nacres} - {name} - "
+                f"{category} - {subcategory[:12]} - {code_nacres_short} - "
                 f"Dépense: {value} {unit} : {prix_str} kg CO₂e"
             )
 
-            # Afficher le nom du consommable
+            # Ajouter le nom du consommable (partie lisible)
             if consommable != 'NA':
-                # On ajoute un espace ou un séparateur
-                item_text += f" [Consommable: {consommable}]"
+                item_text += f" / Consommable: {consommable}"
 
             # Si on a des émissions massiques
             if emission_mass is not None and total_mass is not None and emission_mass != 0:
                 mass_str = fmt_err(emission_mass, emission_mass_error)
                 item_text += f" - Masse {total_mass:.4f} kg : {mass_str} kg CO₂e"
 
-        # Création/mise à jour de l'item
+        # Création / mise à jour de l'item
         if item:
             item.setText(item_text)
             item.setData(Qt.UserRole, data)
             return item
         else:
-            from PySide6.QtWidgets import QListWidgetItem
             new_item = QListWidgetItem(item_text)
             new_item.setData(Qt.UserRole, data)
             self.history_list.addItem(new_item)
@@ -2079,74 +2214,139 @@ class MainWindow(QMainWindow):
 
     #     return eCO2_total, masse_totale_kg
     
+    # def calculate_mass_based_emissions(self, code_nacres, quantity=None):
+    #     """
+    #     Calcule les émissions basées sur la masse (via le code NACRES et la quantité).
+
+    #     - Cherche la ligne correspondante dans self.data_masse (Code NACRES + Consommable).
+    #     - Calcule masse_totale = masse_unitaire_kg * quantité.
+    #     - Recherche le matériau dans self.data_materials pour obtenir eCO2_par_kg + incertitude.
+    #     - Calcule eCO2_total = masse_totale * eCO2_par_kg et l'incertitude associée.
+    #     - Retourne (eCO2_total, masse_totale, eCO2_error).
+
+    #     :param code_nacres: Le code NACRES (ex: "NB13").
+    #     :type code_nacres: str
+    #     :param quantity: Quantité saisie (entier). S'il est None, on lit self.quantity_input.
+    #     :type quantity: int or None
+    #     :return: (emission_massique, masse_totale_kg, emission_mass_error).
+    #     :rtype: tuple(float, float, float)
+    #     """
+    #     # 1) Récupérer la quantité
+    #     if quantity is None:
+    #         try:
+    #             quantity_str = self.quantity_input.text().strip()
+    #             quantity = int(quantity_str) if quantity_str else 0
+    #         except ValueError:
+    #             quantity = 0
+
+    #     # 2) Chercher la ligne correspondante dans data_masse
+    #     #    On regarde si on a "Code NACRES" = code_nacres
+    #     selected_nacres = self.conso_filtered_combo.currentText()
+    #     if " - " in selected_nacres:
+    #         code_nacres_str, objet_nom = selected_nacres.split(" - ", 1)
+    #     else:
+    #         code_nacres_str = code_nacres.strip()
+    #         objet_nom = ""
+
+    #     matching = self.data_masse[
+    #         (self.data_masse['Code NACRES'].str.strip() == code_nacres_str) &
+    #         (self.data_masse["Consommable"].str.strip() == objet_nom)
+    #     ]
+
+    #     if matching.empty:
+    #         return 0.0, 0.0, 0.0  # pas trouvé => pas d'émission
+
+    #     row = matching.iloc[0]
+    #     masse_g = row.get("Masse unitaire (g)", 0.0)
+    #     materiau = row.get("Matériau", "")
+    #     # Ici, on lit la colonne "incertitude" massique :
+    #     incert_mass_factor = row.get("uncertainty", 0.0)  # ex. 0.1 => ±10%
+
+    #     # 3) Calcul de la masse totale
+    #     masse_kg_unitaire = float(masse_g) / 1000.0
+    #     masse_totale_kg = masse_kg_unitaire * quantity
+
+    #     # 4) Chercher le facteur CO₂ du matériau dans data_materials
+    #     mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
+    #     if mat_filter.empty:
+    #         return 0.0, masse_totale_kg, 0.0
+
+    #     eCO2_par_kg = float(mat_filter.iloc[0].get("Equivalent CO₂ (kg eCO₂/kg)", 0.0))
+    #     # Incertitude du matériau (si vous l'avez dans data_materials) :
+    #     incert_material = float(mat_filter.iloc[0].get("uncertainty", 0.0))  # ex. 0.05 => ±5%
+
+    #     # 5) Calcul final
+    #     eCO2_total = masse_totale_kg * eCO2_par_kg
+
+    #     # 6) Combiner incertitude massique + incertitude matériau
+    #     #    => On suppose indépendance => incert_total = sqrt((incert_mass_factor^2) + (incert_material^2))
+    #     #    => Erreur absolue = eCO2_total * incert_total
+    #     incert_total_fraction = (incert_mass_factor**2 + incert_material**2)**0.5
+    #     eCO2_total_error = eCO2_total * incert_total_fraction
+
+    #     return eCO2_total, masse_totale_kg, eCO2_total_error
+
     def calculate_mass_based_emissions(self, code_nacres, quantity=None):
         """
         Calcule les émissions basées sur la masse (via le code NACRES et la quantité).
+        Renvoie (emission_massique, total_mass, emission_mass_error).
 
-        - Cherche la ligne correspondante dans self.data_masse (Code NACRES + Consommable).
-        - Calcule masse_totale = masse_unitaire_kg * quantité.
-        - Recherche le matériau dans self.data_materials pour obtenir eCO2_par_kg + incertitude.
-        - Calcule eCO2_total = masse_totale * eCO2_par_kg et l'incertitude associée.
-        - Retourne (eCO2_total, masse_totale, eCO2_error).
-
-        :param code_nacres: Le code NACRES (ex: "NB13").
+        :param code_nacres: Code NACRES (ex: "NB13") pour filtrer dans self.data_masse.
         :type code_nacres: str
-        :param quantity: Quantité saisie (entier). S'il est None, on lit self.quantity_input.
+        :param quantity: Quantité de consommables. Si None, on lit self.quantity_input.
         :type quantity: int or None
-        :return: (emission_massique, masse_totale_kg, emission_mass_error).
+        :return: (eCO2_total, masse_totale_kg, eCO2_total_error)
         :rtype: tuple(float, float, float)
         """
-        # 1) Récupérer la quantité
+        import math
+
         if quantity is None:
+            # Récupérer la quantité dans le champ
             try:
                 quantity_str = self.quantity_input.text().strip()
                 quantity = int(quantity_str) if quantity_str else 0
             except ValueError:
                 quantity = 0
 
-        # 2) Chercher la ligne correspondante dans data_masse
-        #    On regarde si on a "Code NACRES" = code_nacres
+        # On parse ce qu’il y a dans la combo NACRES
         selected_nacres = self.conso_filtered_combo.currentText()
         if " - " in selected_nacres:
-            code_nacres_str, objet_nom = selected_nacres.split(" - ", 1)
+            code_part, conso_nom = selected_nacres.split(" - ", 1)
         else:
-            code_nacres_str = code_nacres.strip()
-            objet_nom = ""
+            code_part = code_nacres
+            conso_nom = ""
 
+        # Filtrer self.data_masse sur le code NACRES + nom exact si vous le souhaitez
         matching = self.data_masse[
-            (self.data_masse['Code NACRES'].str.strip() == code_nacres_str) &
-            (self.data_masse["Consommable"].str.strip() == objet_nom)
+            (self.data_masse['Code NACRES'].str.strip() == code_part.strip()) &
+            (self.data_masse["Consommable"].str.strip() == conso_nom.strip())
         ]
-
         if matching.empty:
-            return 0.0, 0.0, 0.0  # pas trouvé => pas d'émission
+            # Pas de correspondance => pas d'émission
+            return 0.0, 0.0, 0.0
 
         row = matching.iloc[0]
         masse_g = row.get("Masse unitaire (g)", 0.0)
         materiau = row.get("Matériau", "")
-        # Ici, on lit la colonne "incertitude" massique :
-        incert_mass_factor = row.get("uncertainty", 0.0)  # ex. 0.1 => ±10%
+        # Si vous gérez l’incertitude massique, ex: row.get("incertitude", 0.0)
+        incert_mass_factor = row.get("incertitude", 0.0)
 
-        # 3) Calcul de la masse totale
         masse_kg_unitaire = float(masse_g) / 1000.0
         masse_totale_kg = masse_kg_unitaire * quantity
 
-        # 4) Chercher le facteur CO₂ du matériau dans data_materials
+        # Chercher l'équivalent CO2/kg du matériau
         mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
         if mat_filter.empty:
             return 0.0, masse_totale_kg, 0.0
 
         eCO2_par_kg = float(mat_filter.iloc[0].get("Equivalent CO₂ (kg eCO₂/kg)", 0.0))
-        # Incertitude du matériau (si vous l'avez dans data_materials) :
-        incert_material = float(mat_filter.iloc[0].get("uncertainty", 0.0))  # ex. 0.05 => ±5%
+        incert_material = float(mat_filter.iloc[0].get("incertitude", 0.0))  # ex: ±5%
 
-        # 5) Calcul final
+        # Calcul total
         eCO2_total = masse_totale_kg * eCO2_par_kg
 
-        # 6) Combiner incertitude massique + incertitude matériau
-        #    => On suppose indépendance => incert_total = sqrt((incert_mass_factor^2) + (incert_material^2))
-        #    => Erreur absolue = eCO2_total * incert_total
-        incert_total_fraction = (incert_mass_factor**2 + incert_material**2)**0.5
+        # incertitude en quadrature si vous en avez besoin
+        incert_total_fraction = math.sqrt(incert_mass_factor**2 + incert_material**2)
         eCO2_total_error = eCO2_total * incert_total_fraction
 
         return eCO2_total, masse_totale_kg, eCO2_total_error
