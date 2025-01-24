@@ -24,6 +24,7 @@ from windows.data_mass_window import DataMassWindow
 from windows.edit_calculation_dialog import EditCalculationDialog
 from windows.graphiques.stacked_bar_consumables import StackedBarConsumablesWindow
 from windows.graphiques.nacres_bar_chart import NacresBarChartWindow
+from windows.graphiques.proportional_bar_chart_mass import ProportionalBarChartNacresWindow
 
 class MainWindow(QMainWindow):
     data_changed = Signal()
@@ -470,26 +471,48 @@ class MainWindow(QMainWindow):
         """
         graph_summary_label = QLabel("Générer des résumés graphiques :")
         main_layout.addWidget(graph_summary_label)
-
+        # Boutons pour les graphiques line 1 (Pie, Bar, Proportional Bar)
         self.generate_pie_button = QPushButton('Diagramme en Secteurs')
+        self.generate_pie_button.setToolTip(
+            "Affiche un diagramme en secteurs pour les émissions totales."
+        )
         self.generate_bar_button = QPushButton('Barres Empilées à 100%')
-        self.generate_proportional_bar_button = QPushButton('Barres Empilées')
+        self.generate_bar_button.setToolTip(
+            "Affiche un graphique en barres empilées à 100% pour les émissions totales."
+        )
 
+        self.generate_proportional_bar_button = QPushButton('Barres Empilées (prix)')
+        self.generate_proportional_bar_button.setToolTip(
+            "Affiche un graphique en barres empilées pour les émissions totales."
+        )
+
+        # Layout pour les boutons de graphiques line 1
         buttons_layout_graph_line1 = QHBoxLayout()
         buttons_layout_graph_line1.addWidget(self.generate_pie_button)
         buttons_layout_graph_line1.addWidget(self.generate_bar_button)
         buttons_layout_graph_line1.addWidget(self.generate_proportional_bar_button)
         main_layout.addLayout(buttons_layout_graph_line1)
 
+        # Boutons pour les graphiques line 2 (Stacked Bar, Nacres Bar)
         self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées (Consommables)")
         self.generate_stacked_bar_consumables_button.setToolTip(
             "Affiche un graphique en barres empilées uniquement pour les consommables à quantité > 0."
         )
-        self.generate_nacres_bar_button = QPushButton("Barres NACRES")
 
+        self.generate_nacres_bar_button = QPushButton("Barres NACRES")
+        self.generate_nacres_bar_button.setToolTip(
+            "Affiche un graphique en barres pour les consommables avec les valeurs NACRES."
+        )
+
+        self.generate_proportional_bar_button_mass = QPushButton('Barres Empilées (Masse)')
+        self.generate_proportional_bar_button_mass.setToolTip(
+            "Affiche un graphique en barres empilées pour les émissions totales avec un calcul se basant sur la masse."
+        )
+        # Layout pour les boutons de graphiques line 2
         buttons_layout_graph_line2 = QHBoxLayout()
         buttons_layout_graph_line2.addWidget(self.generate_stacked_bar_consumables_button)
         buttons_layout_graph_line2.addWidget(self.generate_nacres_bar_button)
+        buttons_layout_graph_line2.addWidget(self.generate_proportional_bar_button_mass)
         main_layout.addLayout(buttons_layout_graph_line2)
 
         main_layout.addSpacing(5)
@@ -527,6 +550,7 @@ class MainWindow(QMainWindow):
         self.generate_proportional_bar_button.clicked.connect(self.generate_proportional_bar_chart)
         self.generate_stacked_bar_consumables_button.clicked.connect(self.generate_stacked_bar_consumables)
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
+        self.generate_proportional_bar_button_mass.clicked.connect(self.generate_proportional_bar_chart_mass)     
 
         self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
         self.add_machine_button.clicked.connect(self.add_machine)
@@ -1479,7 +1503,8 @@ class MainWindow(QMainWindow):
                 'bar': BarChartWindow,
                 'proportional_bar': ProportionalBarChartWindow,
                 'stacked_bar_consumables': StackedBarConsumablesWindow,
-                'nacres_bar': NacresBarChartWindow
+                'nacres_bar': NacresBarChartWindow,
+                'proportional_bar_mass': ProportionalBarChartNacresWindow
             }.get(chart_type)
 
             # Vérifie si le type demandé est valide (i.e., présent dans le dictionnaire).
@@ -1521,6 +1546,9 @@ class MainWindow(QMainWindow):
 
     def generate_nacres_bar_chart(self):
         self.generate_chart('nacres_bar')
+
+    def generate_proportional_bar_chart_mass(self):
+        self.generate_chart('proportional_bar_mass')
 
     def show_sources_popup(self, link_str):
         """
