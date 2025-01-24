@@ -29,6 +29,12 @@ class MainWindow(QMainWindow):
     data_changed = Signal()
 
     def __init__(self):
+        """
+        Initialise la fenêtre principale du calculateur de bilan carbone LABeCO₂.
+
+        Configure le titre de la fenêtre, initialise les gestionnaires de données, charge les données,
+        configure le CarbonCalculator, et initialise les composants de l'interface utilisateur ainsi que les signaux.
+        """
         super().__init__()
         self.setWindowTitle("LABeCO₂ - Calculateur de Bilan Carbone")
 
@@ -107,6 +113,12 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
+        """
+        Initialise l'interface utilisateur principale.
+
+        Organise les différents layouts, sections et widgets de l'application,
+        configure les éléments graphiques et prépare la fenêtre principale pour l'affichage.
+        """
         main_layout = QVBoxLayout()
         main_layout.setSpacing(5)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -147,6 +159,15 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(700, 700)
 
     def initUIHeader(self, main_layout):
+        """
+        Initialise la section d'en-tête de l'interface utilisateur.
+
+        Ajoute le logo de l'application et configure le texte d'introduction avec une option pour afficher
+        plus ou moins de contenu. Intègre également des liens interactifs pour accéder à des informations supplémentaires.
+        
+        Args:
+            main_layout (QVBoxLayout): Le layout principal auquel ajouter les éléments de l'en-tête.
+        """
         self.add_logo()
         main_layout.addWidget(self.logo_label)
 
@@ -205,6 +226,12 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.header_label)
 
     def add_logo(self):
+        """
+        Ajoute le logo de l'application à l'en-tête.
+
+        Charge l'image du logo, la redimensionne de manière proportionnelle,
+        et l'affiche dans un QLabel aligné au centre. En cas d'échec du chargement, affiche un message d'erreur.
+        """
         logo_path = load_logo()
         self.logo_label = QLabel()
         pixmap = QPixmap(logo_path)
@@ -216,12 +243,27 @@ class MainWindow(QMainWindow):
             self.logo_label.setAlignment(Qt.AlignCenter)
 
     def toggle_text_display(self):
+        """
+        Bascule l'affichage du texte d'introduction entre l'état développé et réduit.
+
+        Permet à l'utilisateur de voir plus ou moins de contenu dans la section d'en-tête en cliquant sur un lien.
+        """
         if self.header_label.text() == self.collapsed_text:
             self.header_label.setText(self.full_text)
         else:
             self.header_label.setText(self.collapsed_text)
 
     def initUICategorySelectors(self, main_layout):
+        """
+        Initialise les sélecteurs de catégories dans l'interface utilisateur.
+
+        Configure les labels, comboboxes et champs de saisie pour la sélection des catégories,
+        sous-catégories, noms, années, consommables, et les champs d'entrée des valeurs.
+        Ajoute également les boutons pour calculer, gérer les consommables, et les actions d'import/export.
+        
+        Args:
+            main_layout (QVBoxLayout): Le layout principal auquel ajouter les sélecteurs de catégories.
+        """
         # Label + ComboBox catégorie
         self.category_label = QLabel('Catégorie:')
         self.category_combo = QComboBox()
@@ -321,6 +363,15 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(existing_group)
 
     def initUIMachineSection(self, main_layout):
+        """
+        Initialise la section dédiée aux machines dans l'interface utilisateur.
+
+        Configure les champs de saisie pour les informations des machines (nom, puissance, temps d'utilisation, nombre de jours, type d'électricité)
+        et le bouton pour ajouter une machine au calculateur.
+        
+        Args:
+            main_layout (QVBoxLayout): Le layout principal auquel ajouter la section des machines.
+        """
         self.machine_name_label = QLabel('Nom de la machine:')
         self.machine_name_field = QLineEdit()
         self.machine_name_field.setMaximumWidth(200)
@@ -362,6 +413,15 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.machine_group)
 
     def initUIHistory(self, main_layout):
+        """
+        Initialise la section d'historique des calculs dans l'interface utilisateur.
+
+        Configure la liste des calculs précédents, les boutons pour supprimer ou modifier un calcul,
+        et les boutons pour exporter ou importer les données de l'historique.
+        
+        Args:
+            main_layout (QVBoxLayout): Le layout principal auquel ajouter la section d'historique.
+        """
         self.history_label = QLabel('Historique des calculs:')
         main_layout.addWidget(self.history_label)
 
@@ -399,6 +459,15 @@ class MainWindow(QMainWindow):
         main_layout.addSpacing(5)
 
     def initUIGraphButtons(self, main_layout):
+        """
+        Initialise les boutons pour générer des graphiques dans l'interface utilisateur.
+
+        Configure les boutons pour créer différents types de graphiques (diagramme en secteurs, barres empilées, etc.)
+        et les connecte aux méthodes correspondantes pour afficher les graphiques.
+        
+        Args:
+            main_layout (QVBoxLayout): Le layout principal auquel ajouter les boutons de graphiques.
+        """
         graph_summary_label = QLabel("Générer des résumés graphiques :")
         main_layout.addWidget(graph_summary_label)
 
@@ -426,6 +495,12 @@ class MainWindow(QMainWindow):
         main_layout.addSpacing(5)
 
     def initUISignals(self):
+        """
+        Initialise les connexions de signaux et slots dans l'interface utilisateur.
+
+        Connecte les événements des widgets (comme les changements de sélection dans les comboboxes,
+        les clics sur les boutons, les changements de texte dans les champs de recherche) aux méthodes correspondantes pour gérer les interactions utilisateur.
+        """
         self.header_label.linkActivated.connect(self.toggle_text_display)
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
@@ -461,11 +536,26 @@ class MainWindow(QMainWindow):
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
     def on_search_text_changed(self, text):
+        """
+        Gère l'événement de changement de texte dans le champ de recherche.
+
+        Met à jour les noms des sous-sous-catégories et les consommables filtrés en fonction du texte de recherche saisi par l'utilisateur,
+        puis synchronise les sélections après la recherche.
+        
+        Args:
+            text (str): Le texte actuellement saisi dans le champ de recherche.
+        """
         self.update_subsubcategory_names()
         self.update_conso_filtered_combo(filter_text=None)
         self.synchronize_after_search()
 
     def synchronize_after_search(self):
+        """
+        Synchronise les sélections après une opération de recherche.
+
+        Ajuste les index des comboboxes des sous-sous-catégories et des consommables si nécessaire,
+        et met à jour la visibilité de la barre "Quantité".
+        """
         c_subsub = self.subsub_name_combo.count()
         if c_subsub == 2:
             self.subsub_name_combo.setCurrentIndex(1)
@@ -477,6 +567,12 @@ class MainWindow(QMainWindow):
         self.update_quantity_visibility()
 
     def update_subcategories(self):
+        """
+        Met à jour les sous-catégories en fonction de la catégorie sélectionnée.
+
+        Configure la visibilité des widgets en fonction de la catégorie choisie (par exemple, masque les éléments non pertinents pour les machines),
+        met à jour les items des comboboxes, gère les champs spécifiques aux véhicules, et appelle les méthodes pour gérer la visibilité des consommables.
+        """
         category = self.category_combo.currentText()
 
         if category == 'Machine':
@@ -551,9 +647,11 @@ class MainWindow(QMainWindow):
 
     def update_nacres_visibility(self):
         """
-        Affiche la zone de consommables (NACRES) UNIQUEMENT si la catégorie == 'Achats'
-        ET que la sous-catégorie contient 'Consommables'.
-        Sinon, on masque tout.
+        Met à jour la visibilité de la zone des consommables (NACRES).
+
+        Affiche ou masque les éléments liés aux consommables en fonction de la catégorie sélectionnée et de la sous-catégorie.
+        Si la catégorie est 'Achats' et que la sous-catégorie contient 'Consommables', affiche les éléments,
+        sinon les masque.
         """
         category = self.category_combo.currentText()
         subcat = self.subcategory_combo.currentText()
@@ -576,6 +674,12 @@ class MainWindow(QMainWindow):
             self.quantity_input.setVisible(False)
 
     def update_subsubcategory_names(self):
+        """
+        Met à jour les noms des sous-sous-catégories en fonction de la catégorie et sous-catégorie sélectionnées.
+
+        Filtre les données en fonction des sélections actuelles, applique le filtre de recherche si nécessaire,
+        et met à jour la combobox des noms. Ajoute également "non renseignée" comme option par défaut.
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         search_text = self.search_field.text().lower()
@@ -615,6 +719,12 @@ class MainWindow(QMainWindow):
         self.update_years()
 
     def update_years(self):
+        """
+        Met à jour la combobox des années disponibles en fonction de la sélection actuelle.
+
+        Filtre les données en fonction de la catégorie, sous-catégorie, sous-sous-catégorie et nom sélectionnés,
+        récupère les années disponibles et les ajoute à la combobox des années. Met à jour l'unité de mesure en conséquence.
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -635,6 +745,12 @@ class MainWindow(QMainWindow):
         self.update_unit()
 
     def update_unit(self):
+        """
+        Met à jour l'unité de mesure en fonction des sélections actuelles.
+
+        Filtre les données en fonction des sélections actuelles et récupère l'unité de mesure correspondante.
+        Met à jour le label et l'état du champ d'entrée de la valeur. Si aucune donnée n'est trouvée, désactive le champ d'entrée.
+        """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
         subsub_name = self.subsub_name_combo.currentText()
@@ -662,6 +778,15 @@ class MainWindow(QMainWindow):
             self.input_field.setEnabled(False)
 
     def update_conso_filtered_combo(self, filter_text=None):
+        """
+        Met à jour la combobox des consommables filtrés en fonction d'un texte de filtre.
+
+        Remplit la combobox avec les consommables qui correspondent au texte de filtre saisi par l'utilisateur.
+        Ajoute également "non renseignée" comme option par défaut. Bloque temporairement les signaux pour éviter des déclenchements intempestifs.
+        
+        Args:
+            filter_text (str, optional): Le texte utilisé pour filtrer les consommables. Par défaut, None.
+        """
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
         self.conso_filtered_combo.addItem("non renseignée")
@@ -682,6 +807,12 @@ class MainWindow(QMainWindow):
         self.update_quantity_visibility()
 
     def on_subsub_name_changed(self):
+        """
+        Gère l'événement de changement de sélection dans la combobox des noms des sous-sous-catégories.
+
+        Filtre les consommables en fonction du nom sélectionné, met à jour la combobox des consommables,
+        et affiche la barre "Quantité" si un consommable valide est sélectionné.
+        """
         subsub_name = self.subsub_name_combo.currentText()
         if not subsub_name or subsub_name == "non renseignée":
             # Réinitialiser la combo conso
@@ -719,6 +850,13 @@ class MainWindow(QMainWindow):
         self.update_quantity_visibility()
 
     def on_conso_filtered_changed(self):
+        """
+        Gère l'événement de changement de sélection dans la combobox des consommables filtrés.
+
+        Met à jour la catégorie à 'Achats' si nécessaire, sélectionne la sous-catégorie "Consommables",
+        et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
+        Affiche la barre "Quantité" si un consommable valide est sélectionné.
+        """
         sel_text = self.conso_filtered_combo.currentText()
         if not sel_text or sel_text == "non renseignée":
             self.quantity_label.setVisible(False)
@@ -799,6 +937,8 @@ class MainWindow(QMainWindow):
 
     def update_quantity_visibility(self):
         """
+        Met à jour la visibilité de la barre "Quantité" en fonction de la catégorie sélectionnée et du consommable.
+
         Affiche la barre "Quantité" uniquement si la catégorie est 'Achats' et qu'un consommable valide est sélectionné.
         Pour toutes les autres catégories, la barre "Quantité" reste masquée.
         """
@@ -819,6 +959,12 @@ class MainWindow(QMainWindow):
                 self.quantity_input.setVisible(True)
 
     def split_subsub_name(self, subsub_name):
+        """
+        Met à jour la visibilité de la barre "Quantité" en fonction de la catégorie sélectionnée et du consommable.
+
+        Affiche la barre "Quantité" uniquement si la catégorie est 'Achats' et qu'un consommable valide est sélectionné.
+        Pour toutes les autres catégories, la barre "Quantité" reste masquée.
+        """
         if ' - ' in subsub_name:
             subsub, name = subsub_name.split(' - ', 1)
         else:
@@ -831,8 +977,11 @@ class MainWindow(QMainWindow):
     
     def calculate_emission(self):
         """
-        Calcule les émissions pour toutes les catégories, 
-        mais SANS doubler la multiplication pour 'Véhicules'.
+        Calcule les émissions de carbone pour la catégorie sélectionnée.
+
+        Gère les calculs spécifiques aux catégories, notamment les machines,
+        en récupérant les données saisies par l'utilisateur, en appelant le CarbonCalculator,
+        et en ajoutant les résultats à l'historique des calculs. Met à jour également le total des émissions.
         """
         category = self.category_combo.currentText()
         subcategory = self.subcategory_combo.currentText()
@@ -933,19 +1082,13 @@ class MainWindow(QMainWindow):
         self.input_field.clear()
         self.data_changed.emit()
 
-    def recalculate_emissions(self, data):
-        """
-        Recalcule les émissions (prix + masse) à partir d'un dictionnaire de données.
-        Retourne (ep, ep_err, em, em_err, tm).
-        """
-        (ep, ep_err, em, em_err, tm, msg_price) = self.carbon_calculator.compute_emission_data(data)
-        if msg_price:
-            QMessageBox.warning(self, "Erreur", msg_price)
-            return (None, None, None, None, None)
-
-        return (ep, ep_err, em, em_err, tm)
-
     def modify_selected_calculation(self):
+        """
+        Modifie un calcul sélectionné dans l'historique.
+
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de modifier les données d'un calcul existant.
+        Si la modification est acceptée, recalcule les émissions et met à jour l'historique ainsi que les totaux.
+        """
         selected_item = self.history_list.currentItem()
         if not selected_item:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
@@ -985,6 +1128,10 @@ class MainWindow(QMainWindow):
 
     def update_total_emissions(self):
         """
+        Met à jour le total global des émissions en agrégeant les données de l'historique.
+
+        Calcule le total des émissions basées sur les prix et les masses des différents calculs,
+        en prenant en compte les incertitudes associées. Affiche les résultats agrégés dans la zone de résultats.
         Recalcule la somme globale des émissions depuis l'historique,
         en distinguant :
 
@@ -1043,6 +1190,19 @@ class MainWindow(QMainWindow):
         )
 
     def create_or_update_history_item(self, data, item=None):
+        """
+        Crée ou met à jour un élément dans l'historique des calculs.
+
+        Formate le texte de l'élément en fonction de la catégorie du calcul et ajoute l'élément à la liste historique.
+        Si un élément existe déjà, le met à jour avec les nouvelles données.
+        
+        Args:
+            data (dict): Le dictionnaire contenant les données du calcul à ajouter ou mettre à jour.
+            item (QListWidgetItem, optional): L'élément existant à mettre à jour. Par défaut, None.
+        
+        Returns:
+            QListWidgetItem: L'élément ajouté ou mis à jour dans l'historique.
+        """
         category = data.get('category', '')
         subcategory = data.get('subcategory', '')
         subsubcategory = data.get('subsubcategory', '')
@@ -1108,6 +1268,11 @@ class MainWindow(QMainWindow):
             return new_item
 
     def delete_selected_calculation(self):
+        """
+        Supprime le calcul actuellement sélectionné dans l'historique.
+
+        Retire l'élément sélectionné de la liste historique et met à jour le total des émissions.
+        """
         sel_row = self.history_list.currentRow()
         if sel_row >= 0:
             self.history_list.takeItem(sel_row)
@@ -1115,6 +1280,12 @@ class MainWindow(QMainWindow):
             self.data_changed.emit()
 
     def export_data(self):
+        """
+        Exporte les données de l'historique des calculs vers un fichier.
+
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de choisir le format de fichier (CSV, Excel, HDF5),
+        puis enregistre les données de l'historique dans le fichier sélectionné. Affiche un message de confirmation ou d'erreur.
+        """
         from PySide6.QtWidgets import QFileDialog
         import pandas as pd
         file_name, _ = QFileDialog.getSaveFileName(
@@ -1153,6 +1324,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erreur Export", f"{e}")
 
     def import_data(self):
+        """
+        Importe des données dans l'historique des calculs à partir d'un fichier.
+
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de sélectionner un fichier (CSV, Excel, HDF5),
+        lit les données du fichier, convertit les colonnes attendues, et ajoute les éléments à l'historique.
+        Affiche un message de confirmation ou d'erreur.
+        """
         from PySide6.QtWidgets import QFileDialog
         import pandas as pd
         file_name, _ = QFileDialog.getOpenFileName(
@@ -1198,8 +1376,14 @@ class MainWindow(QMainWindow):
 
     def add_machine(self):
         """
-        Logique Machine (puissance kW, usage_time h/j, days, type d’électricité),
-        en utilisant compute_emission_data pour centraliser le calcul.
+        Ajoute une machine au calculateur de bilan carbone.
+
+        Récupère les informations saisies par l'utilisateur (nom, puissance, temps d'utilisation, nombre de jours, type d'électricité),
+        calcule les émissions basées sur ces données en utilisant le CarbonCalculator,
+        ajoute le résultat à l'historique des calculs, et met à jour le total des émissions.
+        Efface également les champs de saisie après l'ajout.
+        
+        Affiche un message d'erreur si les valeurs saisies ne sont pas valides ou si le facteur d'émission pour le type d'électricité n'est pas trouvé.
         """
         try:
             machine_name = self.machine_name_field.text().strip()
@@ -1268,74 +1452,86 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Graphiques
     # ------------------------------------------------------------------
+    def generate_chart(self, chart_type):
+        """
+        Génère et affiche un graphique en fonction du type spécifié.
+
+        Args:
+            chart_type (str): Le type de graphique à générer. 
+                            Les types valides sont :
+                            - 'pie' : Diagramme en secteurs.
+                            - 'bar' : Graphique à barres empilées à 100%.
+                            - 'proportional_bar' : Graphique à barres empilées proportionnelles.
+                            - 'stacked_bar_consumables' : Graphique à barres empilées pour les consommables.
+                            - 'nacres_bar' : Graphique basé sur les codes NACRES.
+        """
+        # Détermine le nom de l'attribut correspondant à la fenêtre graphique.
+        # Exemple : pour 'pie', on recherche 'pie_chart_window'.
+        window_attr = f"{chart_type}_chart_window"
+
+        # Récupère la fenêtre existante pour ce type de graphique (si elle existe déjà).
+        window = getattr(self, window_attr, None)
+
+        if window is None:  # Si la fenêtre n'existe pas encore :
+            # Dictionnaire associant chaque type de graphique à sa classe correspondante.
+            window_class = {
+                'pie': PieChartWindow,
+                'bar': BarChartWindow,
+                'proportional_bar': ProportionalBarChartWindow,
+                'stacked_bar_consumables': StackedBarConsumablesWindow,
+                'nacres_bar': NacresBarChartWindow
+            }.get(chart_type)
+
+            # Vérifie si le type demandé est valide (i.e., présent dans le dictionnaire).
+            if window_class is None:
+                # Affiche un avertissement si le type de graphique est inconnu.
+                QMessageBox.warning(self, "Erreur", f"Type de graphique inconnu : {chart_type}")
+                return  # Sort de la fonction sans rien faire.
+
+            # Crée une nouvelle instance de la fenêtre pour le type de graphique spécifié.
+            window = window_class(self)
+
+            # Connecte le signal `finished` de la fenêtre pour réinitialiser l'attribut
+            # correspondant lorsque la fenêtre est fermée.
+            # Cela permet de recréer une nouvelle fenêtre la prochaine fois que cette fonction est appelée.
+            window.finished.connect(lambda: setattr(self, window_attr, None))
+
+            # Stocke la fenêtre créée dans l'attribut correspondant à son type.
+            setattr(self, window_attr, window)
+        else:
+            # Si la fenêtre existe déjà, met à jour ses données.
+            window.refresh_data()
+
+        # Affiche la fenêtre graphique.
+        window.show()
+        window.raise_()  # Amène la fenêtre au premier plan.
+        window.activateWindow()  # Active la fenêtre pour qu'elle soit prête à recevoir des interactions.
 
     def generate_pie_chart(self):
-        if self.pie_chart_window is None:
-            self.pie_chart_window = PieChartWindow(self)
-            self.pie_chart_window.finished.connect(self.on_pie_chart_window_closed)
-        else:
-            self.pie_chart_window.refresh_data()
-        self.pie_chart_window.show()
-        self.pie_chart_window.raise_()
-        self.pie_chart_window.activateWindow()
-
-    def on_pie_chart_window_closed(self):
-        self.pie_chart_window = None
+        self.generate_chart('pie')
 
     def generate_bar_chart(self):
-        if self.bar_chart_window is None:
-            self.bar_chart_window = BarChartWindow(self)
-            self.bar_chart_window.finished.connect(self.on_bar_chart_window_closed)
-        else:
-            self.bar_chart_window.refresh_data()
-        self.bar_chart_window.show()
-        self.bar_chart_window.raise_()
-        self.bar_chart_window.activateWindow()
-
-    def on_bar_chart_window_closed(self):
-        self.bar_chart_window = None
+        self.generate_chart('bar')
 
     def generate_proportional_bar_chart(self):
-        if self.proportional_bar_chart_window is None:
-            self.proportional_bar_chart_window = ProportionalBarChartWindow(self)
-            self.proportional_bar_chart_window.finished.connect(self.on_proportional_bar_chart_window_closed)
-        else:
-            self.proportional_bar_chart_window.refresh_data()
-        self.proportional_bar_chart_window.show()
-        self.proportional_bar_chart_window.raise_()
-        self.proportional_bar_chart_window.activateWindow()
-
-    def on_proportional_bar_chart_window_closed(self):
-        self.proportional_bar_chart_window = None
+        self.generate_chart('proportional_bar')
 
     def generate_stacked_bar_consumables(self):
-        if self.stacked_bar_consumables_window is None:
-            self.stacked_bar_consumables_window = StackedBarConsumablesWindow(self)
-            self.stacked_bar_consumables_window.finished.connect(self.on_stacked_bar_consumables_window_closed)
-        else:
-            self.stacked_bar_consumables_window.refresh_data()
-        self.stacked_bar_consumables_window.show()
-        self.stacked_bar_consumables_window.raise_()
-        self.stacked_bar_consumables_window.activateWindow()
-
-    def on_stacked_bar_consumables_window_closed(self):
-        self.stacked_bar_consumables_window = None
+        self.generate_chart('stacked_bar_consumables')
 
     def generate_nacres_bar_chart(self):
-        if not self.nacres_bar_chart_window:
-            self.nacres_bar_chart_window = NacresBarChartWindow(self)
-            self.nacres_bar_chart_window.finished.connect(self.on_nacres_bar_chart_window_closed)
-        else:
-            self.nacres_bar_chart_window.refresh_data()
-
-        self.nacres_bar_chart_window.show()
-        self.nacres_bar_chart_window.raise_()
-        self.nacres_bar_chart_window.activateWindow()
-
-    def on_nacres_bar_chart_window_closed(self):
-        self.nacres_bar_chart_window = None
+        self.generate_chart('nacres_bar')
 
     def show_sources_popup(self, link_str):
+        """
+        Affiche une fenêtre contextuelle contenant les sources et références de l'application.
+
+        Ouvre une boîte de dialogue modale avec une liste détaillée de sources, références et articles scientifiques,
+        incluant des liens interactifs pour accéder aux ressources externes.
+        
+        Args:
+            link_str (str): La chaîne de lien activée (non utilisée dans cette fonction).
+        """
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
 
         dialog = QDialog(self)
