@@ -1,5 +1,3 @@
-# windows/nacres_bar_chart.py
-
 import numpy as np
 import matplotlib
 matplotlib.use('QtAgg')
@@ -20,9 +18,8 @@ from utils.color_utils import generate_color_shades
 class NacresBarChartWindow(QDialog):
     """
     Fenêtre pour afficher un bar chart basé sur les codes NACRES.
-    Chaque barre peut représenter le total des émissions pour un code NACRES,
-    éventuellement empilées par sous-sous-catégorie, etc. 
-    À adapter selon vos besoins.
+    Chaque barre représente le total des émissions pour un code NACRES,
+    avec des barres d'erreur pour refléter les incertitudes associées.
     """
 
     finished = Signal()  # Émis quand la fenêtre se ferme, pour que MainWindow la remette à None
@@ -69,13 +66,12 @@ class NacresBarChartWindow(QDialog):
         """
         Récupère l'historique depuis self.main_window.history_list,
         agrège les données par code NACRES, et dessine le graphique.
-        Vous pouvez adapter le filtrage, l'agrégation, etc.
         """
         self.figure.clear()
 
-        # Exemple : On récupère 'emissions_price' par code_nacres
-        # Filtrage minimal : category = Achats, quantity > 0, etc.
+        # Récupération des données : 'emissions_price' et erreurs associées
         nacres_dict = {}
+        nacres_errors = {}
         for i in range(self.main_window.history_list.count()):
             item = self.main_window.history_list.item(i)
             data = item.data(Qt.UserRole)
@@ -86,12 +82,20 @@ class NacresBarChartWindow(QDialog):
             category = data.get('category', '')
             quantity = data.get('quantity', 0)
             emissions_price = data.get('emissions_price', 0.0)
+            emissions_error = data.get('emissions_price_error', 0.0)
 
-            # Exemple : On ne garde que Achats + NACRES != 'NA'
+            # On filtre les données valides
             if code_nacres != 'NA' and category == 'Achats' and quantity > 0:
-                if code_nacres not in nacres_dict:
-                    nacres_dict[code_nacres] = 0.0
-                nacres_dict[code_nacres] += emissions_price
+                code_nacres_short = code_nacres[:4]  # Garde uniquement les 4 premiers caractères
+                if code_nacres_short not in nacres_dict:
+                    nacres_dict[code_nacres_short] = 0.0
+                    nacres_errors[code_nacres_short] = 0.0
+                nacres_dict[code_nacres_short] += emissions_price
+                nacres_errors[code_nacres_short] += emissions_error ** 2
+
+        # Conversion des erreurs cumulées en écart-types
+        for code in nacres_errors:
+            nacres_errors[code] = np.sqrt(nacres_errors[code])
 
         if not nacres_dict:
             ax = self.figure.add_subplot(111)
@@ -101,9 +105,16 @@ class NacresBarChartWindow(QDialog):
             return
 
         # On crée un bar chart
-        ax = self.figure.add_subplot(111)
+        self.plot_chart(nacres_dict, nacres_errors)
+
+    def plot_chart(self, nacres_dict, nacres_errors):
+        """
+        Trace le graphique en barres avec barres d'erreur.
+        """
+        # Préparer les données
         codes = sorted(nacres_dict.keys())
         values = [nacres_dict[c] for c in codes]
+        errors = [nacres_errors[c] for c in codes]
 
         x_indices = np.arange(len(codes))
         bar_width = 0.8
@@ -114,19 +125,26 @@ class NacresBarChartWindow(QDialog):
         # Génération de nuances si besoin
         color_list = generate_color_shades(base_color, len(values))
 
+        # Création du graphique
+        ax = self.figure.add_subplot(111)
         bars = ax.bar(x_indices, values, bar_width, color=color_list, edgecolor='white')
 
-        # Affiche la valeur au-dessus de chaque barre
-        for idx, rect in enumerate(bars):
-            height = rect.get_height()
-            ax.text(rect.get_x() + rect.get_width()/2, height + 0.01,
-                    f"{height:.2f}", ha='center', va='bottom', fontsize=8)
+        # Ajout des barres d'erreur
+        ax.errorbar(x_indices, values, yerr=errors, fmt='none', ecolor='black', capsize=5, capthick=1, lw=0.7)
 
+        # Affiche la valeur au-dessus de chaque barre (commenté si non nécessaire)
+        # for idx, rect in enumerate(bars):
+        #     height = rect.get_height()
+        #     ax.text(rect.get_x() + rect.get_width()/2, height + 0.01,
+        #             f"{height:.2f}", ha='center', va='bottom', fontsize=8)
+
+        # Configuration de l'axe x
         ax.set_xticks(x_indices)
         ax.set_xticklabels(codes, rotation=30, ha='right', fontsize=8)
         ax.set_ylabel("Émissions (kg CO₂e)")
-        ax.set_title("Bar Chart par Code NACRES")
+        ax.set_title("Bar Chart par Code NACRES avec Barres d'Erreur")
 
+        # Ajustement du layout
         self.figure.tight_layout()
         self.canvas.draw()
 
