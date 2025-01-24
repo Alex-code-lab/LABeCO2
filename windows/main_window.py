@@ -1403,7 +1403,7 @@ class MainWindow(QMainWindow):
                 'category': 'Machine',
                 'subcategory': machine_name,
                 'subsubcategory': '',  # Pas de sous-sous-catégorie pour les machines
-                'name': electricity_type,
+                'electricity_type': electricity_type,
                 'year': '',  # Pas d'année pour les machines
                 'value': total_usage,  # kWh
                 'days': days,
@@ -1421,7 +1421,7 @@ class MainWindow(QMainWindow):
                 'category': 'Machine',
                 'subcategory': machine_name,
                 'subsubcategory': '',
-                'name': electricity_type,
+                'electricity_type': electricity_type,
                 'value': total_usage,  # kWh
                 'unit': 'kWh',
                 'emissions_price': ep,

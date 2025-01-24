@@ -1,28 +1,20 @@
-import numpy as np
-import matplotlib.patches
-from adjustText import adjust_text
+import numpy as np  # Utilisé pour les calculs numériques (par exemple, les indices x)
+import matplotlib.patches  # Peut être utilisé pour ajouter des formes au graphique (non utilisé ici)
+from adjustText import adjust_text  # Permet d'éviter le chevauchement des étiquettes dans les graphiques
 from PySide6.QtWidgets import (
     QMessageBox, QVBoxLayout, QDialog, QFileDialog, QToolBar, QStyle,
 )
-from PySide6.QtGui import QAction
-from PySide6.QtCore import Qt
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades
+from PySide6.QtGui import QAction  # Actions pour la barre d'outils
+from PySide6.QtCore import Qt  # Constantes Qt, comme Qt.WA_DeleteOnClose
+from matplotlib.figure import Figure  # Représente une figure Matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas  # Intègre une figure Matplotlib dans une application Qt
+from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades  # Utilitaires personnalisés pour gérer les couleurs et catégories
+
 
 class BarChartWindow(QDialog):
     """
     Fenêtre affichant un graphique en barres empilées à 100% 
-    représentant la répartition des émissions de CO₂ par sous-catégorie.
-
-    Ce graphique permet de visualiser, pour chaque catégorie, la part relative 
-    des différentes sous-catégories dans les émissions totales. Les barres 
-    sont toutes normalisées à 100%, permettant ainsi une comparaison visuelle 
-    facile des proportions entre catégories, indépendamment de leur volume total.
-
-    La fenêtre se met à jour automatiquement lorsque le signal data_changed 
-    est émis par la fenêtre principale, reflétant instantanément 
-    les dernières modifications de données.
+    représentant la répartition des émissions de CO₂ par sous-catégorie, avec des barres d'erreur.
     """
 
     def __init__(self, main_window):
@@ -32,207 +24,198 @@ class BarChartWindow(QDialog):
         Paramètres
         ----------
         main_window : MainWindow
-            Une référence à la fenêtre principale, 
-            permettant d'accéder à l'historique des calculs, 
-            aux données, et au signal data_changed.
+            Référence à la fenêtre principale pour accéder aux données et au signal data_changed.
         """
         super().__init__()
-
-        # Indique à Qt que la fenêtre doit être supprimée de la mémoire 
-        # lorsqu'elle est fermée, évitant ainsi les références obsolètes.
+        # Assure que la fenêtre est supprimée de la mémoire après sa fermeture
         self.setAttribute(Qt.WA_DeleteOnClose)
 
-        # Définition du titre et de la géométrie de la fenêtre
+        # Configuration initiale de la fenêtre
         self.setWindowTitle("Répartition des émissions de CO₂ par Sous-catégorie")
         self.setGeometry(200, 200, 800, 600)
 
-        # Référence à la fenêtre principale
-        self.main_window = main_window
+        # Références et constantes
+        self.main_window = main_window  # Référence à la fenêtre principale
+        self.category_colors = CATEGORY_COLORS  # Couleurs définies pour chaque catégorie
+        self.category_order = CATEGORY_ORDER  # Ordre des catégories
 
-        # Les couleurs et l'ordre des catégories sont définis dans des constantes
-        self.category_colors = CATEGORY_COLORS
-        self.category_order = CATEGORY_ORDER
-
-        # Initialise l'interface graphique
+        # Initialisation de l'interface utilisateur
         self.initUI()
 
-        # Récupération initiale des données et affichage du graphique
+        # Chargement initial des données et affichage du graphique
         self.refresh_data()
 
-        # Connexion du signal data_changed du MainWindow 
-        # à la méthode refresh_data() pour actualiser le graphique.
+        # Connecte le signal data_changed à la méthode refresh_data pour mettre à jour le graphique
         self.main_window.data_changed.connect(self.refresh_data)
-
 
     def initUI(self):
         """
-        Initialise l'interface utilisateur de la fenêtre du graphique en barres.
-
-        Cette méthode :
-        - Crée la figure Matplotlib et le canvas pour l'affichage du graphique.
-        - Ajoute une barre d'outils avec des actions pour sauvegarder et rafraîchir le graphique.
-        - Dispose le tout dans un layout vertical.
+        Initialise l'interface utilisateur de la fenêtre.
         """
-        # Création d'une figure Matplotlib et du canvas associé
+        # Création d'une figure Matplotlib et d'un canvas pour l'affichage
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
 
-        # Création de la barre d'outils
+        # Barre d'outils pour les actions utilisateur
         toolbar = QToolBar()
 
-        # Action pour sauvegarder le graphique
+        # Action pour sauvegarder l'image du graphique
         save_icon = self.style().standardIcon(QStyle.SP_DialogSaveButton)
         save_action = QAction(save_icon, "", self)
         save_action.setToolTip("Enregistrer l'image")
-        save_action.triggered.connect(self.save_image)
+        save_action.triggered.connect(self.save_image)  # Connecte l'action à la méthode save_image
         toolbar.addAction(save_action)
 
         # Action pour rafraîchir le graphique
         refresh_icon = self.style().standardIcon(QStyle.SP_BrowserReload)
         refresh_action = QAction(refresh_icon, "", self)
         refresh_action.setToolTip("Actualiser le graphique")
-        refresh_action.triggered.connect(self.refresh_chart)
+        refresh_action.triggered.connect(self.refresh_chart)  # Connecte l'action à la méthode refresh_chart
         toolbar.addAction(refresh_action)
 
-        # Ajout du toolbar et du canvas dans un layout vertical
+        # Organisation des widgets dans un layout vertical
         layout = QVBoxLayout()
-        layout.addWidget(toolbar)
-        layout.addWidget(self.canvas)
+        layout.addWidget(toolbar)  # Ajout de la barre d'outils
+        layout.addWidget(self.canvas)  # Ajout du canvas
         self.setLayout(layout)
-
 
     def refresh_data(self):
         """
-        Met à jour les données nécessaires au tracé du graphique 
-        en se basant sur l'historique des calculs dans la fenêtre principale.
-
-        Cette méthode :
-        - Parcourt l'historique, 
-        - Agrège les émissions par catégorie et sous-catégorie,
-        - Stocke ces informations dans self.subcategory_emissions,
-        - Puis appelle refresh_chart() pour mettre à jour l'affichage.
+        Met à jour les données nécessaires au graphique.
         """
-        categories = []
-        subcategories = []
-        emissions = []
+        categories = []  # Liste des catégories
+        subcategories = []  # Liste des sous-catégories
+        emissions = []  # Liste des émissions
+        errors = []  # Liste des erreurs associées
 
-        # Parcours de l'historique des calculs pour extraire catégories, sous-catégories et émissions
+        # Parcourt l'historique des calculs dans la fenêtre principale
         for i in range(self.main_window.history_list.count()):
             item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
+            data = item.data(Qt.UserRole)  # Récupère les données de l'élément
             if data:
-                categories.append(data.get('category', ''))
-                subcategories.append(data.get('subcategory', ''))
-                emissions.append(data.get('emissions_price', 0))
+                categories.append(data.get('category', ''))  # Ajoute la catégorie
+                subcategories.append(data.get('subcategory', ''))  # Ajoute la sous-catégorie
+                emissions.append(data.get('emissions_price', 0))  # Ajoute les émissions
+                errors.append(data.get('emissions_price_error', 0))  # Ajoute les erreurs
 
-        # Agrégation des émissions par catégorie et sous-catégorie
+        # Agrège les émissions par catégorie et sous-catégorie
         subcategory_emissions = {}
-        for category, subcat, emission in zip(categories, subcategories, emissions):
-            # On vérifie si la catégorie fait partie de l'ordre prédéfini
-            if category in self.category_order:
+        subcategory_errors = {}
+        for category, subcat, emission, error in zip(categories, subcategories, emissions, errors):
+            if category in self.category_order:  # Vérifie si la catégorie est valide
                 if category not in subcategory_emissions:
                     subcategory_emissions[category] = {}
-                # Ajoute ou cumule les émissions pour la sous-catégorie concernée
+                    subcategory_errors[category] = {}
+                # Cumul des émissions et erreurs pour chaque sous-catégorie
                 subcategory_emissions[category][subcat] = subcategory_emissions[category].get(subcat, 0) + emission
+                subcategory_errors[category][subcat] = (
+                    subcategory_errors[category].get(subcat, 0) + error ** 2
+                )
 
-        self.subcategory_emissions = subcategory_emissions
+        # Convertit les erreurs cumulées en écarts types (somme en quadrature)
+        for category in subcategory_errors:
+            for subcat in subcategory_errors[category]:
+                subcategory_errors[category][subcat] = np.sqrt(subcategory_errors[category][subcat])
 
-        # Met à jour le graphique
-        self.refresh_chart()
-
+        self.subcategory_emissions = subcategory_emissions  # Stocke les résultats
+        self.subcategory_errors = subcategory_errors  # Stocke les erreurs
+        self.refresh_chart()  # Met à jour le graphique
 
     def plot_chart(self):
         """
-        Trace le graphique en barres empilées à 100%.
-
-        Pour chaque catégorie, on cumule les émissions de ses sous-catégories 
-        et on les représente en pourcentage (ratio). Cela permet de voir la part 
-        relative de chaque sous-catégorie dans le total de la catégorie, 
-        tous les graphiques étant normalisés à 100%.
+        Trace le graphique en barres empilées à 100% avec des barres d'erreur correctement positionnées.
+        Les barres d'erreur sont placées au sommet de chaque segment empilé, et l'axe Y est ajusté automatiquement
+        pour inclure toute la plage des barres d'erreur et leurs "caps".
         """
-        # Nettoyage de la figure
+        # Nettoyage de la figure pour éviter les superpositions
         self.figure.clear()
 
         # Ajout d'un subplot pour le graphique
         bar_ax = self.figure.add_subplot(111)
 
-        # On récupère les catégories présentes dans l'ordre prédéfini 
-        # et qui ont des émissions (dans subcategory_emissions).
+        # Filtre les catégories présentes dans les données et l'ordre prédéfini
         pie_labels = [cat for cat in self.category_order if cat in self.subcategory_emissions]
 
         # Indices sur l'axe x pour chaque catégorie
         x_indices = np.arange(len(pie_labels))
         bar_width = 0.8  # Largeur des barres
 
-        # Pour chaque catégorie, on trace une barre empilée
+        # Variable pour suivre la hauteur maximale (y compris les barres d'erreur)
+        max_height_with_error = 0
+        capsize = 0.05  # Taille des "caps" exprimée comme fraction de l'axe Y
+
+        # Tracé des barres empilées pour chaque catégorie
         for idx, category in enumerate(pie_labels):
-            sub_emissions = self.subcategory_emissions[category]
-            sub_labels = list(sub_emissions.keys())
-            sub_values = list(sub_emissions.values())
-            total_emission = sum(sub_values)
+            sub_emissions = self.subcategory_emissions[category]  # Récupère les sous-catégories
+            sub_errors = self.subcategory_errors[category]
+            sub_labels = list(sub_emissions.keys())  # Noms des sous-catégories
+            sub_values = list(sub_emissions.values())  # Valeurs des émissions
+            sub_err_values = list(sub_errors.values())  # Erreurs des émissions
+            total_emission = sum(sub_values)  # Total des émissions pour la catégorie
 
-            # Calcul des proportions (ratios) de chaque sous-catégorie
-            # Si total_emission = 0, on évite la division par zéro 
-            # et on met un ratio de 0.
+            # Calcul des proportions pour chaque sous-catégorie
             sub_ratios = [value / total_emission if total_emission != 0 else 0 for value in sub_values]
+            sub_error_ratios = [err / total_emission if total_emission != 0 else 0 for err in sub_err_values]
 
-            # Détermination de la couleur de base pour la catégorie
+            # Détermine la couleur de base et génère des nuances
             base_color = matplotlib.colors.to_rgb(self.category_colors.get(category, '#cccccc'))
-            # Génération de nuances de la couleur pour distinguer les sous-catégories
             colors = generate_color_shades(base_color, len(sub_labels))
-            bottom = 0  # Position de départ cumulée sur l'axe y pour empiler les barres
+            bottom = 0  # Position de départ pour empiler les barres
 
-            # Tracé de chaque portion de barre (pour chaque sous-catégorie)
-            for i, ratio in enumerate(sub_ratios):
-                bar_ax.bar(idx, ratio, bar_width, bottom=bottom, color=colors[i], edgecolor='white')
-                ypos = bottom + ratio / 2
+            for i, (ratio, error_ratio) in enumerate(zip(sub_ratios, sub_error_ratios)):
+                # Trace une portion de barre pour chaque sous-catégorie
+                bar_ax.bar(
+                    idx, ratio, bar_width, bottom=bottom, color=colors[i], edgecolor='white'
+                )
+
+                # Ajout des barres d'erreur
+                # La barre d'erreur est positionnée au sommet de la section empilée (bottom + ratio)
+                bar_ax.errorbar(
+                    idx, bottom + ratio, yerr=error_ratio,
+                    fmt='none', ecolor='black', capsize=5, capthick=1, lw=0.7
+                )
+
+                # Met à jour la hauteur maximale avec la barre d'erreur et les caps
+                max_height_with_error = max(max_height_with_error, bottom + ratio + error_ratio + capsize)
+
+                # Ajout d'une étiquette sur chaque section
+                ypos = bottom + ratio / 2  # Position pour l'étiquette
                 label = sub_labels[i]
-
-                # Si le label est trop long, on le tronque
-                if len(label) > 15:
+                if len(label) > 15:  # Tronque les étiquettes trop longues
                     label = label[:11] + '...'
+                bar_ax.text(idx, ypos, f"{label}: {ratio * 100:.1f}%", ha='center', va='center', fontsize=6, color='white')
+                bottom += ratio  # Met à jour la position pour empiler
 
-                # Ajout d'un texte sur la barre, indiquant le label et le pourcentage
-                bar_ax.text(idx, ypos, f"{label}: {ratio * 100:.1f}%", 
-                            ha='center', va='center', fontsize=6, color='white')
-                # Mise à jour de la position "bottom" pour empiler le prochain ratio au-dessus
-                bottom += ratio
+            # Ajoute le total sous la barre
+            bar_ax.text(idx, -0.1, f"{total_emission:.2f} kg CO₂e", ha='center', va='top', fontsize=8, fontweight='bold')
 
-            # Ajout du total en kg CO₂e sous la barre (en position y négative)
-            bar_ax.text(idx, -0.1, f"{total_emission:.2f} kg CO₂e", 
-                        ha='center', va='top', fontsize=8, fontweight='bold')
+        # Ajuste dynamiquement l'axe Y pour inclure toutes les barres d'erreur et les "caps"
+        y_axis_limit = max_height_with_error + 0.1  # Ajoute une marge dynamique au-dessus
+        bar_ax.set_ylim(0, y_axis_limit)
 
-        # Configuration de l'axe x avec les noms des catégories
+        # Configure l'axe x avec les noms des catégories
         bar_ax.set_xticks(x_indices)
         bar_ax.set_xticklabels(pie_labels, rotation=0, ha='center', fontsize=8, fontweight='bold')
 
-        # Ajustement des limites pour un peu d'espace
-        bar_ax.set_ylim(0, 1.1)
+        # Ajoute un titre
+        bar_ax.set_title("Répartition des émissions par sous-catégorie avec barres d'erreur", fontsize=12)
 
-        # Titre du graphique
-        bar_ax.set_title("Répartition des émissions par sous-catégorie", fontsize=12)
-
-        # Suppression des bordures inutiles du graphique
+        # Supprime les bordures inutiles et l'axe y
         bar_ax.spines['top'].set_visible(False)
         bar_ax.spines['right'].set_visible(False)
         bar_ax.spines['left'].set_visible(False)
         bar_ax.spines['bottom'].set_visible(False)
-        bar_ax.yaxis.set_visible(False)  # On n'a pas besoin de l'axe y visible (tout est en pourcentage)
+        bar_ax.yaxis.set_visible(False)
 
-        # Ajustement de la mise en page
-        self.figure.tight_layout()
+        # Ajuste la mise en page pour éviter les chevauchements
+        self.figure.subplots_adjust(top=0.9)
 
-        # Dessine le graphique sur le canvas
+        # Dessine le graphique
         self.canvas.draw()
-
 
     def save_image(self):
         """
-        Ouvre une boîte de dialogue pour sauvegarder le graphique sous forme d'image.
-
-        - Permet à l'utilisateur de choisir l'emplacement et le nom du fichier.
-        - Ajoute une extension de fichier appropriée si l'utilisateur n'en fournit pas.
-        - Affiche un message d'information en cas de succès, ou un avertissement en cas d'erreur.
+        Sauvegarde le graphique sous forme d'image.
         """
         options = QFileDialog.Options()
         file_name, selected_filter = QFileDialog.getSaveFileName(
@@ -243,7 +226,7 @@ class BarChartWindow(QDialog):
             options=options
         )
         if file_name:
-            # Ajout d'une extension de fichier si nécessaire
+            # Ajoute une extension si nécessaire
             if not any(file_name.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.pdf']):
                 if "PNG" in selected_filter:
                     file_name += '.png'
@@ -253,26 +236,18 @@ class BarChartWindow(QDialog):
                     file_name += '.pdf'
                 else:
                     file_name += '.png'
-
             try:
-                # Sauvegarde de la figure
+                # Sauvegarde la figure
                 self.figure.savefig(file_name)
                 QMessageBox.information(self, 'Succès', f'Image enregistrée avec succès dans {file_name}')
             except Exception as e:
-                # Avertit en cas d'erreur lors de l'enregistrement
                 QMessageBox.warning(self, 'Erreur', f'Erreur lors de l\'enregistrement : {e}')
         else:
-            # L'utilisateur a annulé l'enregistrement
             QMessageBox.information(self, 'Annulation', 'Enregistrement annulé.')
-
 
     def refresh_chart(self):
         """
-        Rafraîchit l'affichage du graphique.
-
-        Cette méthode appelle plot_chart() puis redessine le canvas, permettant ainsi de 
-        mettre à jour le graphique lorsque les données changent, sans avoir à recharger 
-        toutes les données.
+        Rafraîchit le graphique en redessinant le canvas.
         """
         self.plot_chart()
         self.canvas.draw_idle()
