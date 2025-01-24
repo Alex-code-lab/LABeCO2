@@ -15,13 +15,13 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 from utils.data_loader import load_data, load_logo, resource_path
-from windows.pie_chart import PieChartWindow
-from windows.bar_chart import BarChartWindow
-from windows.proportional_bar_chart import ProportionalBarChartWindow
+from windows.graphiques.pie_chart import PieChartWindow
+from windows.graphiques.bar_chart import BarChartWindow
+from windows.graphiques.proportional_bar_chart import ProportionalBarChartWindow
 from windows.data_mass_window import DataMassWindow  # Import de DataMassWindow
 from windows.edit_calculation_dialog import EditCalculationDialog  # NOUVEAU IMPORT
-from windows.stacked_bar_consumables import StackedBarConsumablesWindow
-from windows.nacres_bar_chart import NacresBarChartWindow
+from windows.graphiques.stacked_bar_consumables import StackedBarConsumablesWindow
+from windows.graphiques.nacres_bar_chart import NacresBarChartWindow
 
 class MainWindow(QMainWindow):
     """
