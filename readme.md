@@ -320,8 +320,6 @@ Ce projet est sous licence MIT. Veuillez consulter le fichier [LICENSE](./LICENS
 
 ---
 
-Ensemble, travaillons à réduire notre empreinte carbone pour un avenir durable. 🌍
-
 ## Contact
 
 Pour toute question ou suggestion, veuillez contacter Alexandre Souchaud à l’adresse souchaud@bio.ens.psl.eu
