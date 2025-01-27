@@ -198,43 +198,51 @@ Pour visualiser l’impact des consommables par code NACRES, en se basant sur le
 ---
 ## Détails du Code
 
-### Détails du Code
+### 1. Fichier Principal
+**main_window.py**  
+Contient la logique principale de l’application, y compris les classes et méthodes suivantes :
 
-#### 1. Fichier Principal
-**main.py**  
-Contient la logique principale de l’application, y compris les classes suivantes :
-- **MainWindow** : Gère l’interface utilisateur, les interactions, et les calculs d’émissions.
-- **ChartWindow** : Gère la création du graphique en camembert pour visualiser les émissions.
+- **MainWindow** : Gère l’interface utilisateur principale, les interactions utilisateur, et le calcul des émissions de carbone. Elle intègre des fonctionnalités comme l'historique des calculs, la gestion des consommables, et les graphiques interactifs.
 
-#### 2. Fonctionnalités Clés
+### 2. Fonctionnalités Clés
 - **Chargement des Données** :  
-  Utilise la bibliothèque `pandas` pour lire le fichier HDF5 contenant les facteurs d’émission.
-- **Interface avec PyQt5** :  
-  Crée des widgets, des layouts, et connecte les signaux et slots pour interagir avec l’utilisateur de manière fluide.
+  Utilise la classe `DataManager` pour lire et gérer les données issues des fichiers, y compris les facteurs d’émission, les consommables, et les machines.
+- **Interface avec PySide6** :  
+  Crée une interface graphique intuitive avec des widgets, des layouts, et des signaux connectés aux actions de l’utilisateur.
 - **Graphiques avec Matplotlib** :  
-  Génère des visualisations intégrées dans l’interface PyQt5, permettant un affichage interactif et clair des données.
+  Intègre plusieurs types de graphiques interactifs (diagramme en secteurs, barres empilées, barres proportionnelles, etc.) directement dans l’interface utilisateur.
 - **Gestion des Machines** :  
-  Permet d’ajouter des machines personnalisées et de calculer leurs émissions en fonction de leur puissance et de leur temps d’utilisation.
+  Permet de calculer les émissions liées à l’utilisation de machines spécifiques en fonction de leur puissance, temps d’utilisation, et type d’électricité.
 - **Exportation/Importation des Données** :  
-  Sauvegarde les calculs dans un fichier CSV ou charge des données depuis un fichier existant.
+  Sauvegarde l’historique des calculs dans différents formats (CSV, Excel, HDF5) et permet de charger des données existantes pour reprise ou comparaison.
+- **Gestion des Consommables** :  
+  Fournit une interface dédiée à la gestion et à la sélection des consommables, incluant un filtrage basé sur les codes NACRES.
 
-#### Exemple Visuel
+---
 
-##### Classes Principales
+### 3. Exemple Visuel des Classes Principales
+
 | Classe         | Description                                                                 |
 |----------------|-----------------------------------------------------------------------------|
-| **MainWindow** | Gère l’interface principale, les interactions utilisateur, et les calculs. |
-| **ChartWindow**| Crée et affiche des graphiques pour visualiser la répartition des émissions.|
+| **MainWindow** | Gère l'interface utilisateur principale, les sélecteurs de catégories, les calculs et l'affichage des résultats. |
+| **PieChartWindow** | Affiche un diagramme en secteurs pour la répartition des émissions. |
+| **BarChartWindow** | Affiche des graphiques en barres empilées pour les comparaisons de données. |
+| **ProportionalBarChartWindow** | Montre une distribution proportionnelle des émissions par catégorie. |
+| **StackedBarConsumablesWindow** | Compare les consommables en fonction des calculs basés sur leur prix ou leur masse. |
+| **NacresBarChartWindow** | Analyse les consommables selon leur code NACRES et leurs émissions carbone. |
 
-##### Fonctionnalités Clés
+---
+
+### 4. Fonctionnalités Clés
+
 | Fonctionnalité                  | Détail                                                                 |
 |---------------------------------|-----------------------------------------------------------------------|
-| **Chargement des Données**      | Lecture du fichier HDF5 avec les données des facteurs d’émission.     |
-| **Interface PyQt5**             | Widgets, signaux, et layouts pour une utilisation intuitive.          |
-| **Graphiques Matplotlib**       | Création de graphiques interactifs intégrés à l’application.          |
-| **Gestion des Machines**        | Ajout de machines personnalisées pour un calcul précis des émissions.|
-| **Exportation/Importation CSV** | Sauvegarde ou récupération des calculs pour une utilisation flexible. |
-
+| **Chargement des Données**      | Gestion des données via `DataManager`, incluant les facteurs d'émission et les consommables. |
+| **Interface PySide6**           | Création de widgets, gestion de signaux et événements pour une interface fluide et intuitive. |
+| **Graphiques Matplotlib**       | Génération de graphiques interactifs intégrés directement dans l'application. |
+| **Gestion des Machines**        | Calcul précis des émissions pour des machines personnalisées, basé sur leur puissance et leur temps d’utilisation. |
+| **Exportation/Importation CSV** | Sauvegarde ou reprise de l’historique dans des formats flexibles comme CSV, Excel, ou HDF5. |
+| **Consommables et Codes NACRES**| Analyse des consommables avec des graphiques spécifiques pour leurs coûts carbone basés sur leur prix ou leur masse. |
 
 ## Contribuer
 
@@ -258,17 +266,61 @@ git push origin ma-nouvelle-fonctionnalite
 
 ## Licence
 
-Ce projet est sous licence MIT. Veuillez consulter le fichier LICENSE pour plus de détails.
+Ce projet est sous licence MIT. Veuillez consulter le fichier [LICENSE](./LICENSE) pour plus de détails.
 
-Remerciements
+---
 
-	•	Labo 1point5 : Les données utilisées sont issues de la base de données fournie par le collectif Labo 1point5.
-	•	Bibliothèques Open Source :
-	•	PyQt5
-	•	Matplotlib
-	•	Pandas
-	•	NumPy
-	•	AdjustText
+## Remerciements
+
+### Données et Contributions
+
+- **Labo 1point5** : Les données utilisées proviennent de la base de données fournie par le collectif Labo 1point5, visant à réduire l'empreinte carbone dans les laboratoires de recherche.
+- **Bibliothèques Open Source** :
+  - [PySide6](https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/index.html)
+  - [Matplotlib](https://matplotlib.org/)
+  - [Pandas](https://pandas.pydata.org/)
+  - [NumPy](https://numpy.org/)
+  - [AdjustText](https://github.com/Phlya/adjustText)
+
+---
+
+## Sources et Références
+
+### Sources
+
+- **[Base Carbone®](https://base-empreinte.ademe.fr/)**  
+  Source officielle pour les données de l'ADEME (Agence de la Transition Écologique).
+
+- **[Labo 1point5](https://labos1point5.org/)**  
+  Plateforme collaborative pour la réduction de l'empreinte carbone dans les laboratoires de recherche.
+
+- **[PlasticsEurope](https://plasticseurope.org/fr/)**  
+  Organisation représentant les fabricants de plastiques en Europe, fournissant des données sur l'industrie.
+
+- **[OCDE](https://www.oecd.org/fr/data/)**  
+  Organisation de Coopération et de Développement Économiques, base de données sur les indicateurs environnementaux.
+
+- **[440 Megatonnes](https://440megatonnes.ca/fr/insight/mesurer-lempreinte-carbone-du-plastique/)**  
+  Analyse des impacts carbone du plastique.
+
+- **[Ansell - Reducing the impact of disposable glove manufacturing on the environment](https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/safety-briefing-blogs/emea/reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment/safety-briefing_reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment_en.ashx?rev=96e1cea169c54f0b995d5a4c1f2876d0)**  
+  Article d'Ansell discutant des mesures pour réduire l'impact environnemental de la fabrication des gants jetables.
+
+---
+
+### Articles Scientifiques
+
+- **"Using life cycle assessments to guide reduction in the carbon footprint of single-use lab consumables"**  
+  Isabella Ragazzi, publié dans [PLOS](https://doi.org/10.1371/journal.pstr.0000080), septembre 2023.  
+  DOI : [10.1371/journal.pstr.0000080](https://doi.org/10.1371/journal.pstr.0000080).
+
+- **"The environmental impact of personal protective equipment in the UK healthcare system"**  
+  Reed, S. et al., publié dans [Journal of the Royal Society of Medicine](https://journals.sagepub.com/doi/epub/10.1177/01410768211001583), 2021.  
+  DOI : [10.1177/01410768211001583](https://journals.sagepub.com/doi/epub/10.1177/01410768211001583).
+
+---
+
+Ensemble, travaillons à réduire notre empreinte carbone pour un avenir durable. 🌍
 
 ## Contact
 
