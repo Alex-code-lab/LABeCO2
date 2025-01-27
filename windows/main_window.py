@@ -17,14 +17,14 @@ from windows.data_manager import DataManager
 from windows.carbon_calculator import CarbonCalculator
 
 from utils.data_loader import load_logo, resource_path
-from windows.graphiques.pie_chart import PieChartWindow
-from windows.graphiques.bar_chart import BarChartWindow
-from windows.graphiques.proportional_bar_chart import ProportionalBarChartWindow
+from windows.graphiques.graph_1_pie_chart import PieChartWindow
+from windows.graphiques.graph_2_bar_chart import BarChartWindow
+from windows.graphiques.graph_3_proportional_bar_chart import ProportionalBarChartWindow
 from windows.data_mass_window import DataMassWindow
 from windows.edit_calculation_dialog import EditCalculationDialog
-from windows.graphiques.stacked_bar_consumables import StackedBarConsumablesWindow
-from windows.graphiques.nacres_bar_chart import NacresBarChartWindow
-from windows.graphiques.proportional_bar_chart_mass import ProportionalBarChartNacresWindow
+from windows.graphiques.graph_4_stacked_bar_consumables import StackedBarConsumablesWindow
+from windows.graphiques.graph_5_nacres_bar_chart import NacresBarChartWindow
+from windows.graphiques.graph_6_proportional_bar_chart_mass import ProportionalBarChartNacresWindow
 
 class MainWindow(QMainWindow):
     data_changed = Signal()
@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
         self.initUISignals()
         self.update_subcategories()
 
-        self.resize(760, 700)
+        self.resize(780, 700)
         screen = QApplication.primaryScreen()
         screen_size = screen.size()
         self.setMaximumSize(screen_size.width(), screen_size.height())
@@ -469,8 +469,12 @@ class MainWindow(QMainWindow):
         Args:
             main_layout (QVBoxLayout): Le layout principal auquel ajouter les boutons de graphiques.
         """
-        graph_summary_label = QLabel("Générer des résumés graphiques :")
+        graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
         main_layout.addWidget(graph_summary_label)
+
+        graph_line1 = QLabel("Analyse de la consommation carbone basée sur les dépenses monétaires par catégorie d'achat :")
+        main_layout.addWidget(graph_line1)
+
         # Boutons pour les graphiques line 1 (Pie, Bar, Proportional Bar)
         self.generate_pie_button = QPushButton('Diagramme en Secteurs')
         self.generate_pie_button.setToolTip(
@@ -481,7 +485,7 @@ class MainWindow(QMainWindow):
             "Affiche un graphique en barres empilées à 100% pour les émissions totales."
         )
 
-        self.generate_proportional_bar_button = QPushButton('Barres Empilées (prix)')
+        self.generate_proportional_bar_button = QPushButton('Barres Empilées (montétaire/catégorie)')
         self.generate_proportional_bar_button.setToolTip(
             "Affiche un graphique en barres empilées pour les émissions totales."
         )
@@ -493,20 +497,27 @@ class MainWindow(QMainWindow):
         buttons_layout_graph_line1.addWidget(self.generate_proportional_bar_button)
         main_layout.addLayout(buttons_layout_graph_line1)
 
-        # Boutons pour les graphiques line 2 (Stacked Bar, Nacres Bar)
-        self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées (Consommables)")
+        graph_line2 = QLabel("Analyse de la consommation carbone des consommables :")
+        main_layout.addWidget(graph_line2)
+
+        # Boutons pour les graphiques ligne 2 (Stacked Bar, Nacres Bar)
+
+        self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées - Prix vs Masse")
         self.generate_stacked_bar_consumables_button.setToolTip(
-            "Affiche un graphique en barres empilées uniquement pour les consommables à quantité > 0."
+            "Génère un graphique en barres empilées comparant la consommation carbone des consommables, "
+            "calculée en fonction de leur coût monétaire et de leur masse."
         )
 
-        self.generate_nacres_bar_button = QPushButton("Barres NACRES")
+        self.generate_nacres_bar_button = QPushButton("Barres NACRES - Basées sur le Coût")
         self.generate_nacres_bar_button.setToolTip(
-            "Affiche un graphique en barres pour les consommables avec les valeurs NACRES."
+            "Affiche un graphique en barres pour les consommables, montrant leur empreinte carbone "
+            "calculée à partir de leur valeur monétaire, groupée par codes NACRES."
         )
 
-        self.generate_proportional_bar_button_mass = QPushButton('Barres Empilées (Masse)')
+        self.generate_proportional_bar_button_mass = QPushButton('Barres NACRES - Basées sur la Masse')
         self.generate_proportional_bar_button_mass.setToolTip(
-            "Affiche un graphique en barres empilées pour les émissions totales avec un calcul se basant sur la masse."
+            "Affiche un graphique en barres proportionnelles pour les consommables, montrant leur empreinte carbone "
+            "calculée à partir de leur masse, groupée par codes NACRES."
         )
         # Layout pour les boutons de graphiques line 2
         buttons_layout_graph_line2 = QHBoxLayout()

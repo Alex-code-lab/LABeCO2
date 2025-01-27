@@ -6,11 +6,11 @@ Ce calculateur de Bilan Carbone LabeCO2 est une application interactive dévelop
 
 ## Fonctionnalités 
 
-	•	Interface Intuitive : Sélectionnez des catégories, sous-catégories et sous-sous-catégories pour calculer les émissions.
-	•	Ajout de Machines Personnalisées : Calculez les émissions liées à l’utilisation de machines spécifiques en fonction de leur puissance et de leur temps d’utilisation.
-	•	Historique des Calculs : Suivez et modifiez vos calculs précédents pour affiner votre bilan carbone.
-	•	Exportation et Importation des Données : Sauvegardez vos calculs dans un fichier CSV ou importez des données existantes.
-	•	Visualisation Graphique : Génération d’un graphique en camembert interactif pour visualiser la répartition des émissions par catégorie et sous-catégorie.
+- **Interface Intuitive** : Choisissez des catégories pour calculer les émissions.
+- **Ajout de Machines** : Calculez les émissions pour des machines spécifiques en saisissant leur puissance et temps d’utilisation.
+- **Historique des Calculs** : Gérez vos calculs précédents et ajustez-les pour affiner les résultats.
+- **Exportation et Importation** : Exportez vos données en CSV ou importez des données pour reprise.
+- **Graphiques** : Visualisez les émissions avec des graphiques intégrés.
 
 Capture d’écran
 
@@ -23,7 +23,7 @@ Capture d’écran
     <li>Bibliothèques Python :
         <ul>
             <li><span style="color: green;">pandas</span></li>
-            <li><span style="color: green;">PyQt5</span></li>
+            <li><span style="color: green;">PySide6</span></li>
             <li><span style="color: green;">matplotlib</span></li>
             <li><span style="color: green;">numpy</span></li>
             <li><span style="color: green;">adjustText</span></li>
@@ -120,18 +120,82 @@ pip install pandas PyQt5 matplotlib numpy adjustText
     </li>
 </ul>
 
-## Structure du Projet
+## **Structure du projet**
+
 ```python
-calculateur-bilan-carbone/
-├── main.py                         # Fichier principal de l'application
-├── data_base_GES1point5/
-│   └── data_base.hdf5              # Base de données des facteurs d'émission
-├── images/
-│   ├── Logo.png                    # Logo de l'application
-│   └── icon.png                    # Icône de l'application
-├── README.md                       # Documentation du projet
-└── requirements.txt                # Liste des dépendances Python
+LABeCO₂/
+├── main.py                           # Point d'entrée principal
+├── windows/                          # Interface utilisateur et gestionnaires graphiques
+│   ├── main_window.py                # Fenêtre principale
+│   ├── graphiques/                   # Gestion des graphiques
+│   │   ├── bar_chart.py              # Graphiques en barres
+│   │   ├── nacres_bar_chart.py       # Barres pour les codes NACRES
+│   │   ├── proportional_bar_chart.py # Barres proportionnelles
+│   │   ├── stacked_bar_consumables.py# Barres empilées pour consommables
+│   └── data_mass_window.py           # Gestion des données massiques
+├── utils/                            # Fonctions utilitaires
+│   ├── color_utils.py                # Génération de couleurs et nuances
+│   ├── data_loader.py                # Chargement des données
+├── data_base_GES1point5/             # Données des facteurs d’émission
+│   └── data_base.hdf5
+├── images/                           # Fichiers image requis
+│   ├── Logo.png                      # Logo de l'application
+│   └── icon.png                      # Icône de l'application
+├── requirements.txt                  # Liste des dépendances Python
+└── README.md                         # Documentation du projet
 ```
+---
+
+## **Graphiques disponibles**
+
+### 1. **Diagrammes en secteurs**  
+**Description :**  
+Permet d’analyser la répartition des émissions de CO₂e par catégorie. Chaque segment du diagramme représente une proportion des émissions totales, facilitant l’identification des catégories les plus impactantes.  
+**Utilisation typique :**  
+Pour avoir une vue d’ensemble de la contribution des différentes catégories au bilan carbone global.
+
+---
+
+### 2. **Graphiques en barres empilées - Consommables (Quantité > 0)**  
+**Description :**  
+Affiche un graphique en barres empilées pour les consommables ayant une quantité supérieure à 0. Compare les émissions calculées en fonction du prix et de la masse des consommables.  
+**Utilisation typique :**  
+Pour évaluer l'empreinte carbone des consommables et identifier les consommables avec le plus d'impact.
+
+---
+
+### 3. **Graphiques en barres proportionnelles - Distribution par catégorie**  
+**Description :**  
+Montre une distribution proportionnelle des émissions de CO₂e par catégorie. Chaque barre est proportionnelle au total des émissions pour cette catégorie, avec une répartition interne par sous-catégorie.  
+**Utilisation typique :**  
+Pour comparer l'impact total des catégories tout en visualisant leurs proportions internes.
+
+---
+
+### 4. **Graphiques en barres empilées - Masse vs Monétaire**  
+**Description :**  
+Compare les émissions de CO₂e des consommables calculées selon leur coût monétaire et leur masse. Affiche des barres empilées pour chaque consommable, permettant une comparaison directe entre les deux approches de calcul.  
+**Utilisation typique :**  
+Pour comprendre les différences entre les calculs basés sur le coût monétaire et la masse des consommables.
+
+---
+
+### 5. **Graphiques en barres proportionnelles - Masse selon les codes NACRES**  
+**Description :**  
+Affiche un graphique en barres proportionnelles basé sur la masse des consommables, regroupés par leurs codes NACRES (les 4 premiers caractères). Les proportions internes reflètent la répartition des sous-catégories.  
+**Utilisation typique :**  
+Pour analyser l’impact des consommables regroupés par code NACRES, selon leur empreinte carbone basée sur la masse.
+
+---
+
+### 6. **Graphiques en barres empilées - Monétaire selon les codes NACRES**  
+**Description :**  
+Affiche un graphique en barres empilées pour les consommables regroupés par leurs codes NACRES, montrant leur empreinte carbone calculée selon leur coût monétaire.  
+**Utilisation typique :**  
+Pour visualiser l’impact des consommables par code NACRES, en se basant sur leurs coûts.
+
+---
+---
 ## Détails du Code
 
 ### Détails du Code
@@ -170,6 +234,8 @@ Contient la logique principale de l’application, y compris les classes suivant
 | **Graphiques Matplotlib**       | Création de graphiques interactifs intégrés à l’application.          |
 | **Gestion des Machines**        | Ajout de machines personnalisées pour un calcul précis des émissions.|
 | **Exportation/Importation CSV** | Sauvegarde ou récupération des calculs pour une utilisation flexible. |
+
+
 ## Contribuer
 
 Les contributions sont les bienvenues ! Si vous souhaitez améliorer cette application :
