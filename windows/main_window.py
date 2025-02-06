@@ -26,6 +26,8 @@ from windows.graphiques.graph_4_stacked_bar_consumables import StackedBarConsuma
 from windows.graphiques.graph_5_nacres_bar_chart import NacresBarChartWindow
 from windows.graphiques.graph_6_proportional_bar_chart_mass import ProportionalBarChartNacresWindow
 
+
+
 class MainWindow(QMainWindow):
     data_changed = Signal()
 
@@ -95,21 +97,21 @@ class MainWindow(QMainWindow):
         self.quantity_label = None
         self.quantity_input = None
 
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #a9a9a9;
-                border-radius: 4px;
-                padding: 2px 8px;
-                font: system;
-            }
-            QPushButton:hover {
-                background-color: #dde3e8;
-            }
-            QPushButton:pressed {
-                background-color: #b7bcc0;
-            }
-        """)
+        # self.setStyleSheet("""
+        #     QPushButton {
+        #         background-color: #ffffff;
+        #         border: 1px solid #a9a9a9;
+        #         border-radius: 4px;
+        #         padding: 2px 8px;
+        #         font: system;
+        #     }
+        #     QPushButton:hover {
+        #         background-color: #dde3e8;
+        #     }
+        #     QPushButton:pressed {
+        #         background-color: #b7bcc0;
+        #     }
+        # """)
 
         self.initUI()
 
@@ -313,18 +315,18 @@ class MainWindow(QMainWindow):
         self.quantity_input.setVisible(False)
 
         self.manage_consumables_button = QPushButton("Gestion des Consommables")
-        self.manage_consumables_button.setStyleSheet("""
-            QPushButton {
-                text-decoration: underline;
-                color: blue;
-                background: none;
-                border: none;
-                padding: 0;
-            }
-            QPushButton:hover {
-                color: darkblue;
-            }
-        """)
+        # self.manage_consumables_button.setStyleSheet("""
+        #     QPushButton {
+        #         text-decoration: underline;
+        #         color: blue;
+        #         background: none;
+        #         border: none;
+        #         padding: 0;
+        #     }
+        #     QPushButton:hover {
+        #         color: darkblue;
+        #     }
+        # """)
 
         self.input_label = QLabel('Entrez la valeur:')
         self.input_field = QLineEdit()
