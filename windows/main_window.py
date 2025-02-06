@@ -1620,6 +1620,14 @@ class MainWindow(QMainWindow):
                 DOI : <a href="https://journals.sagepub.com/doi/epub/10.1177/01410768211001583">10.1177/01410768211001583</a>.
             </li>
         </ul>
+        <p><b> Crédits :</b></p>
+        <ul>
+            <li>
+                <b><a href="https://www.ilfotografico.net/">Dario Danile</a></b>: Graphiste de l'icône de l'application.
+            </li>
+            <li>
+                <b>Alexandre Souchaud</b> : Codeur de l'application.
+            </li>
         """
         label = QLabel()
         label.setTextFormat(Qt.RichText)

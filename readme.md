@@ -4,15 +4,22 @@
 
 Ce calculateur de Bilan Carbone LabeCO2 est une application interactive développée en Python utilisant PyQt5 pour l’interface graphique. Elle permet de calculer et de visualiser les émissions de CO₂e (équivalent CO₂) liées aux activités de laboratoire. L’objectif est de sensibiliser les utilisateurs à leur empreinte carbone et de les aider à identifier les postes les plus énergivores pour adopter des pratiques plus durables.
 
-## Fonctionnalités 
 
-- **Interface Intuitive** : Choisissez des catégories pour calculer les émissions.
-- **Ajout de Machines** : Calculez les émissions pour des machines spécifiques en saisissant leur puissance et temps d’utilisation.
-- **Historique des Calculs** : Gérez vos calculs précédents et ajustez-les pour affiner les résultats.
-- **Exportation et Importation** : Exportez vos données en CSV ou importez des données pour reprise.
-- **Graphiques** : Visualisez les émissions avec des graphiques intégrés.
+## **Fonctionnalités**
 
-Capture d’écran
+- **Interface intuitive** : Sélectionnez des catégories, sous-catégories et sous-sous-catégories pour calculer vos émissions.
+- **Gestion des machines personnalisées** : Calculez les émissions liées à l’utilisation de machines spécifiques (puissance, temps d’utilisation, type d’électricité).
+- **Visualisation graphique** :
+  - Graphiques en camembert interactifs.
+  - Graphiques en barres empilées et proportionnelles.
+  - Analyse par codes NACRES (4 premiers caractères affichés).
+- **Gestion des données** :
+  - Historique complet des calculs avec possibilité de modification.
+  - Exportation et importation des données (CSV, Excel, HDF5).
+- **Compatibilité avec les codes NACRES** : Analyse des consommables avec une précision accrue.
+- **Références transparentes** : Intégration des bases de données scientifiques pour garantir la fiabilité des résultats.
+
+Ajout de capture d’écran
 
 ## Prérequis
 <ul>
@@ -30,11 +37,15 @@ Capture d’écran
         </ul>
     </li>
 </ul>
+
+
 Pour installer les dépendances : 
 
 ```bash
 pip install -r requirements.txt
 ```
+requirements.txt et autres se retrouvent dans le dossier "instalation". 
+
 
 ## Installation
 
@@ -68,7 +79,7 @@ pip install -r requirements.txt
         <p>Note : Si le fichier <code>requirements.txt</code> n’est pas présent, installez manuellement les bibliothèques nécessaires :</p>
         <pre>
         <code>
-pip install pandas PyQt5 matplotlib numpy adjustText
+pip install pandas PySide6 matplotlib numpy adjustText
 </code>
         </pre>
     </li>
