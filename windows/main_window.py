@@ -97,21 +97,21 @@ class MainWindow(QMainWindow):
         self.quantity_label = None
         self.quantity_input = None
 
-        # self.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #ffffff;
-        #         border: 1px solid #a9a9a9;
-        #         border-radius: 4px;
-        #         padding: 2px 8px;
-        #         font: system;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #dde3e8;
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #b7bcc0;
-        #     }
-        # """)
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                border: 1px solid #a9a9a9;
+                border-radius: 4px;
+                padding: 2px 8px;
+                font: system;
+            }
+            QPushButton:hover {
+                background-color: #dde3e8;
+            }
+            QPushButton:pressed {
+                background-color: #b7bcc0;
+            }
+        """)
 
         self.initUI()
 
@@ -1372,7 +1372,7 @@ class MainWindow(QMainWindow):
         import pandas as pd
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Importer l'historique", "",
-            "Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5);;Tous les fichiers (*)"
+            "Tous les fichiers (*);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5 *.hdf5)"
         )
         if not file_name:
             return
