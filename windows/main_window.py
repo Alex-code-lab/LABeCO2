@@ -228,6 +228,17 @@ class MainWindow(QMainWindow):
         self.header_label.setOpenExternalLinks(False)
         main_layout.addWidget(self.header_label)
 
+        self.add_calcul_button = QPushButton("Ajouter un calcul")
+        self.add_manip_button = QPushButton("Ajouter une manip type")
+        self.add_calcul_button.setFixedHeight(40)
+        self.add_manip_button.setFixedHeight(40)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_calcul_button)
+        button_layout.addWidget(self.add_manip_button)
+
+        main_layout.addLayout(button_layout)
+
     def add_logo(self):
         """
         Ajoute le logo de l'application à l'en-tête.
@@ -350,6 +361,7 @@ class MainWindow(QMainWindow):
         form_layout.addRow(self.conso_filtered_label, conso_layout)
 
         existing_layout = QVBoxLayout()
+        # Ajoute ici le form_layout, les champs et le bouton "Calculer" déjà configurés
         existing_layout.setSpacing(5)
         existing_layout.addLayout(form_layout)
         existing_layout.addWidget(self.quantity_label)
@@ -363,7 +375,22 @@ class MainWindow(QMainWindow):
 
         existing_group = QWidget()
         existing_group.setLayout(existing_layout)
+
         main_layout.addWidget(existing_group)
+        
+        # Liste déroulante pour les manips type (initialement cachée)
+        self.manip_type_label = QLabel("Choisissez une manip type :")
+        self.manip_type_combo = QComboBox()
+        self.manip_type_combo.addItem("Sélectionnez une manip...")
+        self.manip_type_combo.setVisible(False)
+        self.manip_type_label.setVisible(False)
+        # On les ajoute au layout principal
+        main_layout.addWidget(self.manip_type_label)
+        main_layout.addWidget(self.manip_type_combo)
+        
+
+        existing_group.setVisible(False)
+        self.existing_group = existing_group  # Pour pouvoir la montrer plus tard
 
     def initUIMachineSection(self, main_layout):
         """
@@ -538,6 +565,8 @@ class MainWindow(QMainWindow):
         les clics sur les boutons, les changements de texte dans les champs de recherche) aux méthodes correspondantes pour gérer les interactions utilisateur.
         """
         self.header_label.linkActivated.connect(self.toggle_text_display)
+        self.add_calcul_button.clicked.connect(self.show_calcul_section)
+
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
         self.subcategory_combo.currentIndexChanged.connect(self.update_quantity_visibility)
@@ -557,6 +586,7 @@ class MainWindow(QMainWindow):
         self.modify_button.clicked.connect(self.modify_selected_calculation)
         self.export_button.clicked.connect(self.export_data)
         self.import_button.clicked.connect(self.import_data)
+        self.add_manip_button.clicked.connect(self.show_manip_type_section)
 
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
@@ -572,6 +602,46 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
+    def show_manip_type_section(self):
+        """ Affiche la liste déroulante des manips type et masque la section calcul. """
+        self.existing_group.setVisible(False)
+
+        # Retirer `existing_group` du layout pour éviter l'espace vide
+        self.layout().removeWidget(self.existing_group)
+
+        self.manip_type_label.setHidden(False)
+        self.manip_type_combo.setHidden(False)
+
+        self.adjustSize()
+
+    def add_manip_type_to_history(self):
+        """ Ajoute tous les éléments d'une manip type sélectionnée à l'historique. """
+        manip_name = self.manip_type_combo.currentText()
+        if manip_name in self.manips_type:
+            for item in self.manips_type[manip_name]:
+                new_data = {
+                    "category": item["category"],
+                    "subcategory": item["name"],
+                    "value": item["value"],
+                    "unit": item["unit"],
+                    "emissions_price": 0.0,  # Calcul à faire
+                    "emissions_price_error": 0.0,
+                    "emission_mass": 0.0,
+                    "emission_mass_error": 0.0,
+                    "total_mass": 0.0
+                }
+                self.create_or_update_history_item(new_data)
+            self.update_total_emissions()
+
+    def show_calcul_section(self):
+        """ Affiche la section d'ajout de calcul et masque celle des manips type. """
+        self.existing_group.setHidden(False)
+        self.manip_type_label.setHidden(True)
+        self.manip_type_combo.setHidden(True)
+
+        self.existing_group.adjustSize()
+        self.adjustSize()
+
     def on_search_text_changed(self, text):
         """
         Gère l'événement de changement de texte dans le champ de recherche.
