@@ -1,0 +1,136 @@
+# manips_type_db.py
+
+import sqlite3
+import os
+
+class ManipsTypeDB:
+    def __init__(self, db_path='manips_type.sqlite'):
+        """
+        Initialise la connexion SQLite et crée les tables si elles n'existent pas.
+        :param db_path: Chemin du fichier de base de données SQLite.
+        """
+        self.db_path = db_path
+        # Connexion à la base (créée si inexistante)
+        self.conn = sqlite3.connect(self.db_path)
+        # Pour récupérer les lignes sous forme de dictionnaires (clé = nom de colonne)
+        self.conn.row_factory = sqlite3.Row
+        self.create_tables()
+
+    def create_tables(self):
+        """
+        Crée les tables 'manips' et 'manips_items' si elles n'existent pas déjà.
+        La table 'manips' a un champ 'source' pour distinguer les manips "native" vs "user".
+        """
+        create_manips_table = """
+        CREATE TABLE IF NOT EXISTS manips (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'native'
+        );
+        """
+        create_manips_items_table = """
+        CREATE TABLE IF NOT EXISTS manips_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            manip_id INTEGER NOT NULL,
+            category TEXT,
+            subcategory TEXT,
+            name TEXT,
+            value REAL,
+            unit TEXT,
+            FOREIGN KEY (manip_id) REFERENCES manips(id)
+        );
+        """
+
+        cursor = self.conn.cursor()
+        cursor.execute(create_manips_table)
+        cursor.execute(create_manips_items_table)
+        self.conn.commit()
+
+    def add_manip(self, manip_name, items_list, source="native"):
+        """
+        Ajoute une nouvelle manip et ses items dans la base.
+        :param manip_name: str, nom de la manip
+        :param items_list: liste de dictionnaires décrivant les items, ex:
+            [
+              {
+                "category": "Machine",
+                "subcategory": "Microscope",
+                "name": "Microscope 3000",
+                "value": 5.0,
+                "unit": "kWh"
+              },
+              {
+                "category": "Achats",
+                "subcategory": "Pipettes",
+                "name": "Pipettes stériles",
+                "value": 10.0,
+                "unit": "€"
+              }
+            ]
+        :param source: "native" ou "user" par ex. pour distinguer l'origine
+        """
+        cursor = self.conn.cursor()
+        # 1) Insérer la manip dans la table manips
+        cursor.execute("INSERT INTO manips (name, source) VALUES (?, ?)", (manip_name, source))
+        manip_id = cursor.lastrowid  # Récupère l'ID auto-généré pour la manip
+
+        # 2) Insérer chaque item dans la table manips_items
+        for item in items_list:
+            cursor.execute("""
+                INSERT INTO manips_items (manip_id, category, subcategory, name, value, unit)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                manip_id,
+                item.get("category", ""),
+                item.get("subcategory", ""),
+                item.get("name", ""),
+                item.get("value", 0.0),
+                item.get("unit", "")
+            ))
+        self.conn.commit()
+
+    def list_manips(self, source=None):
+        """
+        Retourne la liste des noms de manip disponibles dans la table `manips`.
+        :param source: None, "native", ou "user".
+                       Si None, on retourne toutes les manips; sinon on filtre sur la colonne 'source'.
+        """
+        cursor = self.conn.cursor()
+        if source is None:
+            cursor.execute("SELECT name FROM manips ORDER BY name ASC")
+        else:
+            cursor.execute("SELECT name FROM manips WHERE source = ? ORDER BY name ASC", (source,))
+        rows = cursor.fetchall()
+        return [row["name"] for row in rows]
+
+    def get_manip_items(self, manip_name):
+        """
+        Récupère tous les items d'une manip, identifiée par son nom.
+        Retourne une liste de dict.
+        """
+        cursor = self.conn.cursor()
+        # Récupérer l'ID de la manip via son nom
+        cursor.execute("SELECT id FROM manips WHERE name = ?", (manip_name,))
+        row = cursor.fetchone()
+        if not row:
+            return []  # Si la manip n'existe pas, on renvoie une liste vide
+
+        manip_id = row["id"]
+        # Maintenant on récupère tous les items associés à ce manip_id
+        cursor.execute("""
+            SELECT category, subcategory, name, value, unit
+            FROM manips_items
+            WHERE manip_id = ?
+        """, (manip_id,))
+        rows = cursor.fetchall()
+
+        items = []
+        for r in rows:
+            items.append({
+                "category": r["category"],
+                "subcategory": r["subcategory"],
+                "name": r["name"],
+                "value": r["value"],
+                "unit": r["unit"]
+            })
+        return items

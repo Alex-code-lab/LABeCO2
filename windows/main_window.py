@@ -17,6 +17,7 @@ from windows.data_manager import DataManager
 from windows.carbon_calculator import CarbonCalculator
 
 from utils.data_loader import load_logo, resource_path
+from manips_types.manips_type_db import ManipsTypeDB
 from windows.graphiques.graph_1_pie_chart import PieChartWindow
 from windows.graphiques.graph_2_bar_chart import BarChartWindow
 from windows.graphiques.graph_3_proportional_bar_chart import ProportionalBarChartWindow
@@ -25,6 +26,7 @@ from windows.edit_calculation_dialog import EditCalculationDialog
 from windows.graphiques.graph_4_stacked_bar_consumables import StackedBarConsumablesWindow
 from windows.graphiques.graph_5_nacres_bar_chart import NacresBarChartWindow
 from windows.graphiques.graph_6_proportional_bar_chart_mass import ProportionalBarChartNacresWindow
+from windows.UserManipDialog import UserManipDialog
 
 
 
@@ -46,6 +48,10 @@ class MainWindow(QMainWindow):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.abspath(".")
+        
+        # Chemin de la base de données SQLite pour les manips type
+        db_path = os.path.join(base_path, "./manips_types/manips_type.sqlite")
+        self.manips_db = ManipsTypeDB(db_path=db_path)
 
         try:
             self.data_manager = DataManager(base_path)
@@ -378,16 +384,27 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(existing_group)
         
+        
         # Liste déroulante pour les manips type (initialement cachée)
         self.manip_type_label = QLabel("Choisissez une manip type :")
         self.manip_type_combo = QComboBox()
         self.manip_type_combo.addItem("Sélectionnez une manip...")
+        # On récupère toutes les manips existantes en base (natives + user)
+        manip_names = self.manips_db.list_manips()
+        for mn in manip_names:
+            self.manip_type_combo.addItem(mn)
+        self.add_manip_type_button = QPushButton("Ajouter la manip sélectionnée")
+
+        # Par défaut, on masque les 3 widgets
         self.manip_type_combo.setVisible(False)
         self.manip_type_label.setVisible(False)
+        self.add_manip_type_button.setVisible(False)
         # On les ajoute au layout principal
         main_layout.addWidget(self.manip_type_label)
         main_layout.addWidget(self.manip_type_combo)
+        main_layout.addWidget(self.add_manip_type_button)
         
+        self.refresh_manip_type_combo()
 
         existing_group.setVisible(False)
         self.existing_group = existing_group  # Pour pouvoir la montrer plus tard
@@ -484,6 +501,9 @@ class MainWindow(QMainWindow):
         buttons_group_layout.setSpacing(0)
         buttons_group_layout.addLayout(calc_buttons_layout)
         buttons_group_layout.addLayout(export_import_layout)
+
+        self.create_user_manip_button = QPushButton("Définir une manip type d'utilisateur")
+        buttons_group_layout.addWidget(self.create_user_manip_button)
 
         main_layout.addLayout(buttons_group_layout)
         main_layout.addSpacing(5)
@@ -586,6 +606,7 @@ class MainWindow(QMainWindow):
         self.modify_button.clicked.connect(self.modify_selected_calculation)
         self.export_button.clicked.connect(self.export_data)
         self.import_button.clicked.connect(self.import_data)
+        self.create_user_manip_button.clicked.connect(self.define_user_manip_from_history)
         self.add_manip_button.clicked.connect(self.show_manip_type_section)
 
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
@@ -599,6 +620,7 @@ class MainWindow(QMainWindow):
         self.add_machine_button.clicked.connect(self.add_machine)
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
 
+        self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
@@ -611,33 +633,46 @@ class MainWindow(QMainWindow):
 
         self.manip_type_label.setHidden(False)
         self.manip_type_combo.setHidden(False)
+        self.add_manip_type_button.setVisible(True)  # Rendre visible uniquement pour les manips type
 
         self.adjustSize()
 
     def add_manip_type_to_history(self):
         """ Ajoute tous les éléments d'une manip type sélectionnée à l'historique. """
         manip_name = self.manip_type_combo.currentText()
-        if manip_name in self.manips_type:
-            for item in self.manips_type[manip_name]:
-                new_data = {
-                    "category": item["category"],
-                    "subcategory": item["name"],
-                    "value": item["value"],
-                    "unit": item["unit"],
-                    "emissions_price": 0.0,  # Calcul à faire
-                    "emissions_price_error": 0.0,
-                    "emission_mass": 0.0,
-                    "emission_mass_error": 0.0,
-                    "total_mass": 0.0
-                }
-                self.create_or_update_history_item(new_data)
-            self.update_total_emissions()
+        if manip_name == "Sélectionnez une manip...":
+            return  # L'utilisateur n'a pas choisi de manip réelle
+
+        # Récupère les items de la manip dans la DB
+        items = self.manips_db.get_manip_items(manip_name)
+        if not items:
+            QMessageBox.warning(self, "Erreur", f"Aucun item trouvé pour la manip '{manip_name}'.")
+            return
+
+        # Pour chaque item de la manip, on crée une ligne dans l'historique
+        for item in items:
+            new_data = {
+                "category": item["category"],
+                "subcategory": item["subcategory"],
+                "value": item["value"],
+                "unit": item["unit"],
+                "emissions_price": 0.0,       # On pourra faire un calcul plus tard
+                "emissions_price_error": 0.0,
+                "emission_mass": 0.0,
+                "emission_mass_error": 0.0,
+                "total_mass": 0.0,
+                "name": item["name"],        # Nom de l'item
+            }
+            self.create_or_update_history_item(new_data)
+
+        self.update_total_emissions()
 
     def show_calcul_section(self):
         """ Affiche la section d'ajout de calcul et masque celle des manips type. """
         self.existing_group.setHidden(False)
         self.manip_type_label.setHidden(True)
         self.manip_type_combo.setHidden(True)
+        self.add_manip_type_button.setHidden(True)
 
         self.existing_group.adjustSize()
         self.adjustSize()
@@ -1078,6 +1113,70 @@ class MainWindow(QMainWindow):
             subsub, name = '', subsub_name
         return subsub.strip(), name.strip()
     
+    def define_user_manip_from_history(self):
+        # 1) Vérifier si des éléments sont sélectionnés
+        selected_items = self.history_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(
+                self,
+                "Aucun item sélectionné",
+                "Pour définir une manip type :\n"
+                "1) Sélectionnez les éléments dans l'historique.\n"
+                "2) Puis cliquez à nouveau sur ce bouton et entrez un nom.\n\n"
+                "La nouvelle manip apparaîtra ensuite dans «Ajouter une manip type»."
+            )
+            return  # On arrête là si rien n'est sélectionné
+
+        # 2) Si des éléments sont bien sélectionnés, on affiche le QDialog pour saisir le nom
+        dialog = UserManipDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            manip_name = dialog.get_manip_name()
+            if not manip_name.strip():
+                return  # L'utilisateur a cliqué sur OK mais n'a rien saisi
+
+            # 3) Construire la liste des items à partir de la sélection
+            items_list = []
+            for lw_item in selected_items:
+                data = lw_item.data(Qt.UserRole)
+                if not data:
+                    continue
+                items_list.append({
+                    "category": data.get("category", ""),
+                    "subcategory": data.get("subcategory", ""),
+                    "name": data.get("name", ""),
+                    "value": data.get("value", 0.0),
+                    "unit": data.get("unit", "")
+                })
+
+            if not items_list:
+                QMessageBox.warning(
+                    self, 
+                    "Aucun item valide", 
+                    "Les éléments sélectionnés sont vides ou invalides."
+                )
+                return
+
+            # 4) Ajouter la manip en base (source = "user")
+            try:
+                self.manips_db.add_manip(manip_name, items_list, source="user")
+                QMessageBox.information(
+                    self, 
+                    "Manip ajoutée", 
+                    f"La manip «{manip_name}» a bien été ajoutée dans la base (source=user)."
+                )
+                self.refresh_manip_type_combo()
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Impossible d'ajouter la manip : {e}")
+
+    def refresh_manip_type_combo(self):
+        # Nettoyer la combo existante
+        self.manip_type_combo.clear()
+        self.manip_type_combo.addItem("Sélectionnez une manip...")
+
+        # Re-lister depuis la base
+        manip_names = self.manips_db.list_manips()
+        for mn in manip_names:
+            self.manip_type_combo.addItem(mn)
     # ------------------------------------------------------------------
     # Calculs d'émissions
     # ------------------------------------------------------------------
