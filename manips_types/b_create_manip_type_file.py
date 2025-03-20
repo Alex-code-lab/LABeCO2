@@ -1,4 +1,4 @@
-from manips_type_db import ManipsTypeDB
+from a_manips_type_db import ManipsTypeDB
 
 db = ManipsTypeDB('manips_types/manips_type.sqlite')
 

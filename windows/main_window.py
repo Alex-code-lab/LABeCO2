@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
     QInputDialog, QFormLayout, QFileDialog, QDialog, QDialogButtonBox,
-    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem
+    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem, QAbstractItemView
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QIntValidator
@@ -17,7 +17,7 @@ from windows.data_manager import DataManager
 from windows.carbon_calculator import CarbonCalculator
 
 from utils.data_loader import load_logo, resource_path
-from manips_types.manips_type_db import ManipsTypeDB
+from manips_types.a_manips_type_db import ManipsTypeDB
 from windows.graphiques.graph_1_pie_chart import PieChartWindow
 from windows.graphiques.graph_2_bar_chart import BarChartWindow
 from windows.graphiques.graph_3_proportional_bar_chart import ProportionalBarChartWindow
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
         screen = QApplication.primaryScreen()
         screen_size = screen.size()
         self.setMaximumSize(screen_size.width(), screen_size.height())
-        self.setMinimumSize(700, 700)
+        self.setMinimumSize(780, 700)
 
     def initUIHeader(self, main_layout):
         """
@@ -472,7 +472,10 @@ class MainWindow(QMainWindow):
         self.history_label = QLabel('Historique des calculs:')
         main_layout.addWidget(self.history_label)
 
+        # self.history_list = QListWidget()
         self.history_list = QListWidget()
+        # self.history_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.history_list.setSelectionMode(QAbstractItemView.MultiSelection)
         self.history_list.setMaximumHeight(100)
 
         history_scroll = QScrollArea()
@@ -481,7 +484,7 @@ class MainWindow(QMainWindow):
         history_scroll.setFixedHeight(100)
         main_layout.addWidget(history_scroll)
 
-        self.delete_button = QPushButton('Supprimer le calcul sélectionné')
+        self.delete_button = QPushButton('Supprimer le(s) calcul(s) sélectionné(s)')
         self.modify_button = QPushButton('Modifier le calcul sélectionné')
 
         calc_buttons_layout = QHBoxLayout()
@@ -635,36 +638,59 @@ class MainWindow(QMainWindow):
         self.manip_type_combo.setHidden(False)
         self.add_manip_type_button.setVisible(True)  # Rendre visible uniquement pour les manips type
 
-        self.adjustSize()
+        # self.adjustSize()
 
     def add_manip_type_to_history(self):
-        """ Ajoute tous les éléments d'une manip type sélectionnée à l'historique. """
-        manip_name = self.manip_type_combo.currentText()
-        if manip_name == "Sélectionnez une manip...":
-            return  # L'utilisateur n'a pas choisi de manip réelle
+        """
+        Ajoute tous les éléments (items) de la manipulation sélectionnée
+        dans la liste déroulante (self.manip_type_combo) à l'historique.
 
-        # Récupère les items de la manip dans la DB
+        Étapes :
+        1. Vérifier si l'utilisateur a réellement choisi une manip (et pas l'entrée par défaut).
+        2. Récupérer le nom de la manip depuis la combo box.
+        3. Obtenir tous les 'items' associés à cette manip dans la base SQLite (manips_items).
+        4. Pour chaque item, créer un 'new_data' et l'ajouter à l'historique via create_or_update_history_item().
+        5. Mettre à jour l'affichage global des émissions (update_total_emissions()).
+        """
+
+        # 1) Récupère l'index actuellement sélectionné dans la combo
+        current_idx = self.manip_type_combo.currentIndex()
+
+        # Si current_idx <= 0, ça veut dire qu'on est sur l'entrée "Sélectionnez une manip..." ou rien de sélectionné
+        if current_idx <= 0:
+            return  # On arrête la fonction, car rien n'a été vraiment choisi
+
+        # 2) Récupère le vrai nom de la manip stocké en "userData"
+        #    (Si tu n'utilises pas userData, tu peux simplement faire 'manip_name = self.manip_type_combo.currentText()')
+        manip_name = self.manip_type_combo.itemData(current_idx)
+        if not manip_name:
+            return  # Aucun nom récupéré => on arrête
+
+        # 3) Récupère tous les items de cette manip depuis la base (table manips_items)
+        #    Si la manip n'existe pas en base ou est vide, on prévient l'utilisateur
         items = self.manips_db.get_manip_items(manip_name)
         if not items:
             QMessageBox.warning(self, "Erreur", f"Aucun item trouvé pour la manip '{manip_name}'.")
             return
 
-        # Pour chaque item de la manip, on crée une ligne dans l'historique
+        # 4) Pour chaque item, on crée un 'new_data' adapté à l'historique,
+        #    puis on l'insère dans la liste via create_or_update_history_item().
         for item in items:
             new_data = {
-                "category": item["category"],
-                "subcategory": item["subcategory"],
-                "value": item["value"],
-                "unit": item["unit"],
-                "emissions_price": 0.0,       # On pourra faire un calcul plus tard
+                "category": item["category"],      # Catégorie générale (Achats, Machine, etc.)
+                "subcategory": item["subcategory"],# Sous-catégorie
+                "value": item["value"],            # Valeur chiffrée (ex: 5.0, 10.0, etc.)
+                "unit": item["unit"],              # Unité correspondante (kWh, €, etc.)
+                "emissions_price": 0.0,            # Par défaut à 0, recalculable plus tard
                 "emissions_price_error": 0.0,
                 "emission_mass": 0.0,
                 "emission_mass_error": 0.0,
                 "total_mass": 0.0,
-                "name": item["name"],        # Nom de l'item
+                "name": item["name"],              # Nom de l'item (ex: "Microscope 3000")
             }
             self.create_or_update_history_item(new_data)
 
+        # 5) Met à jour l'affichage du total des émissions dans la zone de résultat
         self.update_total_emissions()
 
     def show_calcul_section(self):
@@ -675,7 +701,7 @@ class MainWindow(QMainWindow):
         self.add_manip_type_button.setHidden(True)
 
         self.existing_group.adjustSize()
-        self.adjustSize()
+        # self.adjustSize()
 
     def on_search_text_changed(self, text):
         """
@@ -1169,14 +1195,22 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", f"Impossible d'ajouter la manip : {e}")
 
     def refresh_manip_type_combo(self):
-        # Nettoyer la combo existante
+        # On vide la combo
         self.manip_type_combo.clear()
         self.manip_type_combo.addItem("Sélectionnez une manip...")
 
-        # Re-lister depuis la base
-        manip_names = self.manips_db.list_manips()
-        for mn in manip_names:
-            self.manip_type_combo.addItem(mn)
+        # On récupère la liste complète (avec id, name, source)
+        manip_list = self.manips_db.list_manips_with_id()
+
+        # On boucle sur chaque manip
+        for m in manip_list:
+            # Le texte qu'on veut afficher
+            display_text = f"{m['name']} - {m['source']}"
+            
+            # On ajoute l'item dans la combo
+            # - `display_text` est ce que l'utilisateur voit,
+            # - `m['name']` est stocké dans l'UserRole pour un usage ultérieur
+            self.manip_type_combo.addItem(display_text, userData=m['name'])
     # ------------------------------------------------------------------
     # Calculs d'émissions
     # ------------------------------------------------------------------
@@ -1479,11 +1513,16 @@ class MainWindow(QMainWindow):
 
         Retire l'élément sélectionné de la liste historique et met à jour le total des émissions.
         """
-        sel_row = self.history_list.currentRow()
-        if sel_row >= 0:
-            self.history_list.takeItem(sel_row)
-            self.update_total_emissions()
-            self.data_changed.emit()
+        selected_items = self.history_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un ou plusieurs calculs à supprimer.")
+            return
+
+        for item in selected_items:
+            self.history_list.takeItem(self.history_list.row(item))
+
+        self.update_total_emissions()
+        self.data_changed.emit()
 
     def export_data(self):
         """

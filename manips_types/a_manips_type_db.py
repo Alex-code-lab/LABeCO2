@@ -88,6 +88,43 @@ class ManipsTypeDB:
                 item.get("unit", "")
             ))
         self.conn.commit()
+    
+    def update_manip_name(self, manip_id, new_name):
+        """
+        Met à jour le nom d'une manip existante.
+        :param manip_id: int, l'ID de la manip à modifier
+        :param new_name: str, le nouveau nom
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE manips
+            SET name = ?
+            WHERE id = ?
+        """, (new_name, manip_id))
+        self.conn.commit()
+
+    def update_manip_source(self, manip_id, new_source):
+        """
+        Met à jour la source d'une manip existante ('user', 'native', etc.).
+        :param manip_id: int, l'ID de la manip à modifier
+        :param new_source: str, la nouvelle source
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE manips
+            SET source = ?
+            WHERE id = ?
+        """, (new_source, manip_id))
+        self.conn.commit()
+
+    def list_manips_with_id(self):
+        """
+        Retourne la liste (id, name, source) de toutes les manips, classées par id.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, name, source FROM manips ORDER BY id ASC")
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
 
     def list_manips(self, source=None):
         """
