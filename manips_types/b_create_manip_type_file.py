@@ -9,6 +9,7 @@ db.add_manip(
         {
             "category": "Machine",
             "subcategory": "Microscope",
+            "subsubcategory": "KC21 - Litiere",
             "name": "Microscope 3000",
             "value": 5.0,
             "unit": "kWh"
@@ -16,6 +17,7 @@ db.add_manip(
         {
             "category": "Achats",
             "subcategory": "Pipettes",
+            "subsubcategory": "LA11 - Vaccins",
             "name": "Pipettes stériles",
             "value": 10.0,
             "unit": "€"

@@ -34,6 +34,7 @@ class ManipsTypeDB:
             manip_id INTEGER NOT NULL,
             category TEXT,
             subcategory TEXT,
+            subsubcategory TEXT, 
             name TEXT,
             value REAL,
             unit TEXT,
@@ -55,6 +56,7 @@ class ManipsTypeDB:
               {
                 "category": "Machine",
                 "subcategory": "Microscope",
+                "subsubcategory": "KC21 - Litiere",
                 "name": "Microscope 3000",
                 "value": 5.0,
                 "unit": "kWh"
@@ -62,6 +64,7 @@ class ManipsTypeDB:
               {
                 "category": "Achats",
                 "subcategory": "Pipettes",
+                "subsubcategory": "LA11 - Vaccins",
                 "name": "Pipettes stériles",
                 "value": 10.0,
                 "unit": "€"
@@ -77,12 +80,14 @@ class ManipsTypeDB:
         # 2) Insérer chaque item dans la table manips_items
         for item in items_list:
             cursor.execute("""
-                INSERT INTO manips_items (manip_id, category, subcategory, name, value, unit)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO manips_items 
+                    (manip_id, category, subcategory, subsubcategory, name, value, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 manip_id,
                 item.get("category", ""),
                 item.get("subcategory", ""),
+                item.get("subsubcategory", ""),  # On récupère subsubcategory
                 item.get("name", ""),
                 item.get("value", 0.0),
                 item.get("unit", "")
@@ -155,7 +160,7 @@ class ManipsTypeDB:
         manip_id = row["id"]
         # Maintenant on récupère tous les items associés à ce manip_id
         cursor.execute("""
-            SELECT category, subcategory, name, value, unit
+            SELECT category, subcategory, subsubcategory, name, value, unit
             FROM manips_items
             WHERE manip_id = ?
         """, (manip_id,))
@@ -166,6 +171,7 @@ class ManipsTypeDB:
             items.append({
                 "category": r["category"],
                 "subcategory": r["subcategory"],
+                "subsubcategory": r["subsubcategory"],
                 "name": r["name"],
                 "value": r["value"],
                 "unit": r["unit"]

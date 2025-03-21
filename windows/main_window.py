@@ -623,6 +623,8 @@ class MainWindow(QMainWindow):
         self.add_machine_button.clicked.connect(self.add_machine)
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
 
+        self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
+        
         self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
@@ -679,15 +681,38 @@ class MainWindow(QMainWindow):
             new_data = {
                 "category": item["category"],      # Catégorie générale (Achats, Machine, etc.)
                 "subcategory": item["subcategory"],# Sous-catégorie
+                "subsubcategory": item["subsubcategory"],  # Sous-sous-catégorie
                 "value": item["value"],            # Valeur chiffrée (ex: 5.0, 10.0, etc.)
                 "unit": item["unit"],              # Unité correspondante (kWh, €, etc.)
-                "emissions_price": 0.0,            # Par défaut à 0, recalculable plus tard
-                "emissions_price_error": 0.0,
-                "emission_mass": 0.0,
-                "emission_mass_error": 0.0,
-                "total_mass": 0.0,
+                "days": item.get("days", 0),       # Par défaut à 0, recalculable plus tard
+                "year": item.get("year", 0),       # Par défaut à 0, recalculable plus tard
+                # "emissions_price": 0.0,            # Par défaut à 0, recalculable plus tard
+                # "emissions_price_error": 0.0,
+                # "emission_mass": 0.0,
+                # "emission_mass_error": 0.0,
+                # "total_mass": 0.0,
                 "name": item["name"],              # Nom de l'item (ex: "Microscope 3000")
             }
+            print("Item -->", new_data)
+            # 2a) Recalcule les émissions via la logique existante
+            # Tu peux appeler ta fonction interne 'calculate_emission_for_one_item(new_data)'
+            # ou faire self.carbon_calculator.calculateCarbone(new_data). 
+            # EXEMPLE (à adapter selon ton code):
+            # On calcule les émissions avec compute_emission_data
+            ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(new_data)
+
+            # Si tu souhaites gérer un message d’erreur :
+            if msg:
+                QMessageBox.warning(self, "Erreur de calcul : fin de lajout", msg)
+                return  # ou return, selon ta logique
+
+            # On stocke ces résultats dans new_data pour les sauvegarder ensuite
+            new_data["emissions_price"] = ep
+            new_data["emissions_price_error"] = ep_err
+            new_data["emission_mass"] = em
+            new_data["emission_mass_error"] = em_err
+            new_data["total_mass"] = tm
+
             self.create_or_update_history_item(new_data)
 
         # 5) Met à jour l'affichage du total des émissions dans la zone de résultat
@@ -1139,6 +1164,11 @@ class MainWindow(QMainWindow):
             subsub, name = '', subsub_name
         return subsub.strip(), name.strip()
     
+    def open_data_mass_window(self):
+        # On ouvre la fenêtre DataMassWindow
+        self.data_mass_window = DataMassWindow(parent=self, data_materials=self.data_materials)
+        self.data_mass_window.show()
+    
     def define_user_manip_from_history(self):
         # 1) Vérifier si des éléments sont sélectionnés
         selected_items = self.history_list.selectedItems()
@@ -1169,6 +1199,9 @@ class MainWindow(QMainWindow):
                 items_list.append({
                     "category": data.get("category", ""),
                     "subcategory": data.get("subcategory", ""),
+                    "subsubcategory": data.get("subsubcategory", ""),
+                    "year": data.get("year", 0),
+                    "days": data.get("days", 0),
                     "name": data.get("name", ""),
                     "value": data.get("value", 0.0),
                     "unit": data.get("unit", "")

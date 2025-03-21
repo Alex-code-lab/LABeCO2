@@ -26,7 +26,9 @@ class DataMassWindow(QMainWindow):
                         "Code NACRES",
                         "Masse unitaire (g)",
                         "Matériau",
-                        "Source/Signature"]
+                        "Source/Signature",
+                        # "Provenance"
+                        ]
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
