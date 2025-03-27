@@ -1,5 +1,3 @@
-# windows/data_mass_window.py
-
 import os
 import pandas as pd
 from PySide6.QtWidgets import (
@@ -17,18 +15,21 @@ class DataMassWindow(QMainWindow):
 
         self.setWindowTitle("Gestion des consommables")
         self.setGeometry(100, 100, 600, 400)
+        self.nacres_hdf5_file = "./data_masse_eCO2/nacres_2022.h5"  # or adapt path
+        self._all_nacres = []  # Will store (code, description)
 
         # Nom du fichier HDF5
         self.hdf5_file = "./data_masse_eCO2/data_eCO2_masse_consommable.hdf5"
 
-        self.columns = ["Consommable",
-                        "Référence",
-                        "Code NACRES",
-                        "Masse unitaire (g)",
-                        "Matériau",
-                        "Source/Signature",
-                        # "Provenance"
-                        ]
+        self.columns = [
+            "Consommable",
+            "Marque",
+            "Référence",
+            "Code NACRES",
+            "Masse unitaire (g)",
+            "Matériau",
+            "Source/Signature",
+        ]
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
@@ -50,6 +51,7 @@ class DataMassWindow(QMainWindow):
         else:
             data = pd.DataFrame([{
                 "Consommable": "Tube Falcon 15ml",
+                "Marque": "N/A",
                 "Référence": "N/A",
                 "Code NACRES": "NB13",
                 "Masse unitaire (g)": 6.7,
@@ -78,24 +80,40 @@ class DataMassWindow(QMainWindow):
 
         form_layout = QFormLayout()
         self.nom_input = QLineEdit()
+        self.brand_input = QLineEdit()
         self.ref_input = QLineEdit()
-        self.nacres_input = QLineEdit()
+
+        # Instead of form_layout.addRow("Code NACRES:", self.nacres_input)
+        self.nacres_combo = QComboBox()
+        nacres_layout = QVBoxLayout()
+        nacres_layout.addWidget(self.nacres_combo)
+
+        search_layout = QHBoxLayout()
+        search_label = QLabel("Rechercher un code NACRES:")
+        search_layout.addWidget(search_label)
+        self.nacres_search = QLineEdit()
+        search_layout.addWidget(self.nacres_search)
+
+        nacres_layout.addLayout(search_layout)
+        form_layout.addRow("Code NACRES:", nacres_layout)
+
         self.masse_input = QLineEdit()
 
         # Peupler la liste des matériaux depuis data_materials
-        self.materiau_combo = QComboBox()
         if self.data_materials is not None:
             mats = self.data_materials['Materiau'].dropna().unique().tolist()
+            self.materiau_combo = QComboBox()
             self.materiau_combo.addItems(mats)
         else:
             # Liste statique de secours
+            self.materiau_combo = QComboBox()
             self.materiau_combo.addItems(["Polypropylène (PP)", "Polyéthylène (PE)"])
 
         self.source_input = QLineEdit()
 
         form_layout.addRow("Consommable:", self.nom_input)
+        form_layout.addRow("Marque:", self.brand_input)
         form_layout.addRow("Référence:", self.ref_input)
-        form_layout.addRow("Code NACRES:", self.nacres_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
         form_layout.addRow("Matériau:", self.materiau_combo)
         form_layout.addRow("Source/Signature:", self.source_input)
@@ -109,7 +127,6 @@ class DataMassWindow(QMainWindow):
         self.display_button = QPushButton("Actualiser les données")
         self.display_button.clicked.connect(self.afficher_donnees)
         main_layout.addWidget(self.display_button)
-
 
         # Tableau des données
         self.table = QTableWidget()
@@ -132,6 +149,33 @@ class DataMassWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        self.nacres_search.textChanged.connect(self.filter_nacres_list)
+        self.load_nacres_list()
+
+    def load_nacres_list(self):
+        if not os.path.exists(self.nacres_hdf5_file):
+            print(f"[INFO] Fichier '{self.nacres_hdf5_file}' introuvable.")
+            return
+
+        try:
+            df_nacres = pd.read_hdf(self.nacres_hdf5_file)
+            self._all_nacres = []
+            for _, row in df_nacres.iterrows():
+                code = str(row.iloc[0])
+                desc = str(row.iloc[1])
+                self._all_nacres.append((code, desc))
+            self.filter_nacres_list()
+        except Exception as e:
+            print(f"[ERROR] Impossible de charger la liste NACRES: {e}")
+
+    def filter_nacres_list(self):
+        search_text = self.nacres_search.text().strip().lower()
+        self.nacres_combo.clear()
+        for (code, desc) in self._all_nacres:
+            if search_text in code.lower() or search_text in desc.lower():
+                display_text = f"{code} - {desc}"
+                self.nacres_combo.addItem(display_text, code)
+
     def verifier_existence_objet(self, nom, reference, code_nacres):
         if not self.data[self.data["Consommable"] == nom].empty:
             return f"Un objet avec le nom '{nom}' existe déjà."
@@ -143,13 +187,14 @@ class DataMassWindow(QMainWindow):
 
     def ajouter_objet_utilisateur(self):
         nom = self.nom_input.text().strip()
+        marque = self.brand_input.text().strip()
         reference = self.ref_input.text().strip()
-        nacres = self.nacres_input.text().strip()
+        nacres = self.nacres_combo.currentData()
         masse_str = self.masse_input.text().strip().replace(',', '.')
         materiau = self.materiau_combo.currentText()
         source = self.source_input.text().strip()
 
-        if not nom or not reference or not materiau or not source or not nacres:
+        if not nom or not marque or not reference or not materiau or not source or not nacres:
             QMessageBox.warning(self, "Erreur", "Tous les champs doivent être remplis.")
             return
 
@@ -166,6 +211,7 @@ class DataMassWindow(QMainWindow):
 
         nouvel_objet = {
             "Consommable": nom,
+            "Marque": marque,
             "Référence": reference,
             "Code NACRES": nacres,
             "Masse unitaire (g)": masse,
@@ -179,11 +225,12 @@ class DataMassWindow(QMainWindow):
 
         # Efface les champs
         self.nom_input.clear()
+        self.brand_input.clear()
         self.ref_input.clear()
-        self.nacres_input.clear()
         self.masse_input.clear()
         self.materiau_combo.setCurrentIndex(0)
         self.source_input.clear()
+        self.nacres_combo.setCurrentIndex(-1)
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
         self.data_added.emit()

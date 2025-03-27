@@ -33,7 +33,8 @@ class CarbonCalculator:
         code_nacres    = data_dict.get('code_nacres', 'NA')
         consommable    = data_dict.get('consommable', 'NA')
         quantity       = int(data_dict.get('quantity', 0))
-
+        print("carbon calculator infos")
+        print(category, subcat, subsub, name, year, val, days, code_nacres, consommable, quantity)
         # Valeurs de sortie par défaut
         ep = 0.0
         ep_err = 0.0

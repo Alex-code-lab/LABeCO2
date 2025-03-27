@@ -17,6 +17,8 @@ class MainWindow(QMainWindow):
 
         # 1) Dossier de base : on part du répertoire courant
         base_dir = os.path.abspath(os.getcwd())
+        self.nacres_hdf5_file = os.path.join(base_dir, 'data_masse_eCO2', 'nacres_2022.h5')
+        self._all_nacres = []  # List of (code, description) tuples
 
         # 2) Chemins vers les fichiers HDF5
         #    Adapte si ton répertoire n'est pas celui-ci
@@ -89,6 +91,31 @@ class MainWindow(QMainWindow):
             print(f"[ERROR] Impossible de charger la liste des matériaux : {e}")
             return []
 
+    def load_nacres_list(self):
+        if not os.path.exists(self.nacres_hdf5_file):
+            print(f"[INFO] Fichier {self.nacres_hdf5_file} introuvable. Impossible de charger la liste NACRES.")
+            return
+
+        try:
+            df_nacres = pd.read_hdf(self.nacres_hdf5_file)
+            self._all_nacres = []
+            for _, row in df_nacres.iterrows():
+                code = str(row.iloc[0])
+                desc = str(row.iloc[1])
+                self._all_nacres.append((code, desc))
+            self.filter_nacres_list()  # Populate the combo box for the first time
+        except Exception as e:
+            print(f"[ERROR] Impossible de charger la liste NACRES : {e}")
+
+    def filter_nacres_list(self):
+        search_text = self.nacre_search.text().strip().lower()
+        self.nacre_combo.clear()
+
+        for (code, desc) in self._all_nacres:
+            if search_text in code.lower() or search_text in desc.lower():
+                display_text = f"{code} - {desc}"
+                self.nacre_combo.addItem(display_text, code)
+
     def init_ui(self):
         """Construit la fenêtre PySide6 : form + table."""
         # Layout principal
@@ -100,16 +127,27 @@ class MainWindow(QMainWindow):
         self.nom_input = QLineEdit()
         self.brand_input = QLineEdit()
         self.ref_input = QLineEdit()
-        self.nacre_input = QLineEdit()
         self.masse_input = QLineEdit()
         self.materiau_combo = QComboBox()
         self.materiau_combo.addItems(self.materials)
         self.source_input = QLineEdit()
-
+        self.nacre_combo = QComboBox()
         form_layout.addRow("Consommable :", self.nom_input)
         form_layout.addRow("Marque :", self.brand_input)
         form_layout.addRow("Référence :", self.ref_input)
-        form_layout.addRow("Code NACRES :", self.nacre_input)
+
+        nacre_layout = QVBoxLayout()
+        nacre_layout.addWidget(self.nacre_combo)
+
+        search_layout = QVBoxLayout()
+        search_label = QLabel("Rechercher un code NACRES :")
+        search_layout.addWidget(search_label)
+        self.nacre_search = QLineEdit()
+        search_layout.addWidget(self.nacre_search)
+
+        nacre_layout.addLayout(search_layout)
+        form_layout.addRow("Code NACRES :", nacre_layout)
+
         form_layout.addRow("Masse unitaire (g) :", self.masse_input)
         form_layout.addRow("Matériau :", self.materiau_combo)
         form_layout.addRow("Source/Signature :", self.source_input)
@@ -138,7 +176,11 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        # Connect the search bar
+        self.nacre_search.textChanged.connect(self.filter_nacres_list)
+
         # Après la création de l'interface, on montre les données existantes
+        self.load_nacres_list()
         self.afficher_donnees()
 
     def ajouter_objet(self):
@@ -149,13 +191,16 @@ class MainWindow(QMainWindow):
         nom = self.nom_input.text().strip()
         marque = self.brand_input.text().strip()
         reference = self.ref_input.text().strip()
-        nacre = self.nacre_input.text().strip()
         masse_str = self.masse_input.text().replace(',', '.').strip()
         materiau = self.materiau_combo.currentText()
         source = self.source_input.text().strip()
+        nacre = self.nacre_combo.currentData()
+        if not nacre:
+            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un code NACRES.")
+            return
 
         # Vérifications basiques
-        if not nom or not reference or not nacre or not materiau or not source:
+        if not nom or not reference or not materiau or not source:
             QMessageBox.warning(self, "Erreur", "Veuillez remplir tous les champs obligatoires.")
             return
 
@@ -190,11 +235,12 @@ class MainWindow(QMainWindow):
         self.nom_input.clear()
         self.brand_input.clear()
         self.ref_input.clear()
-        self.nacre_input.clear()
         self.masse_input.clear()
         self.source_input.clear()
         if self.materiau_combo.count() > 0:
             self.materiau_combo.setCurrentIndex(0)
+        if self.nacre_combo.count() > 0:
+            self.nacre_combo.setCurrentIndex(0)
 
         # Mettre à jour le tableau
         self.afficher_donnees()

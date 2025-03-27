@@ -34,10 +34,13 @@ class ManipsTypeDB:
             manip_id INTEGER NOT NULL,
             category TEXT,
             subcategory TEXT,
-            subsubcategory TEXT, 
+            subsubcategory TEXT,
+            code_nacres TEXT,
             name TEXT,
             value REAL,
             unit TEXT,
+            quantity REAL,
+            consommable TEXT,
             FOREIGN KEY (manip_id) REFERENCES manips(id)
         );
         """
@@ -67,7 +70,9 @@ class ManipsTypeDB:
                 "subsubcategory": "LA11 - Vaccins",
                 "name": "Pipettes stériles",
                 "value": 10.0,
-                "unit": "€"
+                "unit": "€",
+                "quantity": 100.0,
+                "consommable": ""
               }
             ]
         :param source: "native" ou "user" par ex. pour distinguer l'origine
@@ -81,17 +86,20 @@ class ManipsTypeDB:
         for item in items_list:
             cursor.execute("""
                 INSERT INTO manips_items 
-                    (manip_id, category, subcategory, subsubcategory, name, value, unit)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (manip_id, category, subcategory, subsubcategory, name, value, unit, quantity, consommable)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 manip_id,
                 item.get("category", ""),
                 item.get("subcategory", ""),
-                item.get("subsubcategory", ""),  # On récupère subsubcategory
+                item.get("subsubcategory", ""),
                 item.get("name", ""),
                 item.get("value", 0.0),
-                item.get("unit", "")
+                item.get("unit", ""),
+                item.get("quantity", 0.0),
+                item.get("consommable", "")
             ))
+        print("YOUHOUUUU", items_list)
         self.conn.commit()
     
     def update_manip_name(self, manip_id, new_name):
@@ -160,7 +168,7 @@ class ManipsTypeDB:
         manip_id = row["id"]
         # Maintenant on récupère tous les items associés à ce manip_id
         cursor.execute("""
-            SELECT category, subcategory, subsubcategory, name, value, unit
+            SELECT category, subcategory, subsubcategory, name, value, unit, quantity, consommable
             FROM manips_items
             WHERE manip_id = ?
         """, (manip_id,))
@@ -174,6 +182,10 @@ class ManipsTypeDB:
                 "subsubcategory": r["subsubcategory"],
                 "name": r["name"],
                 "value": r["value"],
-                "unit": r["unit"]
+                "unit": r["unit"],
+                "quantity": r["quantity"],
+                "consommable": r["consommable"]
             })
+            print("DEBUG rechargé:", r["consommable"])
+        print("DEBUG items:", items)
         return items

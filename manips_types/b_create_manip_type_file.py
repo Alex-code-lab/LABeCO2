@@ -20,7 +20,8 @@ db.add_manip(
             "subsubcategory": "LA11 - Vaccins",
             "name": "Pipettes stériles",
             "value": 10.0,
-            "unit": "€"
+            "unit": "€",
+            "quantity": 100.0
         }
     ],
     source="native"

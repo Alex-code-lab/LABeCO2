@@ -642,80 +642,158 @@ class MainWindow(QMainWindow):
 
         # self.adjustSize()
 
+    def calculate_emission_for_item(self, item_data: dict) -> dict:
+        """
+        Calcule les émissions de carbone pour un seul "item" de la même manière
+        que la fonction 'calculate_emission', mais en se basant uniquement sur
+        un dictionnaire item_data (sans accès direct à l'UI).
+
+        - Gère le cas 'Machine' comme dans calculate_emission.
+        - Reconstruit subsub_name si nécessaire pour en extraire le code NACRES.
+        - Appelle compute_emission_data(item_data) pour obtenir ep, ep_err, em, em_err, tm, msg.
+        - Stocke ensuite ces résultats dans item_data et le renvoie.
+
+        Args:
+            item_data (dict): Contient a minima :
+                - category (str)
+                - subcategory (str)
+                - subsubcategory (str)
+                - name (str)           # Pour le code NACRES si Achats
+                - value (float)        # km/jour, €...
+                - days (int)
+                - quantity (int/float)
+                - consommable (str)    # S'il s'agit d'un consommable Achats
+                - year (str)           # Optionnel
+                ...
+        Returns:
+            dict: item_data mis à jour avec :
+                - "emissions_price", "emissions_price_error"
+                - "emission_mass", "emission_mass_error"
+                - "total_mass"
+                - éventuellement "calc_error_msg" si erreur
+        """
+        # 1) Lire les champs principaux
+        category = item_data.get('category', '')
+        subcategory = item_data.get('subcategory', '')
+        # # On recompose un subsub_name comme "subsubcategory - name"
+        # # pour simuler ce que fait `calculate_emission()` avec `split_subsub_name`
+        base_subsub = item_data.get('subsubcategory', '')
+        print("base subsub" , base_subsub)
+        base_name = item_data.get('name', '')
+        subsub_name = (base_subsub + " " + base_name).strip(' - ')
+
+        # year = item_data.get('year', '')
+        # days = int(item_data.get('days', 1))
+        # quantity = item_data.get('quantity', 0)
+
+        # 2) Gérer le cas spécial : Machine
+        #    Dans la fonction 'calculate_emission', on appelait self.add_machine().
+        #    Ici, on peut soit reproduire la logique de add_machine, soit renvoyer item_data avec un message.
+        if category == 'Machine':
+            # Ici, par exemple, on "simule" ce que fait add_machine :
+            # => on suppose que carbon_calculator gère 'value' = kWh
+            ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+            if msg:
+                item_data["calc_error_msg"] = msg
+                return item_data
+            item_data["emissions_price"] = ep
+            item_data["emissions_price_error"] = ep_err
+            item_data["emission_mass"] = em
+            item_data["emission_mass_error"] = em_err
+            item_data["total_mass"] = tm
+            return item_data
+
+        # 3) Gérer NACRES si Achats (optionnel)
+        code_nacres = 'NA'
+        if category == 'Achats' and base_subsub:
+            code_nacres = subsub_name[:4]
+            print("DEBUG CODE NACRES : ", code_nacres)
+        item_data['code_nacres'] = code_nacres
+
+        print ("ITEM DATA ", item_data)
+
+        # Si la fonction 'calculate_emission' fait plus de choses, on peut les reproduire ici.
+
+        # 4) Appeler compute_emission_data
+        #    => on s’appuie sur la structure existante, 
+        #    => item_data doit déjà contenir tout (category, subcategory, subsub, value, days, quantity, etc.)
+        ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+
+        # 5) Si erreur renvoyée
+        if msg:
+            item_data["calc_error_msg"] = msg
+            return item_data
+
+        # 6) Stocker le résultat dans item_data
+        item_data["emissions_price"] = ep
+        item_data["emissions_price_error"] = ep_err
+        item_data["emission_mass"] = em
+        item_data["emission_mass_error"] = em_err
+        item_data["total_mass"] = tm
+
+        # 7) Retour
+        return item_data
+
     def add_manip_type_to_history(self):
         """
-        Ajoute tous les éléments (items) de la manipulation sélectionnée
-        dans la liste déroulante (self.manip_type_combo) à l'historique.
+        Ajoute tous les éléments (items) de la manipulation sélectionnée dans la liste déroulante
+        à l'historique en recalculant les émissions pour chacun d'eux.
 
-        Étapes :
-        1. Vérifier si l'utilisateur a réellement choisi une manip (et pas l'entrée par défaut).
-        2. Récupérer le nom de la manip depuis la combo box.
-        3. Obtenir tous les 'items' associés à cette manip dans la base SQLite (manips_items).
-        4. Pour chaque item, créer un 'new_data' et l'ajouter à l'historique via create_or_update_history_item().
-        5. Mettre à jour l'affichage global des émissions (update_total_emissions()).
+        1. Vérifie qu'une manip type est sélectionnée dans la combo.
+        2. Récupère le nom de la manip (stocké en userData).
+        3. Récupère tous les items associés à cette manip depuis la base SQLite.
+        4. Pour chaque item, construit un dictionnaire 'new_data' incluant tous les champs essentiels,
+        notamment "consommable" et "quantity".
+        5. Appelle calculate_emission_for_item(new_data) pour recalculer les émissions.
+        6. Si le calcul retourne une erreur (champ "calc_error_msg"), affiche un avertissement et arrête.
+        7. Sinon, ajoute l'item recalculé à l'historique et met à jour le total des émissions.
         """
-
-        # 1) Récupère l'index actuellement sélectionné dans la combo
+        # 1) Vérifier l'index sélectionné dans la combo
         current_idx = self.manip_type_combo.currentIndex()
-
-        # Si current_idx <= 0, ça veut dire qu'on est sur l'entrée "Sélectionnez une manip..." ou rien de sélectionné
         if current_idx <= 0:
-            return  # On arrête la fonction, car rien n'a été vraiment choisi
+            return  # Aucune manip réelle n'est sélectionnée
 
-        # 2) Récupère le vrai nom de la manip stocké en "userData"
-        #    (Si tu n'utilises pas userData, tu peux simplement faire 'manip_name = self.manip_type_combo.currentText()')
+        # 2) Récupérer le nom de la manip depuis la combo (stocké dans userData)
         manip_name = self.manip_type_combo.itemData(current_idx)
         if not manip_name:
-            return  # Aucun nom récupéré => on arrête
+            return
 
-        # 3) Récupère tous les items de cette manip depuis la base (table manips_items)
-        #    Si la manip n'existe pas en base ou est vide, on prévient l'utilisateur
+        # 3) Récupérer tous les items associés à cette manip depuis la base
         items = self.manips_db.get_manip_items(manip_name)
         if not items:
             QMessageBox.warning(self, "Erreur", f"Aucun item trouvé pour la manip '{manip_name}'.")
             return
 
-        # 4) Pour chaque item, on crée un 'new_data' adapté à l'historique,
-        #    puis on l'insère dans la liste via create_or_update_history_item().
+        # 4) Pour chaque item, construire le dictionnaire new_data et inclure "consommable" et "quantity"
         for item in items:
             new_data = {
-                "category": item["category"],      # Catégorie générale (Achats, Machine, etc.)
-                "subcategory": item["subcategory"],# Sous-catégorie
-                "subsubcategory": item["subsubcategory"],  # Sous-sous-catégorie
-                "value": item["value"],            # Valeur chiffrée (ex: 5.0, 10.0, etc.)
-                "unit": item["unit"],              # Unité correspondante (kWh, €, etc.)
-                "days": item.get("days", 0),       # Par défaut à 0, recalculable plus tard
-                "year": item.get("year", 0),       # Par défaut à 0, recalculable plus tard
-                # "emissions_price": 0.0,            # Par défaut à 0, recalculable plus tard
-                # "emissions_price_error": 0.0,
-                # "emission_mass": 0.0,
-                # "emission_mass_error": 0.0,
-                # "total_mass": 0.0,
-                "name": item["name"],              # Nom de l'item (ex: "Microscope 3000")
+                "category": item["category"],
+                "subcategory": item["subcategory"],
+                "subsubcategory": item["subsubcategory"],
+                "name": item["name"],
+                "value": item["value"],
+                "unit": item["unit"],
+                "quantity": item.get("quantity", 0.0),
+                "days": item.get("days", 0),
+                "year": item.get("year", 0),
+                "consommable": item.get("consommable", ""),
+                "code_nacres": item.get("code_nacres", "")
             }
-            print("Item -->", new_data)
-            # 2a) Recalcule les émissions via la logique existante
-            # Tu peux appeler ta fonction interne 'calculate_emission_for_one_item(new_data)'
-            # ou faire self.carbon_calculator.calculateCarbone(new_data). 
-            # EXEMPLE (à adapter selon ton code):
-            # On calcule les émissions avec compute_emission_data
-            ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(new_data)
+            # Optionnel : vérifier via un debug
+            print("DEBUG new_data:", new_data)
 
-            # Si tu souhaites gérer un message d’erreur :
-            if msg:
-                QMessageBox.warning(self, "Erreur de calcul : fin de lajout", msg)
-                return  # ou return, selon ta logique
+            # 5) Recalculer les émissions pour cet item
+            updated_data = self.calculate_emission_for_item(new_data)
 
-            # On stocke ces résultats dans new_data pour les sauvegarder ensuite
-            new_data["emissions_price"] = ep
-            new_data["emissions_price_error"] = ep_err
-            new_data["emission_mass"] = em
-            new_data["emission_mass_error"] = em_err
-            new_data["total_mass"] = tm
+            # 6) Si un message d'erreur a été renvoyé, afficher une alerte et interrompre
+            if "calc_error_msg" in updated_data:
+                QMessageBox.warning(self, "Erreur de calcul", updated_data["calc_error_msg"])
+                return  # On peut choisir de continuer plutôt que d'arrêter, selon la logique souhaitée
 
-            self.create_or_update_history_item(new_data)
+            # 7) Ajouter l'item recalculé à l'historique
+            self.create_or_update_history_item(updated_data)
 
-        # 5) Met à jour l'affichage du total des émissions dans la zone de résultat
+        # Mettre à jour le total des émissions
         self.update_total_emissions()
 
     def show_calcul_section(self):
@@ -1204,9 +1282,11 @@ class MainWindow(QMainWindow):
                     "days": data.get("days", 0),
                     "name": data.get("name", ""),
                     "value": data.get("value", 0.0),
-                    "unit": data.get("unit", "")
+                    "unit": data.get("unit", ""),
+                    "quantity": data.get("quantity", 0.0),
+                    "consommable": data.get("consommable", ""),
                 })
-
+            print("DEBUG define_user_manip:", data.get("consommable", ""))
             if not items_list:
                 QMessageBox.warning(
                     self, 
@@ -1246,8 +1326,7 @@ class MainWindow(QMainWindow):
             self.manip_type_combo.addItem(display_text, userData=m['name'])
     # ------------------------------------------------------------------
     # Calculs d'émissions
-    # ------------------------------------------------------------------
-    
+    # ------------------------------------------------------------------ 
     def calculate_emission(self):
         """
         Calcule les émissions de carbone pour la catégorie sélectionnée.
@@ -1281,7 +1360,7 @@ class MainWindow(QMainWindow):
                         if self.conso_filtered_combo.isVisible() else None)
         if selected_nacres and selected_nacres != "non renseignée" and " - " in selected_nacres:
             code_nacres, consommable = selected_nacres.split(" - ", 1)
-
+            
         # Lecture du champ input_field => c'est un nombre "km/jour" si Véhicules, "€" si Achats, etc.
         try:
             input_text = self.input_field.text().strip().replace(',', '.')
@@ -1324,7 +1403,7 @@ class MainWindow(QMainWindow):
             'consommable': consommable,
             'quantity': quantity,
         }
-
+        print("Debug - data_dict :", data_dict)
         # Appel unifié
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
         if msg:
