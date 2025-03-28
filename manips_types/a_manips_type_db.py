@@ -39,6 +39,9 @@ class ManipsTypeDB:
             name TEXT,
             value REAL,
             unit TEXT,
+            days REAL,
+            year REAL,
+            electricity_type TEXT,
             quantity REAL,
             consommable TEXT,
             FOREIGN KEY (manip_id) REFERENCES manips(id)
@@ -86,8 +89,8 @@ class ManipsTypeDB:
         for item in items_list:
             cursor.execute("""
                 INSERT INTO manips_items 
-                    (manip_id, category, subcategory, subsubcategory, name, value, unit, quantity, consommable)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (manip_id, category, subcategory, subsubcategory, name, value, unit, days, year, electricity_type, quantity, consommable)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 manip_id,
                 item.get("category", ""),
@@ -96,10 +99,13 @@ class ManipsTypeDB:
                 item.get("name", ""),
                 item.get("value", 0.0),
                 item.get("unit", ""),
+                item.get("days", 0.0),
+                item.get("year", 0.0),
+                item.get("electricity_type", ""),
                 item.get("quantity", 0.0),
                 item.get("consommable", "")
             ))
-        print("YOUHOUUUU", items_list)
+        print("ADD MANIP : ", items_list)
         self.conn.commit()
     
     def update_manip_name(self, manip_id, new_name):
@@ -168,7 +174,7 @@ class ManipsTypeDB:
         manip_id = row["id"]
         # Maintenant on récupère tous les items associés à ce manip_id
         cursor.execute("""
-            SELECT category, subcategory, subsubcategory, name, value, unit, quantity, consommable
+            SELECT category, subcategory, subsubcategory, name, value, unit, days, year, electricity_type, quantity, consommable
             FROM manips_items
             WHERE manip_id = ?
         """, (manip_id,))
@@ -183,9 +189,10 @@ class ManipsTypeDB:
                 "name": r["name"],
                 "value": r["value"],
                 "unit": r["unit"],
+                "days": r["days"],
+                "year": r["year"],
+                "electricity_type": r["electricity_type"],
                 "quantity": r["quantity"],
                 "consommable": r["consommable"]
             })
-            print("DEBUG rechargé:", r["consommable"])
-        print("DEBUG items:", items)
         return items

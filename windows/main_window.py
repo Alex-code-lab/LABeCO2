@@ -6,8 +6,8 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
-    QInputDialog, QFormLayout, QFileDialog, QDialog, QDialogButtonBox,
-    QListWidgetItem, QScrollArea, QSizePolicy, QSpacerItem, QAbstractItemView
+    QFormLayout,  QDialog, QScrollArea, QSizePolicy, QAbstractItemView,
+    # QListWidgetItem, QSpacerItem, QDialogButtonBox, QFileDialog, QInputDialog,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QIntValidator
@@ -630,17 +630,38 @@ class MainWindow(QMainWindow):
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
     def show_manip_type_section(self):
-        """ Affiche la liste déroulante des manips type et masque la section calcul. """
+        """ Affiche la liste déroulante des manips type et masque la section de calcul. """
+        # Ne pas retirer le widget du layout, simplement le masquer
         self.existing_group.setVisible(False)
+        self.machine_group.setVisible(False)
+        
+        self.manip_type_label.setVisible(True)
+        self.manip_type_combo.setVisible(True)
+        self.add_manip_type_button.setVisible(True)
 
-        # Retirer `existing_group` du layout pour éviter l'espace vide
-        self.layout().removeWidget(self.existing_group)
+    def show_calcul_section(self):
+        """
+        Affiche la section d'ajout de calcul (pour Achats, Véhicules, etc.) et masque les contrôles des manip types.
+        Si la catégorie sélectionnée est "Machine", on masque la zone standard et on affiche la section Machine.
+        """
+        current_category = self.category_combo.currentText()
+        # Masquer les contrôles des manip types
+        self.manip_type_label.setVisible(False)
+        self.manip_type_combo.setVisible(False)
+        self.add_manip_type_button.setVisible(False)
 
-        self.manip_type_label.setHidden(False)
-        self.manip_type_combo.setHidden(False)
-        self.add_manip_type_button.setVisible(True)  # Rendre visible uniquement pour les manips type
-
-        # self.adjustSize()
+        if current_category == "Machine":
+            # Pour Machine, on affiche la section Machine et on masque la zone standard
+            self.existing_group.setVisible(False)
+            self.machine_group.setVisible(True)
+        else:
+            # Pour les autres, on affiche la zone standard et on masque la section Machine
+            self.existing_group.setVisible(True)
+            self.machine_group.setVisible(False)
+        self.category_combo.setEnabled(True)
+        self.subcategory_combo.setEnabled(True)
+        self.existing_group.setVisible(True)
+        self.existing_group.adjustSize()
 
     def calculate_emission_for_item(self, item_data: dict) -> dict:
         """
@@ -678,7 +699,6 @@ class MainWindow(QMainWindow):
         # # On recompose un subsub_name comme "subsubcategory - name"
         # # pour simuler ce que fait `calculate_emission()` avec `split_subsub_name`
         base_subsub = item_data.get('subsubcategory', '')
-        print("base subsub" , base_subsub)
         base_name = item_data.get('name', '')
         subsub_name = (base_subsub + " " + base_name).strip(' - ')
 
@@ -707,7 +727,6 @@ class MainWindow(QMainWindow):
         code_nacres = 'NA'
         if category == 'Achats' and base_subsub:
             code_nacres = subsub_name[:4]
-            print("DEBUG CODE NACRES : ", code_nacres)
         item_data['code_nacres'] = code_nacres
 
         print ("ITEM DATA ", item_data)
@@ -776,11 +795,13 @@ class MainWindow(QMainWindow):
                 "quantity": item.get("quantity", 0.0),
                 "days": item.get("days", 0),
                 "year": item.get("year", 0),
+                "electricity_type": item.get("electricity_type", ""),
                 "consommable": item.get("consommable", ""),
                 "code_nacres": item.get("code_nacres", "")
             }
+
             # Optionnel : vérifier via un debug
-            print("DEBUG new_data:", new_data)
+            # print("DEBUG new_data:", new_data)
 
             # 5) Recalculer les émissions pour cet item
             updated_data = self.calculate_emission_for_item(new_data)
@@ -795,16 +816,6 @@ class MainWindow(QMainWindow):
 
         # Mettre à jour le total des émissions
         self.update_total_emissions()
-
-    def show_calcul_section(self):
-        """ Affiche la section d'ajout de calcul et masque celle des manips type. """
-        self.existing_group.setHidden(False)
-        self.manip_type_label.setHidden(True)
-        self.manip_type_combo.setHidden(True)
-        self.add_manip_type_button.setHidden(True)
-
-        self.existing_group.adjustSize()
-        # self.adjustSize()
 
     def on_search_text_changed(self, text):
         """
@@ -839,15 +850,14 @@ class MainWindow(QMainWindow):
 
     def update_subcategories(self):
         """
-        Met à jour les sous-catégories en fonction de la catégorie sélectionnée.
-
-        Configure la visibilité des widgets en fonction de la catégorie choisie (par exemple, masque les éléments non pertinents pour les machines),
-        met à jour les items des comboboxes, gère les champs spécifiques aux véhicules, et appelle les méthodes pour gérer la visibilité des consommables.
+        Met à jour les sous-catégories et les zones d'interface en fonction de la catégorie sélectionnée.
+        Pour "Machine", on masque tous les contrôles standards et on affiche la section Machine.
+        Pour les autres catégories, on affiche les contrôles standards et on masque la section Machine.
         """
         category = self.category_combo.currentText()
 
         if category == 'Machine':
-            # Masquer tout ce qui n’est pas "machine"
+            # Masquer les éléments standards
             self.subcategory_label.setVisible(False)
             self.subcategory_combo.setVisible(False)
             self.search_label.setVisible(False)
@@ -860,22 +870,19 @@ class MainWindow(QMainWindow):
             self.days_label.setVisible(False)
             self.days_field.setVisible(False)
             self.calculate_button.setVisible(False)
+            # Afficher la section Machine
             self.machine_group.setVisible(True)
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-
-            # Masquer le bouton "Gestion des Consommables"
+            # Masquer les contrôles liés aux consommables
             self.manage_consumables_button.setVisible(False)
-
-            # Masquer les autres éléments liés aux consommables
             self.conso_filtered_label.setVisible(False)
             self.conso_filtered_combo.setVisible(False)
             self.conso_search_label.setVisible(False)
             self.conso_search_field.setVisible(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
-
         else:
-            # Réafficher la zone "standard"
+            # Afficher les éléments standards
             self.subcategory_label.setVisible(True)
             self.subcategory_combo.setVisible(True)
             self.search_label.setVisible(True)
@@ -886,22 +893,16 @@ class MainWindow(QMainWindow):
             self.input_label.setVisible(True)
             self.input_field.setVisible(True)
             self.calculate_button.setVisible(True)
+            # Masquer la section Machine
             self.machine_group.setVisible(False)
             self.machine_group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-
-            # Contrôler la visibilité du bouton "Gestion des Consommables" uniquement pour 'Achats'
+            # Afficher ou masquer le bouton "Gestion des Consommables" pour 'Achats'
             if category == 'Achats':
                 self.manage_consumables_button.setVisible(True)
             else:
                 self.manage_consumables_button.setVisible(False)
-
-            # Mettre à jour les sous-catégories
-            subcats = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
-            self.subcategory_combo.clear()
-            self.subcategory_combo.addItems(sorted(subcats.astype(str)))
-
-            # Cas particulier : Véhicules => on affiche le champ "jours"
-            if category == "Véhicules":
+            # Pour "Véhicules", afficher le champ "Nombre de jours"
+            if category == 'Véhicules':
                 self.days_label.setVisible(True)
                 self.days_field.setVisible(True)
                 self.days_field.setEnabled(True)
@@ -909,11 +910,11 @@ class MainWindow(QMainWindow):
                 self.days_label.setVisible(False)
                 self.days_field.setVisible(False)
                 self.days_field.setEnabled(False)
-
-            # APRES avoir mis à jour subcategory_combo, on appelle update_subsubcategory_names()
+            # Mettre à jour la liste des sous-catégories en fonction de la catégorie
+            subcats = self.data[self.data['category'] == category]['subcategory'].dropna().unique()
+            self.subcategory_combo.clear()
+            self.subcategory_combo.addItems(sorted(subcats.astype(str)))
             self.update_subsubcategory_names()
-
-            # => On appelle notre fonction pour afficher/masquer la zone NACRES
             self.update_nacres_visibility()
 
     def update_nacres_visibility(self):
@@ -1285,8 +1286,8 @@ class MainWindow(QMainWindow):
                     "unit": data.get("unit", ""),
                     "quantity": data.get("quantity", 0.0),
                     "consommable": data.get("consommable", ""),
+                    "electricity_type": data.get("electricity_type", ""),
                 })
-            print("DEBUG define_user_manip:", data.get("consommable", ""))
             if not items_list:
                 QMessageBox.warning(
                     self, 
@@ -1403,7 +1404,7 @@ class MainWindow(QMainWindow):
             'consommable': consommable,
             'quantity': quantity,
         }
-        print("Debug - data_dict :", data_dict)
+        # print("Debug - data_dict :", data_dict)
         # Appel unifié
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
         if msg:
@@ -1457,7 +1458,7 @@ class MainWindow(QMainWindow):
                                     data_materials=self.data_materials)
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
-            print("Debug - Nouveau self.modified_data :", modified_data)
+            # print("Debug - Nouveau self.modified_data :", modified_data)
 
             # On suppose que modified_data['value'] = val/jour
             # et modified_data['days'] = days.
@@ -1577,7 +1578,7 @@ class MainWindow(QMainWindow):
 
         if category == 'Machine':
             item_text = (
-                f"Machine - {subcategory} - {value:.2f} kWh : "
+                f"Machine - {subcategory} - {data.get('electricity_type')} - {value:.2f} kWh : "
                 f"{fmt_err(ep, ep_err)} kg CO₂e"
             )
         elif category == 'Véhicules':
@@ -1755,7 +1756,6 @@ class MainWindow(QMainWindow):
             total_usage = power * usage_time * days  # kWh total
 
             electricity_type = self.electricity_combo.currentText()
-
             data_dict = {
                 'category': 'Machine',
                 'subcategory': machine_name,
