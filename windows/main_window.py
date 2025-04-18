@@ -1920,7 +1920,7 @@ class MainWindow(QMainWindow):
                 Source officielle pour les données de l'ADEME (Agence de la Transition Écologique).
             </li>
             <li>
-                <b><a href="https://labos1point5.org/">Labo 1point5</a></b><br>
+                <b><a href="https://labos1point5.org/">Labos 1point5</a></b><br>
                 Plateforme collaborative pour la réduction de l'empreinte carbone dans les laboratoires de recherche.
             </li>
             <li>
