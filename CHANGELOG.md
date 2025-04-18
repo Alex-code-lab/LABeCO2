@@ -1,8 +1,8 @@
 # 📘 CHANGELOG – LABeCO₂
 
-Toutes les modifications notables du projet seront consignées dans ce fichier.
+Toutes les modifications notables du projet seront consignées dans ce fichier avec ré-organisation des fichiers.
 
-## [2.0] – 2025-04-18
+## [2.1] – 2025-04-18
 ### ✨ Ajouts majeurs
 - Implémentation d'une **nouvelle structure de l'application**, facilitant la maintenance et l'ajout de nouvelles fonctionnalités ;
 - Ajout du support de **`ManipType`**, permettant de mieux catégoriser les types de calculs dans LABeCO₂ ;

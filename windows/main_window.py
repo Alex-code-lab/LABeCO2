@@ -8,8 +8,8 @@
 #
 # Vous pouvez consulter la GPL ici : https://www.gnu.org/licenses/gpl-3.0.fr.html
 #
-# Date de création : 01/10/2024 — Version V2.0 du 10/04/2025
-# DOI:10.5281/zenodo.15240635
+# Date de création : 01/10/2024 — Version V2.1 du 10/04/2025
+# DOI: 10.5281/zenodo.15243498
 
 
 import sys

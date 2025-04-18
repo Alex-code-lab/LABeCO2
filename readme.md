@@ -11,8 +11,8 @@ Alexandre Souchaud labeco2.contact@gmail.com
 ## Date de création : 01/10/2024
 ## Date de la dernière version : 10/04/2025
 
-## Version Actuelle V2.0
-
+## Version Actuelle V2.1
+## DOI: 10.5281/zenodo.15243498
 ## Description
 
 Ce calculateur de Bilan Carbone LabeCO2 est une application interactive développée en Python utilisant PyQt5 pour l’interface graphique. Elle permet de calculer et de visualiser les émissions de CO₂e (équivalent CO₂) liées aux activités de laboratoire. L’objectif est de sensibiliser les utilisateurs à leur empreinte carbone et de les aider à identifier les postes les plus énergivores pour adopter des pratiques plus durables.
