@@ -1,4 +1,17 @@
 📝 LabeCO2
+Copiright © 2025 Alexandre Souchaud : tous droits reservés
+## Contact
+Pour toutes questions ou informations concernant le logiciel et ses droits, veuillez contacter : 
+labeco2.contact@gmail.com
+
+## Auteur
+Alexandre Souchaud labeco2.contact@gmail.com
+## Date de création de la version 1
+1er Octobre 2024
+## Date de création : 01/10/2024
+## Date de la dernière version : 10/04/2025
+
+## Version Actuelle V10
 
 ## Description
 

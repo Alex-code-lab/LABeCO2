@@ -1,3 +1,14 @@
+# main.py, LABeCO2 ©
+# Copyright (c), 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+# Auteur : Alexandre Souchaud — labeco2.contact@gmail.com
+#
+# Ce programme est distribué sous une double licence :
+#   - GNU GPL v3 (ou toute version ultérieure), pour une utilisation libre et non commerciale ;
+#   - Licence commerciale obligatoire pour toute utilisation professionnelle ou lucrative.
+#
+# Vous pouvez consulter la GPL ici : https://www.gnu.org/licenses/gpl-3.0.fr.html
+#
+# Date de création : 01/10/2024 — Version V10 du 10/04/2025
 import sys
 import os
 # from PyQt5.QtWidgets import QApplication
