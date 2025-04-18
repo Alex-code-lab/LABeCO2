@@ -1,4 +1,4 @@
-📝 LabeCO2
+📝 LABeCO2
 Copiright © 2025 Alexandre Souchaud : tous droits reservés
 ## Contact
 Pour toutes questions ou informations concernant le logiciel et ses droits, veuillez contacter : 
