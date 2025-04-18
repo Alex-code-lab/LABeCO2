@@ -1,3 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# utils/data_loader.py
+
 import sys
 import os
 import pandas as pd

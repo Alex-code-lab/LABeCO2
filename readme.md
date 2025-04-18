@@ -11,7 +11,7 @@ Alexandre Souchaud labeco2.contact@gmail.com
 ## Date de création : 01/10/2024
 ## Date de la dernière version : 10/04/2025
 
-## Version Actuelle V10
+## Version Actuelle V2.0
 
 ## Description
 
@@ -317,6 +317,7 @@ Ce projet est sous licence MIT. Veuillez consulter le fichier [LICENSE](./LICENS
 
 - **[Labo 1point5](https://labos1point5.org/)**  
   Plateforme collaborative pour la réduction de l'empreinte carbone dans les laboratoires de recherche.
+  Les données ont été téléchargée en Octobre 2024 et était les dernières alors mise en ligne par le collectif.
 
 - **[PlasticsEurope](https://plasticseurope.org/fr/)**  
   Organisation représentant les fabricants de plastiques en Europe, fournissant des données sur l'industrie.

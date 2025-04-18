@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# windows/graphiques/graph_6_proportional_bar_chart_mass.py
 import numpy as np
 import matplotlib
 from PySide6.QtWidgets import (

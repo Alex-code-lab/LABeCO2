@@ -1,6 +1,0 @@
-category;code_nacres;consommable;days;emission_mass;emissions_price;name;quantity;subcategory;subsubcategory;total_mass;unit;value;days_machine;electricity_type;power;usage_time
-Achats;NB21;Consommable 18;1.0;4.988999999999999;12.2;Consommables de chromatographie et d'extraction non dedies aux instruments;100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB21;1.6629999999999998;euro;20.0;;;;
-Achats;NB17;Consommable 7;1.0;1.5584000000000002;16.38;Autres consommables en plastique et en verre hors culture cell. et bacterio;100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB17;1.9480000000000002;euro;39.0;;;;
-Achats;NB23;Consommable 3;1.0;11.3015;117.73;Membranes et kits pour le transfert d'acides nucleiques et des proteines (blot);100.0;Consommables (Matières premières, produits chimiques/biologiques et organismes vivants);NB23;3.229;euro;193.0;;;;
-Machine;;;;;1.04;;;coco;;;kWh;20.0;2.0;Electricité France continentale;1.0;10.0
-Véhicules;NA;NA;4.0;;7.7616;TGV;0.0;ferroviaire;TGV > 200 km;;km;2352.0;;;;

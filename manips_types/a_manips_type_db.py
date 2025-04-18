@@ -1,4 +1,9 @@
-# manips_type_db.py
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# manips_types/a_manips_type_db.py
 
 import sqlite3
 import os

@@ -1,3 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# utils/graph_utils.py
+
 import matplotlib.pyplot as plt
 
 def plot_pie_chart(ax, labels, values, colors, title):

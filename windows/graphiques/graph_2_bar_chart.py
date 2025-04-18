@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# windows/graphiques/graph_2_bar_chart.py
 import numpy as np  # Utilisé pour les calculs numériques (par exemple, les indices x)
 import matplotlib.patches  # Peut être utilisé pour ajouter des formes au graphique (non utilisé ici)
 from adjustText import adjust_text  # Permet d'éviter le chevauchement des étiquettes dans les graphiques

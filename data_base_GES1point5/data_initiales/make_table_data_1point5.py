@@ -1,3 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+#
+# Ce fichier fait partie du projet LABeCO2.
+# Distribué sous licence : GNU GPL v3 (non commercial)
+# data_base_GES1Point5/make_table_data_1point5.py
+
+# toutes les datas de la base de données sont issues des données de labos1.5
 import pandas as pd
 import glob
 import os
