@@ -1,0 +1,201 @@
+.
+├── a_faire.txt
+├── CHANGELOG.md
+├── data_base_GES1point5
+│   ├── data_base_GES1point5.csv
+│   ├── data_base_GES1point5.hdf5
+│   ├── data_base.hdf5
+│   └── data_initiales
+│       ├── GES1point5_electricity_factors_20241107.tsv
+│       ├── GES1point5_purchases_factors_20241107.tsv
+│       ├── GES1point5_ractivities_factors_20241107.tsv
+│       ├── GES1point5_transports_factors_20241107.tsv
+│       ├── GES1point5_vehicles_factors_20241107.tsv
+│       ├── make_table_data_1point5.py
+│       ├── table_unique.csv
+│       ├── table_unique.h5
+│       └── table_unique.xlsx
+├── data_masse_eCO2
+│   ├── code_NACRES
+│   │   ├── cration_liste_NACRES_2022.ipynb
+│   │   ├── NACRES_list-raccourcie.numbers
+│   │   ├── NACRES_list.csv
+│   │   ├── nacres-janvier-2022.xls
+│   │   └── repartition_budget_NACRES.ipynb
+│   ├── data_base_masse_consommable
+│   │   ├── ajout_data_masse.py
+│   │   └── masses_consommable.xlsx
+│   ├── data_base_materiaux
+│   │   └── materiau_eCO2-kg.py
+│   ├── data_eCO2_masse_consommable.hdf5
+│   ├── empreinte_carbone_materiaux.h5
+│   ├── empreinte_carbone_solvants.h5
+│   ├── masses_consommable.csv
+│   ├── materiaux_labo.h5
+│   ├── mock_consumables_100.csv
+│   ├── mock_consumables_100.hdf5
+│   ├── nacres_2022.h5
+│   └── pour_travail.ipynb
+├── images
+│   ├── icon.icns
+│   ├── icon.png
+│   ├── LABeCo2.pdf
+│   └── Logo.png
+├── installation
+│   ├── bonnes_pratiques_git_complet.txt
+│   ├── installation_and_usage_anaconda.txt
+│   ├── installation_and_usage_homebrew.txt
+│   ├── requirements-brew.txt
+│   ├── requirements.txt
+│   ├── Setup_env.txt
+│   └── setup_labeco2_env.txt
+├── key.ipynb
+├── key.key
+├── LABeCO2_env_test
+│   ├── bin
+│   │   ├── activate
+│   │   ├── activate.csh
+│   │   ├── activate.fish
+│   │   ├── Activate.ps1
+│   │   ├── cpuinfo
+│   │   ├── debugpy
+│   │   ├── f2py
+│   │   ├── f2py3
+│   │   ├── f2py3.11
+│   │   ├── fonttools
+│   │   ├── ipython
+│   │   ├── ipython3
+│   │   ├── jupyter
+│   │   ├── jupyter-kernel
+│   │   ├── jupyter-kernelspec
+│   │   ├── jupyter-migrate
+│   │   ├── jupyter-run
+│   │   ├── jupyter-troubleshoot
+│   │   ├── macho_dump
+│   │   ├── macho_find
+│   │   ├── macho_standalone
+│   │   ├── pip
+│   │   ├── pip3
+│   │   ├── pip3.11
+│   │   ├── pt2to3
+│   │   ├── ptdump
+│   │   ├── ptrepack
+│   │   ├── pttree
+│   │   ├── pyftmerge
+│   │   ├── pyftsubset
+│   │   ├── pygmentize
+│   │   ├── pyi-archive_viewer
+│   │   ├── pyi-bindepend
+│   │   ├── pyi-grab_version
+│   │   ├── pyi-makespec
+│   │   ├── pyi-set_version
+│   │   ├── pyinstaller
+│   │   ├── pyside6-assistant
+│   │   ├── pyside6-deploy
+│   │   ├── pyside6-designer
+│   │   ├── pyside6-genpyi
+│   │   ├── pyside6-linguist
+│   │   ├── pyside6-lrelease
+│   │   ├── pyside6-lupdate
+│   │   ├── pyside6-metaobjectdump
+│   │   ├── pyside6-project
+│   │   ├── pyside6-qml
+│   │   ├── pyside6-qmlcachegen
+│   │   ├── pyside6-qmlformat
+│   │   ├── pyside6-qmlimportscanner
+│   │   ├── pyside6-qmllint
+│   │   ├── pyside6-qmlls
+│   │   ├── pyside6-qmltyperegistrar
+│   │   ├── pyside6-qtpy2cpp
+│   │   ├── pyside6-rcc
+│   │   ├── pyside6-uic
+│   │   ├── python -> python3.11
+│   │   ├── python3 -> python3.11
+│   │   ├── python3.11 -> /opt/homebrew/opt/python@3.11/bin/python3.11
+│   │   ├── runxlrd.py
+│   │   └── ttx
+│   ├── include
+│   │   ├── b2nd.h
+│   │   ├── blosc2
+│   │   │   ├── blosc2-common.h
+│   │   │   ├── blosc2-export.h
+│   │   │   ├── blosc2-stdio.h
+│   │   │   ├── codecs-registry.h
+│   │   │   ├── filters-registry.h
+│   │   │   └── tuners-registry.h
+│   │   ├── blosc2.h
+│   │   └── python3.11
+│   ├── lib
+│   │   ├── cmake
+│   │   │   └── Blosc2
+│   │   ├── libblosc2.2.15.2.dylib
+│   │   ├── libblosc2.4.dylib
+│   │   ├── libblosc2.a
+│   │   ├── libblosc2.dylib
+│   │   └── python3.11
+│   │       └── site-packages
+│   ├── pyvenv.cfg
+│   └── share
+│       ├── jupyter
+│       │   └── kernels
+│       └── man
+│           └── man1
+├── LICENCE
+├── main.py
+├── manips_types
+│   ├── a_manips_type_db.py
+│   ├── b_create_manip_type_file.py
+│   ├── BC_2025_02_07.csv
+│   ├── BC_2025_02_07.h5
+│   ├── c_manage_manips_type.py
+│   ├── example_history.csv
+│   ├── manips_type.sqlite
+│   └── readme_manips_types.md
+├── packaging
+│   ├── build
+│   │   └── main_app_labeco2
+│   │       ├── Analysis-00.toc
+│   │       ├── base_library.zip
+│   │       ├── BUNDLE-00.toc
+│   │       ├── EXE-00.toc
+│   │       ├── LABeCO2.pkg
+│   │       ├── localpycs
+│   │       ├── PKG-00.toc
+│   │       ├── PYZ-00.pyz
+│   │       ├── PYZ-00.toc
+│   │       ├── warn-main_app_labeco2.txt
+│   │       └── xref-main_app_labeco2.html
+│   ├── dist
+│   │   ├── LABeCO2
+│   │   └── LABeCO2.app
+│   │       └── Contents
+│   ├── hook-tables.py
+│   ├── main_app_labeco2.spec
+│   ├── main_app.spec
+│   ├── main.spec
+│   └── Untitled-1.md
+├── readme.md
+├── structure.txt
+├── styles
+│   └── styles.qss
+├── utils
+│   ├── color_utils.py
+│   ├── data_loader.py
+│   ├── graph_utils.py
+│   └── readme_utils.md
+└── windows
+    ├── carbon_calculator.py
+    ├── data_manager.py
+    ├── data_mass_window.py
+    ├── edit_calculation_dialog.py
+    ├── graphiques
+    │   ├── graph_1_pie_chart.py
+    │   ├── graph_2_bar_chart.py
+    │   ├── graph_3_proportional_bar_chart.py
+    │   ├── graph_4_stacked_bar_consumables.py
+    │   ├── graph_5_nacres_bar_chart.py
+    │   └── graph_6_proportional_bar_chart_mass.py
+    ├── main_window.py
+    └── UserManipDialog.py
+
+36 directories, 163 files

@@ -147,26 +147,81 @@ pip install pandas PySide6 matplotlib numpy adjustText
 ## **Structure du projet**
 
 ```python
-LABeCO₂/
-├── main.py                           # Point d'entrée principal
-├── windows/                          # Interface utilisateur et gestionnaires graphiques
-│   ├── main_window.py                # Fenêtre principale
-│   ├── graphiques/                   # Gestion des graphiques
-│   │   ├── bar_chart.py              # Graphiques en barres
-│   │   ├── nacres_bar_chart.py       # Barres pour les codes NACRES
-│   │   ├── proportional_bar_chart.py # Barres proportionnelles
-│   │   ├── stacked_bar_consumables.py# Barres empilées pour consommables
-│   └── data_mass_window.py           # Gestion des données massiques
-├── utils/                            # Fonctions utilitaires
-│   ├── color_utils.py                # Génération de couleurs et nuances
-│   ├── data_loader.py                # Chargement des données
-├── data_base_GES1point5/             # Données des facteurs d’émission
-│   └── data_base.hdf5
-├── images/                           # Fichiers image requis
-│   ├── Logo.png                      # Logo de l'application
-│   └── icon.png                      # Icône de l'application
-├── requirements.txt                  # Liste des dépendances Python
-└── README.md                         # Documentation du projet
+LABeCO2/                          # Racine du projet
+├── CHANGELOG.md                  # Historique complet des versions et correctifs
+├── LICENCE.md                    # Licence MIT appliquée au projet
+├── README.md                     # Documentation principale (présentation, install…)
+├── requirements.txt              # Dépendances Python minimales (pip)
+├── structure.txt                 # Arbre exhaustif généré automatiquement
+├── main.py                       # Point d’entrée CLI/GUI : lance l’app PySide6
+│
+├── data_base_GES1point5/         # Base officielle Labo 1point5 (facteurs d’émission)
+│   ├── data_base_GES1point5.csv  # Version CSV de la base consolidée
+│   ├── data_base_GES1point5.hdf5 # Version HDF5 (chargement plus rapide)
+│   ├── data_base.hdf5            # Dump minimal pour l’exe packagé
+│   └── data_initiales/           # Données sources mises à jour (07 nov 2024)
+│       ├── GES1point5_electricity_factors_20241107.tsv   # Électricité
+│       ├── GES1point5_purchases_factors_20241107.tsv     # Achats
+│       ├── GES1point5_ractivities_factors_20241107.tsv   # Activités de recherche
+│       ├── GES1point5_transports_factors_20241107.tsv    # Transports
+│       ├── GES1point5_vehicles_factors_20241107.tsv      # Véhicules
+│       ├── make_table_data_1point5.py  # Script de fusion/clean des TSV
+│       ├── table_unique.{csv,h5,xlsx}  # Table agrégée prête à l’import
+│
+├── data_masse_eCO2/              # Facteurs d’émission exprimés « au kg » (matériaux…)
+│   ├── code_NACRES/              # Ressources pour le mapping NACRES (codes achats FR)
+│   │   ├── NACRES_list.csv       # Liste nettoyée des codes NACRES
+│   │   └── *.ipynb / *.numbers   # Notebooks & tableurs de construction
+│   ├── data_base_masse_consommable/
+│   │   ├── masses_consommable.xlsx   # Données brutes de masse des consommables
+│   │   └── ajout_data_masse.py       # Ajout/enrichissement dans la base
+│   ├── data_base_materiaux/      # Scripts pour matériaux spécifiques
+│   │   └── materiau_eCO2-kg.py
+│   ├── empreinte_carbone_*.h5    # HDF5 : matériaux, solvants, consommables
+│   ├── mock_consumables_100.*    # Jeu de données factice pour tests UI
+│   └── nacres_2022.h5            # Mapping NACRES → catégories 2022
+│
+├── images/                       # Ressources graphiques
+│   ├── Logo.png                  # Logo affiché dans l’interface/README
+│   ├── icon.png                  # Icône standard (Windows/Linux)
+│   ├── icon.icns                 # Icône macOS (.app)
+│   └── LABeCo2.pdf               # Flyer ou documentation marketing
+│
+├── installation/                 # Guides d’installation et scripts systèmes
+│   ├── requirements-brew.txt     # Tap Homebrew : libs système nécessaires
+│   ├── installation_and_usage_*  # Tutoriels détaillés (Conda, Homebrew…)
+│   └── setup_labeco2_env.txt     # Pas‑à‑pas pour créer un venv prêt à l’emploi
+│
+├── manips_types/                 # Gestion des « types de manip » (scénarios d’usage)
+│   ├── manips_type.sqlite        # DB SQLite : types + paramètres par défaut
+│   ├── example_history.csv       # Exemple d’historique utilisateur
+│   ├── a_manips_type_db.py       # CRUD sur la base SQLite
+│   ├── b_create_manip_type_file.py   # Export CSV/HDF5 depuis la DB
+│   └── c_manage_manips_type.py       # IHM PySide6 de gestion des types
+│
+├── styles/                       # Feuilles de style Qt (QSS)
+│   └── styles.qss
+│
+├── utils/                        # Fonctions utilitaires transverses
+│   ├── data_loader.py            # Abstraction d’accès aux HDF5/CSV
+│   ├── color_utils.py            # Génération de palettes & conversions
+│   ├── graph_utils.py            # Helpers matplotlib (couleurs cohérentes, labels)
+│   └── readme_utils.md           # Notes dev sur les utils
+│
+└── windows/                      # Interface graphique (PySide6)
+    ├── main_window.py            # Fenêtre principale : navigation + graphes
+    ├── carbon_calculator.py      # Logique métier du calcul CO₂e
+    ├── data_manager.py           # Cache et opérations CRUD sur l’historique
+    ├── data_mass_window.py       # IHM dédiée aux facteurs « masse »
+    ├── edit_calculation_dialog.py# Popup d’édition d’une ligne historique
+    ├── UserManipDialog.py        # Gestion des scénarios « manips »
+    └── graphiques/               # 6 types de graphiques interactifs
+        ├── graph_1_pie_chart.py          # Camembert
+        ├── graph_2_bar_chart.py          # Barres empilées (prix vs masse)
+        ├── graph_3_proportional_bar_chart.py
+        ├── graph_4_stacked_bar_consumables.py
+        ├── graph_5_nacres_bar_chart.py   # Agrégation par code NACRES
+        └── graph_6_proportional_bar_chart_mass.py
 ```
 ---
 
