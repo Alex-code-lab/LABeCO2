@@ -23,7 +23,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class ManipsTypeDB:
-    def __init__(self, db_path='manips_type.sqlite'):
+    def __init__(self, db_path='manips_types/manips_type.sqlite'):
         """
         Initialise la connexion SQLite et crée les tables si elles n'existent pas.
         :param db_path: Chemin du fichier de base de données SQLite.
