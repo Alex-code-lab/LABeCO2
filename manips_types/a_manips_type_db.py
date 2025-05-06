@@ -7,6 +7,20 @@
 
 import sqlite3
 import os
+import sys
+
+# Fonction utilitaire pour compatibilité PyInstaller
+def resource_path(relative_path):
+    """
+    Récupère le chemin absolu vers une ressource, compatible avec PyInstaller.
+    """
+    try:
+        # PyInstaller crée un dossier temporaire _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class ManipsTypeDB:
     def __init__(self, db_path='manips_type.sqlite'):
@@ -14,7 +28,7 @@ class ManipsTypeDB:
         Initialise la connexion SQLite et crée les tables si elles n'existent pas.
         :param db_path: Chemin du fichier de base de données SQLite.
         """
-        self.db_path = db_path
+        self.db_path = resource_path(db_path)
         # Connexion à la base (créée si inexistante)
         self.conn = sqlite3.connect(self.db_path)
         # Pour récupérer les lignes sous forme de dictionnaires (clé = nom de colonne)
