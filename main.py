@@ -13,15 +13,13 @@
 # Ce fichier est le point d'entrée de l'application PySide6.
 import sys
 import os
-# from PyQt5.QtWidgets import QApplication
-# from PyQt5.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from windows.main_window import MainWindow  # Importez la classe MainWindow
 from utils.data_loader import resource_path
 
-# Ajoute cette ligne pour spécifier le chemin des plugins Qt
-os.environ["QT_PLUGIN_PATH"] = os.path.join(os.path.dirname(sys.executable), "PyQt5", "Qt5", "plugins")
+# # Ajoute cette ligne pour spécifier le chemin des plugins Qt
+# os.environ["QT_PLUGIN_PATH"] = os.path.join(os.path.dirname(sys.executable), "PyQt5", "Qt5", "plugins")
 
 # Point d'entrée du programme
 if __name__ == '__main__':
