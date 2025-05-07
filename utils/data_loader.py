@@ -16,7 +16,7 @@ def resource_path(relative_path):
         # PyInstaller crée un dossier temporaire et stocke le chemin dans _MEIPASS
         base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.abspath(".")
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
     return os.path.join(base_path, relative_path)
 
