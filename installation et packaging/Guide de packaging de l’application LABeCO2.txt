@@ -1,0 +1,112 @@
+Guide de packaging de l’application LABeCO2
+
+Ce document décrit, pas à pas, la procédure pour générer les exécutables Windows et macOS de LABeCO2 à l’aide de PyInstaller, ainsi que la signification de chaque option utilisée.
+
+⸻
+
+1. Prérequis
+
+Outil / version	Rôle	Commentaire
+Python 3.11	Interpréteur	Identique sur Windows et macOS pour limiter les surprises ; utilisez l’environnement virtuel du projet.
+PyInstaller 6.11.1	Création des exécutables	Installez : pip install pyinstaller==6.11.1 dans le venv.
+Deux fichiers .spec	Recettes de compilation	• LABeCO2_windows.spec
+• LABeCO2_Mac.spec		
+
+Emplacement recommandé
+
+LABeCO2/
+├── main.py
+├── LABeCO2_windows.spec
+├── LABeCO2_Mac.spec
+└── … (code, données, images, styles)
+
+
+⸻
+
+2. Structure d’un fichier .spec (rappel rapide)
+
+Un fichier .spec est un script Python exécuté par PyInstaller. Les blocs principaux :
+
+Bloc	Rôle principal	Points clés pour LABeCO2
+Analysis	Recense les scripts, dépendances Python et données à embarquer.	Les chemins sont différents entre Windows (\\) et macOS (/).
+PYZ	Crée une archive zippée des modules Python.	Peu modifié.
+EXE	Construit le binaire (Win : .exe / Mac : Mach-O).	Option icon spécifique au S.E.
+BUNDLE (macOS seulement)	Transforme le binaire en bundle .app.	Necessaire pour l’icône Dock ; identifiant bundle facultatif.
+COLLECT	Copie tout (binaire, ressources) dans le dossier dist.	Le nom doit être différent du binaire sous macOS.
+
+
+⸻
+
+3. Compilation
+
+3.1 macOS (Apple Silicon ou Intel)
+
+pyinstaller --clean --noconfirm LABeCO2_Mac.spec
+
+3.2 Windows
+
+pyinstaller --clean --noconfirm LABeCO2_windows.spec
+
+Signification des options de ligne de commande
+
+Option	Explication détaillée
+--clean	Supprime les dossiers build et les caches PyInstaller avant de commencer. Évite l’utilisation de fichiers obsolètes et réduit les erreurs « missing file ».
+--noconfirm	Écrase sans poser de question les dossiers build et dist existants. Utile pour l’intégration continue ou les scripts automatisés.
+(Pas d’option supplémentaire)	Les paramètres comme --onefile et --windowed sont déjà codés dans les blocs EXE / BUNDLE des fichiers .spec.
+
+
+⸻
+
+4. Répertoires générés
+
+Après compilation :
+
+LABeCO2/
+├── build/   ← fichiers intermédiaires (peut être supprimé)
+└── dist/
+    ├── LABeCO2_app/      ← macOS : contient LABeCO2.app
+    │   └── LABeCO2.app
+    └── LABeCO2.exe       ← Windows, si compilation sur Win
+
+Ouverture lente ? Le mode --onefile crée un exécutable monolithique ; à la première exécution, PyInstaller décompresse le contenu dans un répertoire temporaire, d’où quelques secondes d’attente.
+
+⸻
+
+5. Tester l’application
+
+macOS
+
+cd dist/LABeCO2_app
+open LABeCO2.app    # ou double-clic dans Finder
+
+--> L'application n'est pas signée, donc un message d'avertissement s'affiche. Pour l'ignorer, faites un clic droit sur l'application et choisissez "Ouvrir" dans le menu contextuel.
+il peut arriver que votre MacOS bloque l'application, dans ce cas, allez dans Préférences Système > Sécurité et confidentialité > Général et cliquez sur "Ouvrir quand même".
+Une signature est prévue pour la version finale.
+
+Windows
+
+.\dist\LABeCO2.exe  # double-clic possible
+
+Pour déboguer, retirez l’option console=False dans EXE afin d’obtenir la sortie standard dans un terminal.
+
+⸻
+
+6. Mise à jour ou ajout de ressources
+	1.	Ajoutez le fichier dans le dossier adéquat (ex.  images/ ).
+	2.	Ajoutez son chemin dans la liste datas= du fichier .spec correspondant.
+	3.	Recompilez avec la même commande (--clean --noconfirm).
+
+⸻
+
+7. Distribution finale
+	•	Windows : zippez LABeCO2.exe ou créez un installeur (Inno Setup, NSIS).
+	•	macOS : signez éventuellement LABeCO2.app puis compressez-la (zip ou dmg).
+
+⸻
+
+8. Remarques
+	•	Les fichiers .spec sont spécifiques à chaque S.E. ; ne les partagez pas entre Windows et macOS.
+	•	Pour les mises à jour, utilisez la commande pyinstaller avec le fichier .spec correspondant.
+	•	Pour des tests rapides, utilisez --onefile pour un exécutable unique, mais sachez que cela peut ralentir le démarrage de l’application.
+	•	Pour les tests de compatibilité, utilisez un environnement virtuel propre et identique à celui de production.
+	•	Pour les tests de performance, utilisez un environnement similaire à celui de production (matériel, S.E., etc.).
