@@ -1,0 +1,10 @@
+Produit,Type,Code NACRES,CAS,Référence,Unité,Densité (g/mL),Concentration (mg/mL),Facteur CO₂ (kg CO₂e/kg),Incertitude (%),Références,Note
+Acétone,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-64-1,,mL,0.79,,2.55,30,,
+Éthanol 96 %,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",64-17-5,,mL,0.789,,1.10,20,CarbonCloud,
+Toluène,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",108-88-3,,mL,0.867,,1.47,25,,
+Méthanol,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-56-1,,mL,0.791,,0.66,25,,
+API/anticorps,Biologie,NA45 Autres anticorps primaires couples,,,mg/mL,,1.0,1500,large (100–10 000),"Green House Gaz Protocol GHG Protocol Bessell et al., 2020",Valeur médiane avec une marge d'erreur ewtremment importante
+"Fetal Bovine Serum (FBS) – Sigma-Aldrich “Serum University”
+",Biologie,NA73 Milieux pour culture de petits organismes vivants,,,mL,"1,05",,"33,4",60,"Sérum de veau fœtal (FBS) et Smetana et al. (2015)  
+",
+Milieu de Eagle modifié par Dulbecco (DMEM),Biologie,NA73 Milieux pour culture de petits organismes vivants,,D6429,mL,1,,"1,7",20,"Tuomisto, H.L. et al. “Life cycle assessment of culture media with alternative compositions for cultured meat production.” Int. J. Life Cycle Assess. (2024). lien",

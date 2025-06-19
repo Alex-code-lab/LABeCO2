@@ -40,8 +40,16 @@ class MainWindow(QMainWindow):
             "Référence",
             "Code NACRES",
             "Masse unitaire (g)",
-            "Matériau",
-            "Source/Signature"
+            "Matériau consommable",
+            "Masse unitaire deuxieme materiaux (g)",
+            "Matériau deuxieme materiaux",
+            "Masse emballage unitaire (g)",
+            "Matériau emballage",
+            "Masse condionnement (g)",
+            "Matériau conditionnement",
+            "Nbr par conditionnement",
+            "Source/Signature",
+            "Lien / Note / Remarque"
         ]
 
         # 4) Chargement initial des données
@@ -218,15 +226,26 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre (ex: 14.35).")
             return
 
-        # Créer un nouvel enregistrement
+        # Créer un nouvel enregistrement avec tous les champs, certains vides
         new_line = {
             "Consommable": nom,
             "Marque": marque,
             "Référence": reference,
             "Code NACRES": nacre,
             "Masse unitaire (g)": masse,
-            "Matériau": materiau,
-            "Source/Signature": source
+            "Matériau consommable": materiau,
+            # Second material (optional, left blank)
+            "Masse unitaire deuxieme materiaux (g)": "",
+            "Matériau deuxieme materiaux": "",
+            # Emballage (optional)
+            "Masse emballage unitaire (g)": "",
+            "Matériau emballage": "",
+            # Conditionnement (optional)
+            "Masse condionnement (g)": "",
+            "Matériau conditionnement": "",
+            "Nbr par conditionnement": "",
+            "Source/Signature": source,
+            "Lien / Note / Remarque": ""
         }
 
         # Ajouter la nouvelle ligne au DF existant

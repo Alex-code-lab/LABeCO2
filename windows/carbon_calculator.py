@@ -107,49 +107,118 @@ class CarbonCalculator:
         ep = total_value * emission_factor
         ep_err = ep * factor_uncert
 
-        # Calcul massique NACRES si Achats + code_nacres != 'NA'
+        # Cas spécial pour Achats + code NACRES : distinction liquides vs solides
         if category == 'Achats' and code_nacres != 'NA':
-            e_mass, t_mass, e_mass_err = self._calculate_mass_based_emissions_old(
-                code_nacres, consommable, quantity
-            )
-            em = e_mass
-            em_err = e_mass_err
-            tm = t_mass
+            # 1) On regarde si c'est un liquide
+            liq_row = self.dm.get_liquid_data(code_nacres)
+            if liq_row is not None:
+                # volume (mL) = quantity
+                e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity)
+                em     = e_liq
+                em_err = err_liq
+                tm     = m_liq
+            else:
+                # 2) Sinon, calcul classique pour consommables solides
+                e_mass, t_mass, e_mass_err = self._calculate_mass_based_emissions_old(
+                    code_nacres, consommable, quantity
+                )
+                em     = e_mass
+                em_err = e_mass_err
+                tm     = t_mass
 
         return (ep, ep_err, em, em_err, tm, error_message)
 
     def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity):
         """
-        Calcule les émissions massiques en matching sur (Code NACRES, Consommable)
-        dans data_masse, puis cherche le matériau dans data_materials.
+        Calcule l'empreinte carbone totale (produit + emballage + conditionnement)
+        à partir des masses unitaires et des matériaux.
         """
+        # 1) Cas où aucun code NACRES valide n'est fourni
         if not code_nacres or code_nacres == 'NA':
             return (0.0, 0.0, 0.0)
 
-        matching = self.data_masse[
-            (self.data_masse['Code NACRES'].str.strip() == code_nacres.strip()) &
-            (self.data_masse['Consommable'].str.strip() == consommable.strip())
+        # 2) Récupérer la ligne correspondante dans data_masse
+        df_row = self.data_masse[
+            (self.data_masse[self.dm.CODE_NACRES_COL].astype(str).str.strip() == code_nacres.strip()) &
+            (self.data_masse[self.dm.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
         ]
-        if matching.empty:
+        if df_row.empty:
+            return (0.0, 0.0, 0.0)
+        row = df_row.iloc[0]
+
+        # 3) Définir les composants à traiter, y compris le second matériau du produit
+        composants = [
+            # Produit principal : matériau 1 puis matériau 2
+            (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL),
+            (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None)),
+            # Emballage
+            (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL),
+            # Conditionnement
+            (self.dm.MASSE_CONDITIONNEMENT_COL, self.dm.MATERIAU_CONDITIONNEMENT_COL),
+        ]
+
+        total_mass_kg = 0.0
+        total_emission = 0.0
+        total_unc_sq = 0.0
+
+        # 4) Pour chaque composant, calculer sa contribution
+        for col_masse, col_mat in composants:
+            if col_masse is None or col_mat is None:
+                continue
+            # Lecture brute de la masse (g)
+            raw_masse = float(row.get(col_masse, 0.0) or 0.0)
+            # Si on est dans le conditionnement, on divise par le nombre par conditionnement
+            if col_masse == self.dm.MASSE_CONDITIONNEMENT_COL:
+                nombre = row.get(self.dm.NOMBRE_PAR_COND_COL, 1) or 1
+                if nombre <= 0:
+                    continue
+                raw_masse = raw_masse / float(nombre)
+            # On obtient la masse finale du composant
+            masse_g = raw_masse
+            materiau = row.get(col_mat, "") or ""
+
+            # Ignorer si pas de masse ou matériau manquant
+            if masse_g <= 0 or not materiau:
+                continue
+
+            # Conversion en kg et application de la quantité
+            masse_kg = quantity * masse_g / 1000.0
+            total_mass_kg += masse_kg
+
+            # Récupérer le facteur CO₂ (kgCO₂/kg) et son incertitude
+            co2_per_kg, uncert_mat = self.dm.get_material_data(materiau)
+            if co2_per_kg is None:
+                continue
+
+            # Calcul de l’émission pour ce composant
+            emission = masse_kg * co2_per_kg
+            total_emission += emission
+
+            # Accumuler l’incertitude (émission * taux d’incertitude)²
+            total_unc_sq += (emission * uncert_mat) ** 2
+
+        total_unc = total_unc_sq ** 0.5
+        return (total_emission, total_mass_kg, total_unc)
+    
+
+    def _calculate_liquid_emissions(self, code_nacres, volume_ml):
+        """
+        Calcule l'empreinte carbone d'un consommable liquide via volume (mL).
+        """
+        row = self.dm.get_liquid_data(code_nacres)
+        if row is None:
             return (0.0, 0.0, 0.0)
 
-        row = matching.iloc[0]
-        masse_g = row.get("Masse unitaire (g)", 0.0)
-        materiau = row.get("Matériau", "")
-        incert_mass_factor = float(row.get("uncertainty", 0.0) or 0.0)
+        # Colonnes de la table liquid
+        dens = float(row.get("Densité (g/mL)", 0.0) or 0.0)
+        factor = float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0) or 0.0)
+        uncert_pct = float(row.get("Incertitude (%)", 0.0) or 0.0) / 100.0
 
-        masse_kg_unitaire = float(masse_g) / 1000.0
-        masse_totale_kg = masse_kg_unitaire * quantity
+        # volume (mL) → masse (kg)
+        mass_kg = dens * volume_ml / 1000.0
 
-        mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
-        if mat_filter.empty:
-            return (0.0, masse_totale_kg, 0.0)
+        # émission + incertitude
+        emission = mass_kg * factor
+        error = emission * uncert_pct
 
-        eCO2_par_kg = float(mat_filter.iloc[0].get("Equivalent CO₂ (kg eCO₂/kg)", 0.0))
-        incert_material = float(mat_filter.iloc[0].get("uncertainty", 0.0) or 0.0)
-
-        eCO2_total = masse_totale_kg * eCO2_par_kg
-        incert_total_fraction = (incert_mass_factor**2 + incert_material**2)**0.5
-        eCO2_total_error = eCO2_total * incert_total_fraction
-
-        return (eCO2_total, masse_totale_kg, eCO2_total_error)
+        return (emission, mass_kg, error)

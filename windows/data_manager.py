@@ -29,7 +29,15 @@ class DataManager:
     CODE_NACRES_COL = "Code NACRES"
     CONSOMMABLE_COL = "Consommable"
     MASSE_G_COL = "Masse unitaire (g)"
-    MATERIAU_COL = "Matériau"
+    MATERIAU_COL = "Matériau consommable"
+    # Second matériau pour le consommable
+    MASSE_G2_COL      = "Masse unitaire deuxieme materiaux (g)"
+    MATERIAU2_COL     = "Matériau deuxieme materiaux"
+    MASSE_EMBALLAGE_COL = "Masse emballage unitaire (g)"
+    MATERIAU_EMBALLAGE_COL = "Matériau emballage"
+    MASSE_CONDITIONNEMENT_COL = "Masse condionnement (g)"
+    MATERIAU_CONDITIONNEMENT_COL = "Matériau conditionnement"
+    NOMBRE_PAR_COND_COL = "Nbr par conditionnement"
 
     # Spécifique matériaux
     MATERIAU_NAME_COL = "Materiau"
@@ -38,6 +46,8 @@ class DataManager:
     # Chemins par défaut
     DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
     DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
+    DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
+
 
     def __init__(self, base_path):
         """
@@ -58,11 +68,20 @@ class DataManager:
         self.data_masse = pd.read_hdf(self.data_masse_path)
         if self.CODE_NACRES_COL not in self.data_masse.columns:
             raise KeyError(f"La colonne '{self.CODE_NACRES_COL}' est introuvable dans data_masse.")
+        # Nettoyage rapide du DataFrame pour supprimer les lignes vides
+        self.data_masse.dropna(subset=[self.CONSOMMABLE_COL], inplace=True)
 
         # Charger data_materials
         if not os.path.exists(self.data_materials_path):
             raise FileNotFoundError(f"Fichier {self.data_materials_path} introuvable.")
         self.data_materials = pd.read_hdf(self.data_materials_path)
+
+        # Charger consommables liquides (produits chimiques / bioproduits)
+        self.liq_path = os.path.join(base_path, "data_masse_eCO2", self.DATA_LIQUID_CONSOMMABLES)
+        if os.path.exists(self.liq_path):
+            self.data_liquides = pd.read_hdf(self.liq_path)
+        else:
+            self.data_liquides = pd.DataFrame()  # vide si absent
 
     def get_main_data(self):
         """Retourne la DataFrame principale."""
@@ -105,8 +124,15 @@ class DataManager:
         """
         Retourne (co2_par_kg, incert_material) pour un matériau.
         """
+        import pandas as pd
+        
+        # Si le nom de matériau est manquant (NaN) ou n'est pas une chaîne, on ne peut pas récupérer de données
+        if pd.isna(material_name) or not isinstance(material_name, str):
+            return None, None
+
         df_mat = self.data_materials
-        mask = df_mat[self.MATERIAU_NAME_COL].str.strip() == material_name.strip()
+        # Comparaison sécurisée via conversion en chaîne et strip
+        mask = df_mat[self.MATERIAU_NAME_COL].astype(str).str.strip() == material_name.strip()
         filtered = df_mat[mask]
         if filtered.empty:
             return None, None
@@ -114,3 +140,19 @@ class DataManager:
         co2_par_kg = float(filtered[self.EQUIV_CO2_COL].iloc[0] or 0.0)
         incert_mat = float(filtered.get(self.UNCERTAINTY_COL, pd.Series([0.0])).iloc[0] or 0.0)
         return co2_par_kg, incert_mat
+    
+    def get_data_liquides(self):
+        """Retourne la DataFrame des consommables liquides."""
+        return self.data_liquides
+
+    def get_liquid_data(self, code_nacres):
+        """
+        Cherche un consommable liquide par code NACRES.
+        Retourne la Series de la ligne si trouvée, sinon None.
+        """
+        if self.data_liquides.empty:
+            return None
+        df = self.data_liquides
+        mask = df[self.CODE_NACRES_COL].astype(str).str.strip() == code_nacres.strip()
+        filtered = df[mask]
+        return filtered.iloc[0] if not filtered.empty else None

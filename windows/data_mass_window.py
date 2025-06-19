@@ -33,8 +33,16 @@ class DataMassWindow(QMainWindow):
             "Référence",
             "Code NACRES",
             "Masse unitaire (g)",
-            "Matériau",
+            "Matériau consommable",
+            "Masse unitaire deuxieme materiaux (g)",
+            "Matériau deuxieme materiaux",
+            "Masse emballage unitaire (g)",
+            "Matériau emballage",
+            "Masse condionnement (g)",
+            "Matériau conditionnement",
+            "Nbr par conditionnement",
             "Source/Signature",
+            "Lien / Note / Remarque",
         ]
 
         # Charger ou initialiser les données
@@ -50,23 +58,34 @@ class DataMassWindow(QMainWindow):
     def charger_ou_initialiser_donnees(self):
         if os.path.exists(self.hdf5_file):
             try:
-                return pd.read_hdf(self.hdf5_file)
+                df = pd.read_hdf(self.hdf5_file)
             except Exception as e:
                 QMessageBox.warning(self, "Erreur", f"Impossible de charger le fichier HDF5 : {e}")
-                return pd.DataFrame(columns=self.columns)
+                df = pd.DataFrame(columns=self.columns)
         else:
-            data = pd.DataFrame([{
+            df = pd.DataFrame([{
                 "Consommable": "Tube Falcon 15ml",
                 "Marque": "N/A",
                 "Référence": "N/A",
                 "Code NACRES": "NB13",
                 "Masse unitaire (g)": 6.7,
-                "Matériau": "Polypropylène (PP)",
+                "Matériau consommable": "Polypropylène (PP)",
+                "Masse unitaire deuxieme materiaux (g)": "N/A",
+                "Matériau deuxieme materiaux": "N/A",
+                "Masse emballage unitaire (g)": "N/A",
+                "Matériau emballage": "N/A",
+                "Masse condionnement (g)": "N/A",
+                "Matériau conditionnement": "N/A",
+                "Nbr par conditionnement": "N/A",
                 "Source/Signature": "Alexandre Souchaud"
             }], columns=self.columns)
-
-            self.sauvegarder_donnees(data)
-            return data
+            self.sauvegarder_donnees(df)
+        # --- Harmoniser les colonnes manquantes ---
+        data = df
+        for col in self.columns:
+            if col not in data.columns:
+                data[col] = ""
+        return data
 
     def sauvegarder_donnees(self, df=None):
         if df is None:
@@ -89,6 +108,31 @@ class DataMassWindow(QMainWindow):
         self.brand_input = QLineEdit()
         self.ref_input = QLineEdit()
 
+        # Définir la liste des matériaux avant toute création de ComboBox qui l'utilise
+        if self.data_materials is not None:
+            mats = self.data_materials['Materiau'].dropna().unique().tolist()
+        else:
+            mats = ["Polypropylène (PP)", "Polyéthylène (PE)"]
+
+        # Second matériau (optionnel)
+        self.masse2_input = QLineEdit()
+        self.materiau2_combo = QComboBox()
+        self.materiau2_combo.addItems(mats)
+
+        # Emballage
+        self.masse_emb_input = QLineEdit()
+        self.mat_emb_combo = QComboBox()
+        self.mat_emb_combo.addItems(mats)
+
+        # Conditionnement
+        self.masse_cond_input = QLineEdit()
+        self.mat_cond_combo = QComboBox()
+        self.mat_cond_combo.addItems(mats)
+        self.nbr_cond_input = QLineEdit()
+
+        # Lien / Note
+        self.lien_input = QLineEdit()
+
         # Instead of form_layout.addRow("Code NACRES:", self.nacres_input)
         self.nacres_combo = QComboBox()
         nacres_layout = QVBoxLayout()
@@ -106,14 +150,8 @@ class DataMassWindow(QMainWindow):
         self.masse_input = QLineEdit()
 
         # Peupler la liste des matériaux depuis data_materials
-        if self.data_materials is not None:
-            mats = self.data_materials['Materiau'].dropna().unique().tolist()
-            self.materiau_combo = QComboBox()
-            self.materiau_combo.addItems(mats)
-        else:
-            # Liste statique de secours
-            self.materiau_combo = QComboBox()
-            self.materiau_combo.addItems(["Polypropylène (PP)", "Polyéthylène (PE)"])
+        self.materiau_combo = QComboBox()
+        self.materiau_combo.addItems(mats)
 
         self.source_input = QLineEdit()
 
@@ -121,7 +159,18 @@ class DataMassWindow(QMainWindow):
         form_layout.addRow("Marque:", self.brand_input)
         form_layout.addRow("Référence:", self.ref_input)
         form_layout.addRow("Masse unitaire (g):", self.masse_input)
-        form_layout.addRow("Matériau:", self.materiau_combo)
+        form_layout.addRow("Matériau consommable:", self.materiau_combo)
+        form_layout.addRow("Masse unitaire 2 (g):", self.masse2_input)
+        form_layout.addRow("Matériau 2:", self.materiau2_combo)
+
+        form_layout.addRow("Masse emballage (g):", self.masse_emb_input)
+        form_layout.addRow("Matériau emballage:", self.mat_emb_combo)
+
+        form_layout.addRow("Masse conditionnement (g):", self.masse_cond_input)
+        form_layout.addRow("Matériau conditionnement:", self.mat_cond_combo)
+        form_layout.addRow("Nbr par conditionnement:", self.nbr_cond_input)
+
+        form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
         form_layout.addRow("Source/Signature:", self.source_input)
 
         main_layout.addLayout(form_layout)
@@ -198,6 +247,14 @@ class DataMassWindow(QMainWindow):
         nacres = self.nacres_combo.currentData()
         masse_str = self.masse_input.text().strip().replace(',', '.')
         materiau = self.materiau_combo.currentText()
+        masse2_str   = self.masse2_input.text().strip().replace(',', '.')
+        materiau2    = self.materiau2_combo.currentText()
+        masse_emb_str= self.masse_emb_input.text().strip().replace(',', '.')
+        mat_emb      = self.mat_emb_combo.currentText()
+        masse_cond_str = self.masse_cond_input.text().strip().replace(',', '.')
+        mat_cond     = self.mat_cond_combo.currentText()
+        nbr_cond     = self.nbr_cond_input.text().strip()
+        lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
 
         if not nom or not marque or not reference or not materiau or not source or not nacres:
@@ -221,7 +278,15 @@ class DataMassWindow(QMainWindow):
             "Référence": reference,
             "Code NACRES": nacres,
             "Masse unitaire (g)": masse,
-            "Matériau": materiau,
+            "Matériau consommable": materiau,
+            "Masse unitaire deuxieme materiaux (g)": masse2_str,
+            "Matériau deuxieme materiaux": materiau2,
+            "Masse emballage unitaire (g)": masse_emb_str,
+            "Matériau emballage": mat_emb,
+            "Masse condionnement (g)": masse_cond_str,
+            "Matériau conditionnement": mat_cond,
+            "Nbr par conditionnement": nbr_cond,
+            "Lien / Note / Remarque": lien_note,
             "Source/Signature": source
         }
         self.data = self.ajouter_objet_df(self.data, nouvel_objet)
@@ -235,6 +300,14 @@ class DataMassWindow(QMainWindow):
         self.ref_input.clear()
         self.masse_input.clear()
         self.materiau_combo.setCurrentIndex(0)
+        self.masse2_input.clear()
+        self.materiau2_combo.setCurrentIndex(0)
+        self.masse_emb_input.clear()
+        self.mat_emb_combo.setCurrentIndex(0)
+        self.masse_cond_input.clear()
+        self.mat_cond_combo.setCurrentIndex(0)
+        self.nbr_cond_input.clear()
+        self.lien_input.clear()
         self.source_input.clear()
         self.nacres_combo.setCurrentIndex(-1)
 
@@ -254,64 +327,90 @@ class DataMassWindow(QMainWindow):
         self.table.setRowCount(len(self.data))
         for row_idx, row_data in self.data.iterrows():
             for col_idx, col_name in enumerate(self.columns):
-                item = QTableWidgetItem(str(row_data[col_name]))
+                cell_value = str(row_data.get(col_name, ""))
+                item = QTableWidgetItem(cell_value)
                 self.table.setItem(row_idx, col_idx, item)
 
     def calculer_eCO2_via_masse(self):
         """
-        Calculer l'eCO₂ via masse:
-        On utilise la dernière ligne sélectionnée dans le tableau, ou par exemple
-        le Code NACRES et le matériau pour retrouver masse et matériau.
-
-        Pour simplifier, on va prendre le dernier objet ajouté ou un objet spécifique.
-        Ici, comme exemple, on va calculer pour le dernier objet du tableau.
+        Calcule l'eCO2 total en additionnant :
+          - matériau principal
+          - deuxième matériau (si masse > 0)
+          - emballage
+          - conditionnement (divisé par Nbr par conditionnement)
         """
-
         if self.data.empty:
             QMessageBox.warning(self, "Erreur", "Aucun consommable disponible.")
             return
 
-        # Récupérer le dernier objet ou la sélection
-        # Ici, on prend le dernier objet pour l'exemple
+        # Dernière ligne du tableau
         last_obj = self.data.iloc[-1]
 
         try:
-            quantite_str = self.qty_input.text().strip()
-            quantite = int(quantite_str)
+            quantite = int(self.qty_input.text().strip())
         except ValueError:
             QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
             return
-
         if quantite <= 0:
             QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
             return
-
-        masse_g = last_obj["Masse unitaire (g)"]
-        materiau = last_obj["Matériau"]
 
         if self.data_materials is None:
             QMessageBox.warning(self, "Erreur", "Les données matériaux ne sont pas chargées.")
             return
 
-        # Convertir la masse en kg
-        masse_kg = masse_g / 1000.0
+        # Rassemble toutes les paires (masse, matériau)
+        composants = [
+            ("Masse unitaire (g)", "Matériau consommable"),
+            ("Masse unitaire deuxieme materiaux (g)", "Matériau deuxieme materiaux"),
+            ("Masse emballage unitaire (g)", "Matériau emballage"),
+            ("Masse condionnement (g)", "Matériau conditionnement"),
+        ]
 
-        # Récupérer l'eCO2 par kg du matériau
-        mat_filter = self.data_materials[self.data_materials['Materiau'] == materiau]
-        if mat_filter.empty:
-            QMessageBox.warning(self, "Erreur", f"Matériau '{materiau}' non trouvé dans data_materials.")
-            return
+        total_mass_kg = 0.0
+        total_eCO2 = 0.0
+        details = []
 
-        eCO2_par_kg = mat_filter['eCO2_kg'].values[0]
+        for col_masse, col_mat in composants:
+            masse_g = last_obj.get(col_masse, 0)
+            try:
+                masse_g = float(masse_g)
+            except ValueError:
+                masse_g = 0.0
+            materiau = str(last_obj.get(col_mat, "")).strip()
 
-        # Calcul de l'eCO2 total
-        eCO2_total = quantite * masse_kg * eCO2_par_kg
+            if masse_g <= 0 or materiau == "" or pd.isna(masse_g):
+                continue
 
-        QMessageBox.information(self, "Calcul eCO₂ via masse",
-                        f"Consommable: {last_obj['Consommable']}\n"
-                        f"Quantité: {quantite}\n"
-                        f"Masse unitaire: {masse_g} g ({masse_kg:.4f} kg)\n"
-                        f"Matériau: {materiau}\n"
-                        f"eCO₂ par kg matériau: {eCO2_par_kg:.4f} kg CO₂e/kg\n"
-                        f"eCO₂ total: {eCO2_total:.4f} kg CO₂e"
-                        )
+            # Cas conditionnement : diviser par Nb par cond.
+            if col_masse == "Masse condionnement (g)":
+                nb = last_obj.get("Nbr par conditionnement", 1)
+                try:
+                    nb = float(nb) if nb else 1
+                    if nb > 0:
+                        masse_g /= nb
+                except ValueError:
+                    pass
+
+            masse_kg = masse_g / 1000.0 * quantite
+            total_mass_kg += masse_kg
+
+            # Chercher facteur
+            mat_row = self.data_materials[self.data_materials['Materiau'] == materiau]
+            if mat_row.empty:
+                details.append(f"{materiau}: facteur inconnu → ignoré")
+                continue
+            facteur = float(mat_row['eCO2_kg'].iloc[0])
+            eCO2 = masse_kg * facteur
+            total_eCO2 += eCO2
+            details.append(f"{materiau}: {masse_kg:.4f} kg × {facteur:.2f} = {eCO2:.3f} kg")
+
+        details_str = "\n".join(details) if details else "Aucun composant carbone calculé."
+        QMessageBox.information(
+            self, "Calcul eCO₂ via masse",
+            f"Consommable: {last_obj['Consommable']}\n"
+            f"Quantité: {quantite}\n"
+            f"Masse totale: {total_mass_kg:.4f} kg\n"
+            f"Détails:\n{details_str}\n"
+            f"eCO₂ total: {total_eCO2:.4f} kg CO₂e"
+        )

@@ -75,6 +75,7 @@ class MainWindow(QMainWindow):
         self.data = self.data_manager.get_main_data()
         self.data_masse = self.data_manager.get_data_masse()
         self.data_materials = self.data_manager.get_data_materials()
+        self.data_liquides = self.data_manager.get_data_liquides() 
 
         # 3) CarbonCalculator
         self.carbon_calculator = CarbonCalculator(self.data_manager)
@@ -1087,6 +1088,13 @@ class MainWindow(QMainWindow):
             if not filter_text or filter_text in display_text.lower():
                 self.conso_filtered_combo.addItem(display_text)
 
+        for idx, row in self.data_liquides.iterrows():
+            code = str(row.get(self.data_manager.CODE_NACRES_COL, "")).strip()
+            prod = str(row.get("Produit", "")).strip()
+            display = f"{code} - {prod}"
+            if not filter_text or filter_text.lower() in display.lower():
+                self.conso_filtered_combo.addItem(display)
+
         self.conso_filtered_combo.blockSignals(False)
         self.update_quantity_visibility()
 
@@ -1118,6 +1126,15 @@ class MainWindow(QMainWindow):
             display_text = f"{full_code} - {consommable}"
             if full_code.startswith(code_nacres_4):
                 filtered_items.append(display_text)
+
+                # --- Ajout : intégrer les consommables liquides ---
+        for idx, row in self.data_liquides.iterrows():
+            full_code = str(row.get(self.data_manager.CODE_NACRES_COL, "")).strip()
+            produit   = str(row.get("Produit", "")).strip()
+            display_text = f"{full_code} - {produit}"
+            if full_code.startswith(code_nacres_4):
+                filtered_items.append(display_text)
+
 
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
@@ -1396,13 +1413,13 @@ class MainWindow(QMainWindow):
         # => carbon_calculator décidera s'il multiplie ou non.
 
         # Calcul massique => quantity
-        quantity = 0
+        quantity = 0.0
         if self.quantity_label.isVisible() and self.quantity_input.isVisible():
             try:
-                quantity_str = self.quantity_input.text().strip()
-                quantity = int(quantity_str) if quantity_str else 0
-            except:
-                quantity = 0
+                quantity_str = self.quantity_input.text().strip().replace(',', '.')
+                quantity = float(quantity_str) if quantity_str else 0.0
+            except ValueError:
+                quantity = 0.0
 
         data_dict = {
             'category': category,
@@ -1416,6 +1433,26 @@ class MainWindow(QMainWindow):
             'consommable': consommable,
             'quantity': quantity,
         }
+
+                # --- Enrichissement des données massiques pour le bilan carbone ---
+        # --- Enrichissement des données pour le calcul massique ---
+        if category == 'Achats' and consommable and consommable != 'NA':
+            # Recherche de la ligne correspondante dans data_masse
+            df_row = self.data_masse[
+                (self.data_masse[self.data_manager.CODE_NACRES_COL].astype(str).str.strip() == code_nacres.strip()) &
+                (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
+            ]
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                # Masse et matériau du produit
+                data_dict['masse_unitaire'] = float(row.get(self.data_manager.MASSE_G_COL, 0.0) or 0.0)
+                data_dict['materiau_conso']   = row.get(self.data_manager.MATERIAU_COL, "")
+                # Masse et matériau de l’emballage
+                data_dict['masse_emballage']  = float(row.get(self.data_manager.MASSE_EMBALLAGE_COL, 0.0) or 0.0)
+                data_dict['materiau_emballage'] = row.get(self.data_manager.MATERIAU_EMBALLAGE_COL, "")
+                # Masse et matériau du conditionnement
+                data_dict['masse_conditionnement']    = float(row.get(self.data_manager.MASSE_CONDITIONNEMENT_COL, 0.0) or 0.0)
+                data_dict['materiau_conditionnement'] = row.get(self.data_manager.MATERIAU_CONDITIONNEMENT_COL, "")
         # print("Debug - data_dict :", data_dict)
         # Appel unifié
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
