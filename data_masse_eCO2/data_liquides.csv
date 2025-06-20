@@ -1,4 +1,4 @@
-Produit,Type,Code NACRES,CAS,Référence,Unité,Densité (g/mL),Concentration (mg/mL),Facteur CO₂ (kg CO₂e/kg),Incertitude (%),Références,Note
+Produit,Type,Code NACRES,CAS,Référence,Unité,Densité (g/mL),Concentration (mg/mL),Facteur CO₂ (kg CO₂e/kg),Incertitude (%),Source/Signature,Note
 Acétone,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-64-1,,mL,0.79,,2.55,30,,
 Éthanol 96 %,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",64-17-5,,mL,0.789,,1.10,20,CarbonCloud,
 Toluène,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",108-88-3,,mL,0.867,,1.47,25,,

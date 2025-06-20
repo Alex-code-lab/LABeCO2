@@ -45,12 +45,34 @@ class DataMassWindow(QMainWindow):
             "Lien / Note / Remarque",
         ]
 
+        # Spécifique consommables liquides
+        self.columns_liquids = [
+            "Produit",
+            "Type",
+            "Code NACRES",
+            "CAS",
+            "Référence",
+            "Unité",
+            "Densité (g/mL)",
+            "Concentration (mg/mL)",
+            "Facteur CO₂ (kg CO₂e/kg)",
+            "Incertitude (%)",
+            "Source/Signature",
+            "Note"
+        ]
+
+        # Fichier pour les consommables liquides
+        self.hdf5_liquids = "./data_masse_eCO2/data_eCO2_liquides_consommable.hdf5"
+
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
 
         # data_materials transmis par MainWindow
         # data_materials doit contenir 'Materiau' et 'eCO2_kg'
         self.data_materials = data_materials
+
+        self.data_liquids = self.load_liquid_df()
+
 
         self.init_ui()
         self.afficher_donnees()
@@ -103,7 +125,15 @@ class DataMassWindow(QMainWindow):
     def init_ui(self):
         main_layout = QVBoxLayout()
 
-        form_layout = QFormLayout()
+        self.form_layout = QFormLayout()
+
+        # Sélecteur de type
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Consommable solide", "Consommable liquide"])
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+        self.form_layout.addRow("Type d'objet :", self.type_combo)
+        self.is_liquid = False  # par défaut
+
         self.nom_input = QLineEdit()
         self.brand_input = QLineEdit()
         self.ref_input = QLineEdit()
@@ -145,7 +175,7 @@ class DataMassWindow(QMainWindow):
         search_layout.addWidget(self.nacres_search)
 
         nacres_layout.addLayout(search_layout)
-        form_layout.addRow("Code NACRES:", nacres_layout)
+        self.form_layout.addRow("Code NACRES:", nacres_layout)
 
         self.masse_input = QLineEdit()
 
@@ -155,25 +185,40 @@ class DataMassWindow(QMainWindow):
 
         self.source_input = QLineEdit()
 
-        form_layout.addRow("Consommable:", self.nom_input)
-        form_layout.addRow("Marque:", self.brand_input)
-        form_layout.addRow("Référence:", self.ref_input)
-        form_layout.addRow("Masse unitaire (g):", self.masse_input)
-        form_layout.addRow("Matériau consommable:", self.materiau_combo)
-        form_layout.addRow("Masse unitaire 2 (g):", self.masse2_input)
-        form_layout.addRow("Matériau 2:", self.materiau2_combo)
+        self.form_layout.addRow("Consommable:", self.nom_input)
+        self.form_layout.addRow("Marque:", self.brand_input)
+        self.form_layout.addRow("Référence:", self.ref_input)
+        self.form_layout.addRow("Masse unitaire (g):", self.masse_input)
+        self.form_layout.addRow("Matériau consommable:", self.materiau_combo)
+        self.form_layout.addRow("Masse unitaire 2 (g):", self.masse2_input)
+        self.form_layout.addRow("Matériau 2:", self.materiau2_combo)
 
-        form_layout.addRow("Masse emballage (g):", self.masse_emb_input)
-        form_layout.addRow("Matériau emballage:", self.mat_emb_combo)
+        self.form_layout.addRow("Masse emballage (g):", self.masse_emb_input)
+        self.form_layout.addRow("Matériau emballage:", self.mat_emb_combo)
 
-        form_layout.addRow("Masse conditionnement (g):", self.masse_cond_input)
-        form_layout.addRow("Matériau conditionnement:", self.mat_cond_combo)
-        form_layout.addRow("Nbr par conditionnement:", self.nbr_cond_input)
+        self.form_layout.addRow("Masse conditionnement (g):", self.masse_cond_input)
+        self.form_layout.addRow("Matériau conditionnement:", self.mat_cond_combo)
+        self.form_layout.addRow("Nbr par conditionnement:", self.nbr_cond_input)
 
-        form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
-        form_layout.addRow("Source/Signature:", self.source_input)
+        self.form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
+        self.form_layout.addRow("Source/Signature:", self.source_input)
 
-        main_layout.addLayout(form_layout)
+        # --- Widgets spécifiques Liquide ---
+        self.dens_input    = QLineEdit()
+        self.conc_input    = QLineEdit()
+        self.factor_input  = QLineEdit()
+        self.uncert_input  = QLineEdit()
+
+        self.form_layout.addRow("Densité (g/mL):",      self.dens_input)
+        self.form_layout.addRow("Concentration (mg/mL):", self.conc_input)
+        self.form_layout.addRow("Facteur CO₂ (kg/kg):", self.factor_input)
+        self.form_layout.addRow("Incertitude (%) :",    self.uncert_input)
+
+        # Masquer ces lignes initialement
+        for w in (self.dens_input, self.conc_input, self.factor_input, self.uncert_input):
+            w.setVisible(False)
+
+        main_layout.addLayout(self.form_layout)
 
         self.add_button = QPushButton("Ajouter l'objet")
         self.add_button.clicked.connect(self.ajouter_objet_utilisateur)
@@ -204,8 +249,19 @@ class DataMassWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+        # Applique la visibilité initiale (solide)
+        self.update_form_visibility()
         self.nacres_search.textChanged.connect(self.filter_nacres_list)
         self.load_nacres_list()
+
+    def on_type_changed(self, idx):
+        """Bascule solide/liquide : met à jour visibilité + table."""
+        self.is_liquid = (idx == 1)               # 0 = solide, 1 = liquide
+        # Recharger le fichier HDF5 liquide à chaque bascule pour afficher les ajouts récents
+        if self.is_liquid:
+            self.data_liquids = self.load_liquid_df()
+        self.update_form_visibility()             # masque/affiche les bons champs
+        self.afficher_donnees()                   # recharge la table avec le bon DF
 
     def load_nacres_list(self):
         if not os.path.exists(self.nacres_hdf5_file):
@@ -222,6 +278,16 @@ class DataMassWindow(QMainWindow):
             self.filter_nacres_list()
         except Exception as e:
             print(f"[ERROR] Impossible de charger la liste NACRES: {e}")
+
+    def load_liquid_df(self):
+        if os.path.exists(self.hdf5_liquids):
+            df_liq = pd.read_hdf(self.hdf5_liquids)
+        else:
+            df_liq = pd.DataFrame(columns=self.columns_liquids)
+        for col in self.columns_liquids:
+            if col not in df_liq.columns:
+                df_liq[col] = ""
+        return df_liq
 
     def filter_nacres_list(self):
         search_text = self.nacres_search.text().strip().lower()
@@ -241,6 +307,7 @@ class DataMassWindow(QMainWindow):
         return None
 
     def ajouter_objet_utilisateur(self):
+        is_liq = self.is_liquid
         nom = self.nom_input.text().strip()
         marque = self.brand_input.text().strip()
         reference = self.ref_input.text().strip()
@@ -257,42 +324,72 @@ class DataMassWindow(QMainWindow):
         lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
 
-        if not nom or not marque or not reference or not materiau or not source or not nacres:
-            QMessageBox.warning(self, "Erreur", "Tous les champs doivent être remplis.")
+        if is_liq:
+            dens       = self.dens_input.text().strip().replace(',', '.')
+            conc       = self.conc_input.text().strip().replace(',', '.')
+            facteur    = self.factor_input.text().strip().replace(',', '.')
+            incert     = self.uncert_input.text().strip().replace(',', '.')
+        else:
+            dens = conc = facteur = incert = ""
+
+        if is_liq:
+            required_ok = all([nom, nacres, dens, facteur, source])
+        else:
+            required_ok = all([nom, marque, reference, materiau, nacres, masse_str, source])
+        if not required_ok:
+            QMessageBox.warning(self, "Erreur", "Tous les champs obligatoires doivent être remplis.")
             return
 
-        try:
-            masse = float(masse_str)
-        except ValueError:
-            QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
-            return
+        if not is_liq:
+            try:
+                masse = float(masse_str)
+            except ValueError:
+                QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
+                return
 
         erreur = self.verifier_existence_objet(nom, reference, nacres)
         if erreur:
             QMessageBox.warning(self, "Erreur", erreur)
             return
 
-        nouvel_objet = {
-            "Consommable": nom,
-            "Marque": marque,
-            "Référence": reference,
-            "Code NACRES": nacres,
-            "Masse unitaire (g)": masse,
-            "Matériau consommable": materiau,
-            "Masse unitaire deuxieme materiaux (g)": masse2_str,
-            "Matériau deuxieme materiaux": materiau2,
-            "Masse emballage unitaire (g)": masse_emb_str,
-            "Matériau emballage": mat_emb,
-            "Masse condionnement (g)": masse_cond_str,
-            "Matériau conditionnement": mat_cond,
-            "Nbr par conditionnement": nbr_cond,
-            "Lien / Note / Remarque": lien_note,
-            "Source/Signature": source
-        }
-        self.data = self.ajouter_objet_df(self.data, nouvel_objet)
-
-        # Sauvegarde des données
-        self.sauvegarder_donnees()
+        if is_liq:
+            nouvel_objet = {
+                "Produit": nom,
+                "Type": "Liquide",
+                "Code NACRES": nacres,
+                "CAS": reference,
+                "Référence": reference,
+                "Unité": "mL",
+                "Densité (g/mL)": dens,
+                "Concentration (mg/mL)": conc,
+                "Facteur CO₂ (kg CO₂e/kg)": facteur,
+                "Incertitude (%)": incert,
+                "Source/Signature": source,
+                "Note": lien_note
+            }
+        else:
+            nouvel_objet = {
+                "Consommable": nom,
+                "Marque": marque,
+                "Référence": reference,
+                "Code NACRES": nacres,
+                "Masse unitaire (g)": masse_str,
+                "Matériau consommable": materiau,
+                "Masse unitaire deuxieme materiaux (g)": masse2_str,
+                "Matériau deuxieme materiaux": materiau2,
+                "Masse emballage unitaire (g)": masse_emb_str,
+                "Matériau emballage": mat_emb,
+                "Masse condionnement (g)": masse_cond_str,
+                "Matériau conditionnement": mat_cond,
+                "Nbr par conditionnement": nbr_cond,
+                "Lien / Note / Remarque": lien_note,
+                "Source/Signature": source
+            }
+        if is_liq:
+            self.save_liquid(nouvel_objet)
+        else:
+            self.data = self.ajouter_objet_df(self.data, nouvel_objet)
+            self.sauvegarder_donnees()
 
         # Efface les champs
         self.nom_input.clear()
@@ -310,9 +407,36 @@ class DataMassWindow(QMainWindow):
         self.lien_input.clear()
         self.source_input.clear()
         self.nacres_combo.setCurrentIndex(-1)
+        self.dens_input.clear()
+        self.conc_input.clear()
+        self.factor_input.clear()
+        self.uncert_input.clear()
 
         QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
         self.data_added.emit()
+
+    def save_liquid(self, obj_dict):
+        """Ajoute une ligne au fichier HDF5 des liquides."""
+        # Charger ou créer DF
+        if os.path.exists(self.hdf5_liquids):
+            try:
+                df_liq = pd.read_hdf(self.hdf5_liquids)
+            except Exception:
+                df_liq = pd.DataFrame(columns=self.columns_liquids)
+        else:
+            df_liq = pd.DataFrame(columns=self.columns_liquids)
+
+        # Assurer toutes les colonnes
+        for col in self.columns_liquids:
+            if col not in df_liq.columns:
+                df_liq[col] = ""
+
+        new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
+        df_liq = pd.concat([df_liq, new_line], ignore_index=True)
+        df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
+        self.data_liquids = df_liq
+        if self.is_liquid:
+            self.afficher_donnees()
 
     def ajouter_objet_df(self, df, objet):
         nouvel_objet = pd.DataFrame([objet])
@@ -324,12 +448,46 @@ class DataMassWindow(QMainWindow):
             return pd.concat([df, nouvel_objet], ignore_index=True)
 
     def afficher_donnees(self):
-        self.table.setRowCount(len(self.data))
-        for row_idx, row_data in self.data.iterrows():
-            for col_idx, col_name in enumerate(self.columns):
-                cell_value = str(row_data.get(col_name, ""))
-                item = QTableWidgetItem(cell_value)
-                self.table.setItem(row_idx, col_idx, item)
+        # Réinitialiser le tableau
+        self.table.clearContents()
+        if self.is_liquid:
+            df, cols = self.data_liquids, self.columns_liquids
+        else:
+            df, cols = self.data, self.columns
+
+        self.table.setColumnCount(len(cols))
+        self.table.setHorizontalHeaderLabels(cols)
+
+        self.table.setRowCount(len(df))
+        for i, (_, row) in enumerate(df.iterrows()):
+            for j, col in enumerate(cols):
+                self.table.setItem(i, j, QTableWidgetItem(str(row.get(col, ""))))
+        self.table.resizeColumnsToContents()
+    
+    def update_form_visibility(self):
+        """Montre/masque les champs en fonction de self.is_liquid."""
+        # Champs propres aux solides
+        for w in (
+            self.masse_input, self.materiau_combo,
+            self.masse2_input, self.materiau2_combo,
+            self.masse_emb_input, self.mat_emb_combo,
+            self.masse_cond_input, self.mat_cond_combo,
+            self.nbr_cond_input
+        ):
+            lab = self.form_layout.labelForField(w)
+            if lab:
+                lab.setVisible(not self.is_liquid)
+            w.setVisible(not self.is_liquid)
+
+        # Champs propres aux liquides
+        for w in (
+            self.dens_input, self.conc_input,
+            self.factor_input, self.uncert_input
+        ):
+            lab = self.form_layout.labelForField(w)
+            if lab:
+                lab.setVisible(self.is_liquid)
+            w.setVisible(self.is_liquid)
 
     def calculer_eCO2_via_masse(self):
         """
