@@ -2027,6 +2027,15 @@ class MainWindow(QMainWindow):
         <p><b>Sources et Références :</b></p>
         <ul>
             <li>
+                <b><a href="https://apps.labos1point5.org/documentation/carbon/ges-emissions-factors">GES 1point5 - Facteurs d'émission</a></b><br>
+                Données utilisées par l'application GES 1point5 pour l'électricité, les véhicules, les transports, etc.
+            </li>
+            <li>
+                <b><a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">Labos 1point5 (PER1p5) - Données achats</a></b><br>
+                Données PER1p5 pour les achats (NACRES vers facteurs d'émission macro / méso / micro).<br>
+                M. De Paepe, L. Jeanneau, J. Mariette, O. Aumont, A. Estevez-Torres, <i>Purchases dominate the carbon footprint of research laboratories</i>, bioRxiv 2023 (<a href="https://doi.org/10.1101/2023.04.04.535626">https://doi.org/10.1101/2023.04.04.535626</a>).
+            </li>
+            <li>
                 <b><a href="https://base-empreinte.ademe.fr/">Base Carbone®</a></b><br>
                 Source officielle pour les données de l'ADEME (Agence de la Transition Écologique).
             </li>
