@@ -21,7 +21,7 @@ Il contient :
   - récupérer les items associés à une manip
 
 ### 2. `b_create_manip_type_file.py` : insertion de manipulations types
-Ce fichier permet de créer de nouvelles manipulations de type *native* (ou *user*) dans la base, via un appel à la méthode `add_manip()`.
+Ce fichier permet de créer de nouvelles manipulations de type *native* (ou *utilisateur·rice*) dans la base, via un appel à la méthode `add_manip()`.
 
 💡 Il sert notamment à alimenter la base de données initiale avec des exemples standards.
 
@@ -29,7 +29,7 @@ Ce fichier permet de créer de nouvelles manipulations de type *native* (ou *use
 Ce script propose un menu dans le terminal pour :
 - lister toutes les manipulations types (avec ID, nom, et source)
 - modifier leur nom
-- modifier leur source (`native`, `user`, etc.)
+- modifier leur source (`native`, `utilisateur·rice`, etc.)
 
 Il permet de rapidement corriger ou mettre à jour les informations contenues dans la base via une interface simple.
 
@@ -62,5 +62,5 @@ Une manipulation type peut contenir plusieurs objets décrits comme suit :
 ```
 
 ## NB : 
-•	Les manipulations peuvent être marquées comme “native” (venant avec l’application) ou “user” (ajoutées par l’utilisateur).
+•	Les manipulations peuvent être marquées comme “native” (venant avec l’application) ou “utilisateur·rice” (ajoutées par l’utilisateur).
 •	Ce système permet d’initialiser un référentiel commun d’activités types à réutiliser dans d’autres parties de l’application LABeCO2.

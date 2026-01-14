@@ -52,7 +52,7 @@ def update_manip_name(db):
 def update_manip_source(db):
     print("\n** Modifier la source d'une manip **")
     manip_id = input("Entrez l'ID de la manip à modifier : ").strip()
-    new_source = input("Nouvelle source (ex: 'native' ou 'user') : ").strip()
+    new_source = input("Nouvelle source (ex: 'native' ou 'utilisateur·rice') : ").strip()
     if not manip_id.isdigit():
         print("ID invalide.")
         return

@@ -23,6 +23,27 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class ManipsTypeDB:
+    SOURCE_NATIVE = "native"
+    SOURCE_USER = "utilisateur·rice"
+    SOURCE_USER_LEGACY = "user"
+
+    @classmethod
+    def normalize_source(cls, source):
+        if source is None:
+            return None
+        if not isinstance(source, str):
+            return source
+        if source == cls.SOURCE_USER_LEGACY:
+            return cls.SOURCE_USER
+        return source
+
+    @classmethod
+    def source_filter_values(cls, source):
+        normalized = cls.normalize_source(source)
+        if normalized == cls.SOURCE_USER:
+            return [cls.SOURCE_USER, cls.SOURCE_USER_LEGACY]
+        return [normalized]
+
     def __init__(self, db_path='manips_types/manips_type.sqlite'):
         """
         Initialise la connexion SQLite et crée les tables si elles n'existent pas.
@@ -38,7 +59,7 @@ class ManipsTypeDB:
     def create_tables(self):
         """
         Crée les tables 'manips' et 'manips_items' si elles n'existent pas déjà.
-        La table 'manips' a un champ 'source' pour distinguer les manips "native" vs "user".
+        La table 'manips' a un champ 'source' pour distinguer les manips "native" vs "utilisateur·rice".
         """
         create_manips_table = """
         CREATE TABLE IF NOT EXISTS manips (
@@ -72,7 +93,7 @@ class ManipsTypeDB:
         cursor.execute(create_manips_items_table)
         self.conn.commit()
 
-    def add_manip(self, manip_name, items_list, source="native"):
+    def add_manip(self, manip_name, items_list, source=None):
         """
         Ajoute une nouvelle manip et ses items dans la base.
         :param manip_name: str, nom de la manip
@@ -97,8 +118,11 @@ class ManipsTypeDB:
                 "consommable": ""
               }
             ]
-        :param source: "native" ou "user" par ex. pour distinguer l'origine
+        :param source: "native" ou "utilisateur·rice" par ex. pour distinguer l'origine
         """
+        if source is None:
+            source = self.SOURCE_NATIVE
+        source = self.normalize_source(source)
         cursor = self.conn.cursor()
         # 1) Insérer la manip dans la table manips
         cursor.execute("INSERT INTO manips (name, source) VALUES (?, ?)", (manip_name, source))
@@ -143,10 +167,11 @@ class ManipsTypeDB:
 
     def update_manip_source(self, manip_id, new_source):
         """
-        Met à jour la source d'une manip existante ('user', 'native', etc.).
+        Met à jour la source d'une manip existante ('utilisateur·rice', 'native', etc.).
         :param manip_id: int, l'ID de la manip à modifier
         :param new_source: str, la nouvelle source
         """
+        new_source = self.normalize_source(new_source)
         cursor = self.conn.cursor()
         cursor.execute("""
             UPDATE manips
@@ -158,25 +183,86 @@ class ManipsTypeDB:
     def list_manips_with_id(self):
         """
         Retourne la liste (id, name, source) de toutes les manips, classées par id.
+        La source est normalisée (ex: "user" -> "utilisateur·rice").
         """
         cursor = self.conn.cursor()
         cursor.execute("SELECT id, name, source FROM manips ORDER BY id ASC")
         rows = cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "source": self.normalize_source(r["source"]),
+            }
+            for r in rows
+        ]
 
     def list_manips(self, source=None):
         """
         Retourne la liste des noms de manip disponibles dans la table `manips`.
-        :param source: None, "native", ou "user".
+        :param source: None, "native", ou "utilisateur·rice".
                        Si None, on retourne toutes les manips; sinon on filtre sur la colonne 'source'.
+                       Le filtre "user" est accepté et normalisé.
         """
         cursor = self.conn.cursor()
         if source is None:
             cursor.execute("SELECT name FROM manips ORDER BY name ASC")
         else:
-            cursor.execute("SELECT name FROM manips WHERE source = ? ORDER BY name ASC", (source,))
+            source_values = self.source_filter_values(source)
+            if len(source_values) == 1:
+                cursor.execute(
+                    "SELECT name FROM manips WHERE source = ? ORDER BY name ASC",
+                    (source_values[0],),
+                )
+            else:
+                placeholders = ", ".join("?" for _ in source_values)
+                cursor.execute(
+                    f"SELECT name FROM manips WHERE source IN ({placeholders}) ORDER BY name ASC",
+                    source_values,
+                )
         rows = cursor.fetchall()
         return [row["name"] for row in rows]
+
+    def get_manip_source(self, manip_name):
+        """
+        Récupère la source d'une manip par son nom.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT source FROM manips WHERE name = ? ORDER BY id ASC LIMIT 1",
+            (manip_name,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return self.normalize_source(row["source"])
+
+    def delete_manip(self, manip_name):
+        """
+        Supprime une manip et ses items associés à partir du nom.
+        Retourne le nombre de manips supprimées.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT id FROM manips WHERE name = ? ORDER BY id ASC",
+            (manip_name,),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return 0
+
+        manip_ids = [r["id"] for r in rows]
+        placeholders = ", ".join("?" for _ in manip_ids)
+        cursor.execute(
+            f"DELETE FROM manips_items WHERE manip_id IN ({placeholders})",
+            manip_ids,
+        )
+        cursor.execute(
+            f"DELETE FROM manips WHERE id IN ({placeholders})",
+            manip_ids,
+        )
+        self.conn.commit()
+        return len(manip_ids)
 
     def get_manip_items(self, manip_name):
         """

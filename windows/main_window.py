@@ -402,20 +402,23 @@ class MainWindow(QMainWindow):
         self.manip_type_label = QLabel("Choisissez une manip type :")
         self.manip_type_combo = QComboBox()
         self.manip_type_combo.addItem("Sélectionnez une manip...")
-        # On récupère toutes les manips existantes en base (natives + user)
+        # On récupère toutes les manips existantes en base (natives + utilisateur·rice)
         manip_names = self.manips_db.list_manips()
         for mn in manip_names:
             self.manip_type_combo.addItem(mn)
         self.add_manip_type_button = QPushButton("Ajouter la manip sélectionnée")
+        self.delete_manip_type_button = QPushButton("Supprimer de la base de doonnée la manip sélectionnée")
 
         # Par défaut, on masque les 3 widgets
         self.manip_type_combo.setVisible(False)
         self.manip_type_label.setVisible(False)
         self.add_manip_type_button.setVisible(False)
+        self.delete_manip_type_button.setVisible(False)
         # On les ajoute au layout principal
         main_layout.addWidget(self.manip_type_label)
         main_layout.addWidget(self.manip_type_combo)
         main_layout.addWidget(self.add_manip_type_button)
+        main_layout.addWidget(self.delete_manip_type_button)
         
         self.refresh_manip_type_combo()
 
@@ -639,6 +642,8 @@ class MainWindow(QMainWindow):
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         
         self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
+        self.delete_manip_type_button.clicked.connect(self.delete_selected_user_manip)
+        self.manip_type_combo.currentIndexChanged.connect(self.update_delete_manip_button)
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
@@ -651,6 +656,7 @@ class MainWindow(QMainWindow):
         self.manip_type_label.setVisible(True)
         self.manip_type_combo.setVisible(True)
         self.add_manip_type_button.setVisible(True)
+        self.update_delete_manip_button()
 
     def show_calcul_section(self):
         """
@@ -662,6 +668,7 @@ class MainWindow(QMainWindow):
         self.manip_type_label.setVisible(False)
         self.manip_type_combo.setVisible(False)
         self.add_manip_type_button.setVisible(False)
+        self.delete_manip_type_button.setVisible(False)
 
         if current_category == "Machine":
             # Pour Machine, on affiche la section Machine et on masque la zone standard
@@ -786,7 +793,11 @@ class MainWindow(QMainWindow):
             return  # Aucune manip réelle n'est sélectionnée
 
         # 2) Récupérer le nom de la manip depuis la combo (stocké dans userData)
-        manip_name = self.manip_type_combo.itemData(current_idx)
+        manip_data = self.manip_type_combo.itemData(current_idx)
+        if isinstance(manip_data, dict):
+            manip_name = manip_data.get("name")
+        else:
+            manip_name = manip_data
         if not manip_name:
             return
 
@@ -829,6 +840,66 @@ class MainWindow(QMainWindow):
 
         # Mettre à jour le total des émissions
         self.update_total_emissions()
+
+    def get_selected_manip_info(self):
+        current_idx = self.manip_type_combo.currentIndex()
+        if current_idx <= 0:
+            return None, None
+
+        manip_data = self.manip_type_combo.itemData(current_idx)
+        if isinstance(manip_data, dict):
+            return manip_data.get("name"), manip_data.get("source")
+        if isinstance(manip_data, str):
+            return manip_data, self.manips_db.get_manip_source(manip_data)
+        return None, None
+
+    def update_delete_manip_button(self):
+        if not self.manip_type_combo.isVisible():
+            self.delete_manip_type_button.setVisible(False)
+            return
+
+        manip_name, manip_source = self.get_selected_manip_info()
+        should_show = bool(manip_name and manip_source == ManipsTypeDB.SOURCE_USER)
+        self.delete_manip_type_button.setVisible(should_show)
+
+    def delete_selected_user_manip(self):
+        manip_name, manip_source = self.get_selected_manip_info()
+        if not manip_name:
+            return
+        if manip_source != ManipsTypeDB.SOURCE_USER:
+            QMessageBox.warning(
+                self,
+                "Suppression impossible",
+                "Seules les manips utilisateur·rice peuvent être supprimées."
+            )
+            self.update_delete_manip_button()
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Supprimer la manip",
+            f"Supprimer définitivement la manip «{manip_name}» de la base de données?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        deleted_count = self.manips_db.delete_manip(manip_name)
+        if deleted_count <= 0:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                f"Aucune manip supprimée pour «{manip_name}»."
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Manip supprimée",
+            f"La manip «{manip_name}» a été supprimée."
+        )
+        self.refresh_manip_type_combo()
 
     def on_search_text_changed(self, text):
         """
@@ -1325,13 +1396,14 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # 4) Ajouter la manip en base (source = "user")
+            # 4) Ajouter la manip en base (source = "utilisateur·rice")
             try:
-                self.manips_db.add_manip(manip_name, items_list, source="user")
+                source_label = ManipsTypeDB.SOURCE_USER
+                self.manips_db.add_manip(manip_name, items_list, source=source_label)
                 QMessageBox.information(
                     self, 
                     "Manip ajoutée", 
-                    f"La manip «{manip_name}» a bien été ajoutée dans la base (source=user)."
+                    f"La manip «{manip_name}» a bien été ajoutée dans la base (source={source_label})."
                 )
                 self.refresh_manip_type_combo()
             except Exception as e:
@@ -1349,11 +1421,13 @@ class MainWindow(QMainWindow):
         for m in manip_list:
             # Le texte qu'on veut afficher
             display_text = f"{m['name']} - {m['source']}"
+            manip_data = {"name": m["name"], "source": m["source"]}
             
             # On ajoute l'item dans la combo
             # - `display_text` est ce que l'utilisateur voit,
-            # - `m['name']` est stocké dans l'UserRole pour un usage ultérieur
-            self.manip_type_combo.addItem(display_text, userData=m['name'])
+            # - `name` et `source` sont stockés dans l'UserRole pour un usage ultérieur
+            self.manip_type_combo.addItem(display_text, userData=manip_data)
+        self.update_delete_manip_button()
     # ------------------------------------------------------------------
     # Calculs d'émissions
     # ------------------------------------------------------------------ 
