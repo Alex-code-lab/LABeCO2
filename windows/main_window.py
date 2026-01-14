@@ -358,7 +358,7 @@ class MainWindow(QMainWindow):
         #     }
         # """)
 
-        self.input_label = QLabel('Entrez la valeur:')
+        self.input_label = QLabel('Entrez la valeur journalière :')
         self.input_field = QLineEdit()
         self.input_field.setEnabled(False)
 
@@ -1126,11 +1126,18 @@ class MainWindow(QMainWindow):
         if not filtered_data.empty:
             unit = filtered_data['unit'].values[0] or 'valeur'
             self.current_unit = unit
-            self.input_label.setText(f'Entrez la valeur en {unit}:')
+            # Le libellé "valeur journalière" n'est pertinent que si le champ "Nombre de jours" est affiché
+            if self.days_label.isVisible():
+                self.input_label.setText(f'Entrez la valeur journalière en {unit}:')
+            else:
+                self.input_label.setText(f'Entrez la valeur en {unit}:')
             self.input_field.setEnabled(True)
         else:
             self.current_unit = None
-            self.input_label.setText('Entrez la valeur:')
+            if self.days_label.isVisible():
+                self.input_label.setText('Entrez la valeur journalière:')
+            else:
+                self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
 
     def update_conso_filtered_combo(self, filter_text=None):

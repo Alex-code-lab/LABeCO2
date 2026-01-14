@@ -205,10 +205,10 @@ class EditCalculationDialog(QDialog):
             self.current_unit = data.get('unit', '')
 
             if self.current_unit:
-                self.input_label.setText(f'Entrez la valeur en {self.current_unit}:')
+                self.input_label.setText(f'Entrez la valeur journalière en {self.current_unit}:')
                 self.input_field.setEnabled(True)
             else:
-                self.input_label.setText('Entrez la valeur:')
+                self.input_label.setText('Entrez la valeur journalière:')
                 self.input_field.setEnabled(False)
 
             # --- Spécifique Véhicules : on stocke un total dans 'value',
@@ -500,11 +500,11 @@ class EditCalculationDialog(QDialog):
         if not filtered_data.empty:
             unit = filtered_data['unit'].values[0] or 'valeur'
             self.current_unit = unit
-            self.input_label.setText(f'Entrez la valeur en {unit}:')
+            self.input_label.setText(f'Entrez la valeur journalière en {unit}:')
             self.input_field.setEnabled(True)
         else:
             self.current_unit = None
-            self.input_label.setText('Entrez la valeur:')
+            self.input_label.setText('Entrez la valeur journalière:')
             self.input_field.setEnabled(False)
 
     def update_nacres_filtered_combo(self):
