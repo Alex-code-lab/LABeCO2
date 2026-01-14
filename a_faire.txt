@@ -6,3 +6,9 @@
 2- Améliorer le packaging pour toutes plateforme
 
 3- chiffré les bases de données (surtout celles de labos1point5) si on a la nouvelle database
+
+
+Source véhicule éléctricité...  :https://apps.labos1point5.org/documentation/carbon/ges-emissions-factors
+
+
+Source pour les dernière data (qui dates de 2023 je crois pour les achats : ce que je mets à jours)

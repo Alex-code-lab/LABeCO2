@@ -23,6 +23,11 @@ df_list = []
 for file in all_files:
     # Lire chaque fichier TSV dans un DataFrame Pandas
     df = pd.read_csv(file, sep='\t')  # ajuster le sep si besoin
+
+    # Forcer la catégorie "Achats" pour les fichiers de type purchases
+    if "purchases" in os.path.basename(file).lower():
+        df["category"] = "Achats"
+
     df_list.append(df)
 
 # 5) Fusionner tous les DataFrame en un seul
@@ -39,3 +44,22 @@ output_file = './data_base_GES1point5/data_initiales/table_unique.csv'
 final_df.to_csv(output_file)#, key='data', mode='w')
 
 print(f"Fichier HDF5 généré : {output_file}")
+
+# 7) Exporter le DataFrame final au format HDF5
+output_hdf5 = './data_base_GES1point5/data_initiales/data_base_GES1point5.hdf5'
+
+# Conversion explicite des colonnes string pandas en object (compat PyTables)
+final_df_h5 = final_df.copy()
+for col in final_df_h5.columns:
+    if pd.api.types.is_string_dtype(final_df_h5[col].dtype):
+        final_df_h5[col] = final_df_h5[col].astype(object)
+
+        final_df_h5.to_hdf(
+    output_hdf5,
+    key='data',
+    mode='w',
+    format='table'
+)
+        
+print(f"Fichier CSV généré : {output_file}")
+print(f"Fichier HDF5 généré : {output_hdf5}")
