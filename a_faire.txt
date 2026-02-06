@@ -12,3 +12,7 @@ Source véhicule éléctricité...  :https://apps.labos1point5.org/documentation
 
 
 Source pour les dernière data (qui dates de 2023 je crois pour les achats : ce que je mets à jours)
+
+Je peux changé en donné ACV pour les datas de consommables / le restes : en gros si ça vient de la deuxième banque de données (la mienne)
+alors c'esst ACV, si c'est  via la database de Labo1.5 alors c'est du monétaire. sinon iren. On améliore le tout et on 
+fait un test avec David
