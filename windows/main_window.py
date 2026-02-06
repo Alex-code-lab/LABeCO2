@@ -38,6 +38,8 @@ from windows.edit_calculation_dialog import EditCalculationDialog
 from windows.graphiques.graph_4_stacked_bar_consumables import StackedBarConsumablesWindow
 from windows.graphiques.graph_5_nacres_bar_chart import NacresBarChartWindow
 from windows.graphiques.graph_6_proportional_bar_chart_mass import ProportionalBarChartNacresWindow
+from windows.graphiques.graph_7_CoverageWindow import CoverageWindow
+from windows.graphiques.graph_8_CoverageCategory import CoverageCategoryWindow
 from windows.UserManipDialog import UserManipDialog
 
 
@@ -93,6 +95,8 @@ class MainWindow(QMainWindow):
         self.data_mass_window = None
         self.stacked_bar_consumables_window = None
         self.nacres_bar_chart_window = None
+        self.coverage_chart_window = None
+        self.coverage_category_chart_window = None
 
         # Widgets
         self.category_combo = None
@@ -596,6 +600,31 @@ class MainWindow(QMainWindow):
 
         main_layout.addSpacing(5)
 
+        # -------------------------------------------------
+        # Ligne 3 — Couverture méthodologique
+        # -------------------------------------------------
+
+        graph_line3 = QLabel("Analyse de la couverture méthodologique du bilan carbone :")
+        main_layout.addWidget(graph_line3)
+
+        self.generate_coverage_button = QPushButton("Couverture globale")
+        self.generate_coverage_button.setToolTip(
+            "Affiche la couverture méthodologique globale (quantitatif physique, "
+            "proxy monétaire, non couvert)."
+        )
+
+        self.generate_coverage_category_button = QPushButton("Couverture par catégorie")
+        self.generate_coverage_category_button.setToolTip(
+            "Affiche la répartition des émissions selon la méthode de calcul "
+            "(quantitatif physique, proxy monétaire, non couvert)."
+        )
+
+        buttons_layout_graph_line3 = QHBoxLayout()
+        buttons_layout_graph_line3.addWidget(self.generate_coverage_button)
+        buttons_layout_graph_line3.addWidget(self.generate_coverage_category_button)
+
+        main_layout.addLayout(buttons_layout_graph_line3)
+
     def initUISignals(self):
         """
         Initialise les connexions de signaux et slots dans l'interface utilisateur.
@@ -634,6 +663,8 @@ class MainWindow(QMainWindow):
         self.generate_stacked_bar_consumables_button.clicked.connect(self.generate_stacked_bar_consumables)
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
         self.generate_proportional_bar_button_mass.clicked.connect(self.generate_proportional_bar_chart_mass)     
+        self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
+        self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
 
         self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
         self.add_machine_button.clicked.connect(self.add_machine)
@@ -1951,6 +1982,8 @@ class MainWindow(QMainWindow):
                             - 'proportional_bar' : Graphique à barres empilées proportionnelles.
                             - 'stacked_bar_consumables' : Graphique à barres empilées pour les consommables.
                             - 'nacres_bar' : Graphique basé sur les codes NACRES.
+                            - 'coverage' : Couverture méthodologique globale.
+                            - 'coverage_category' : Couverture méthodologique par catégorie.
         """
         # Détermine le nom de l'attribut correspondant à la fenêtre graphique.
         # Exemple : pour 'pie', on recherche 'pie_chart_window'.
@@ -1967,7 +2000,9 @@ class MainWindow(QMainWindow):
                 'proportional_bar': ProportionalBarChartWindow,
                 'stacked_bar_consumables': StackedBarConsumablesWindow,
                 'nacres_bar': NacresBarChartWindow,
-                'proportional_bar_mass': ProportionalBarChartNacresWindow
+                'proportional_bar_mass': ProportionalBarChartNacresWindow,
+                'coverage': CoverageWindow,
+                'coverage_category': CoverageCategoryWindow
             }.get(chart_type)
 
             # Vérifie si le type demandé est valide (i.e., présent dans le dictionnaire).
@@ -2012,6 +2047,12 @@ class MainWindow(QMainWindow):
 
     def generate_proportional_bar_chart_mass(self):
         self.generate_chart('proportional_bar_mass')
+
+    def generate_coverage_chart(self):
+        self.generate_chart('coverage')
+
+    def generate_coverage_category_chart(self):
+        self.generate_chart('coverage_category')
 
     def show_sources_popup(self, link_str):
         """

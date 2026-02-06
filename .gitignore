@@ -11,3 +11,4 @@ build/
 Desktop/
 packaging/
 .DS_Store
+*.xlsx
