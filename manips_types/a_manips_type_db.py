@@ -8,19 +8,7 @@
 import sqlite3
 import os
 import sys
-
-# Fonction utilitaire pour compatibilité PyInstaller
-def resource_path(relative_path):
-    """
-    Récupère le chemin absolu vers une ressource, compatible avec PyInstaller.
-    """
-    try:
-        # PyInstaller crée un dossier temporaire _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
+from utils.data_loader import resource_path
 
 class ManipsTypeDB:
     SOURCE_NATIVE = "native"
@@ -55,6 +43,15 @@ class ManipsTypeDB:
         # Pour récupérer les lignes sous forme de dictionnaires (clé = nom de colonne)
         self.conn.row_factory = sqlite3.Row
         self.create_tables()
+
+    def close(self):
+        """Ferme la connexion SQLite proprement."""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def __del__(self):
+        self.close()
 
     def create_tables(self):
         """
@@ -148,7 +145,6 @@ class ManipsTypeDB:
                 item.get("quantity", 0.0),
                 item.get("consommable", "")
             ))
-        print("ADD MANIP : ", items_list)
         self.conn.commit()
     
     def update_manip_name(self, manip_id, new_name):

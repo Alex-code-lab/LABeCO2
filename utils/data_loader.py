@@ -28,49 +28,17 @@ def load_logo():
     pixmap = QPixmap(image_path)
     return pixmap
 
-# def load_data():
-#     # data_file = resource_path('data_base_GES1point5/data_base_GES1point5.hdf5')
-#     # data_file = resource_path('data_base_GES1point5/GES1point5_purchases_factors_PER1p5_v1-0-2023.h5')
-#     data_file = resource_path('data_base_GES1point5/data_base_GES1point5.hdf5')
-#     # Le fichier HDF5 contient plusieurs tables (datasets) ; il faut préciser la clé.
-#     # La table compatible avec l'ancien format "Achats" est "purchases_factors".
-#     try:
-#         df = pd.read_hdf(data_file, key="purchases_factors")
-#     except (ValueError, KeyError):
-#         # Si la clé n'existe pas, on affiche les clés disponibles pour faciliter le debug.
-#         with pd.HDFStore(data_file, mode="r") as store:
-#             keys = store.keys()
-#         raise ValueError(
-#             f"Impossible de charger les données : key must be provided when HDF5 file contains multiple datasets. "
-#             f"Clé attendue: 'purchases_factors'. Clés disponibles : {keys}"
-#         )
-
-#     return df
-# def load_data
 
 def load_data():
     data_file = resource_path('data_base_GES1point5/data_base_GES1point5.hdf5')
-    df = pd.read_hdf(data_file)
+    try:
+        df = pd.read_hdf(data_file, key='purchases_factors')
+    except (KeyError, ValueError):
+        # Fallback : lire la première clé disponible
+        with pd.HDFStore(data_file, mode='r') as store:
+            keys = store.keys()
+        if not keys:
+            raise ValueError(f"Le fichier HDF5 '{data_file}' ne contient aucune table.")
+        df = pd.read_hdf(data_file, key=keys[0])
     return df
 
-# def load_data(data_file_path):
-#     """
-#     Charge les données depuis un fichier HDF5.
-
-#     Paramètres :
-#     ------------
-#     data_file_path : str
-#         Chemin du fichier HDF5.
-
-#     Retour :
-#     --------
-#     pandas.DataFrame :
-#         Données chargées sous forme de DataFrame.
-#     """
-#     if not os.path.exists(data_file_path):
-#         raise FileNotFoundError(f"Fichier de données introuvable : {data_file_path}")
-
-#     try:
-#         return pd.read_hdf(data_file_path)
-#     except Exception as e:
-#         raise RuntimeError(f"Erreur lors du chargement des données : {e}")

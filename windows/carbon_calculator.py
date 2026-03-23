@@ -17,9 +17,18 @@ class CarbonCalculator:
 
     def __init__(self, data_manager: DataManager):
         self.dm = data_manager
-        self.data = self.dm.get_main_data()
-        self.data_masse = self.dm.get_data_masse()
-        self.data_materials = self.dm.get_data_materials()
+
+    @property
+    def data(self):
+        return self.dm.get_main_data()
+
+    @property
+    def data_masse(self):
+        return self.dm.get_data_masse()
+
+    @property
+    def data_materials(self):
+        return self.dm.get_data_materials()
 
     def compute_emission_data(self, data_dict):
         """
@@ -89,6 +98,26 @@ class CarbonCalculator:
             mask &= (self.data['year'].astype(str) == str(year))
 
         filtered = self.data[mask]
+        if filtered.empty:
+            # Fallback: comparaison insensible à la casse / aux espaces
+            def _norm_series(series):
+                return series.fillna('').astype(str).str.strip().str.casefold()
+
+            norm_category = str(category).strip().casefold()
+            norm_subcat = str(subcat).strip().casefold()
+            norm_subsub = str(subsub).strip().casefold()
+            norm_name = str(name).strip().casefold()
+
+            mask_norm = (
+                (_norm_series(self.data['category']) == norm_category) &
+                (_norm_series(self.data['subcategory']) == norm_subcat) &
+                (_norm_series(self.data['subsubcategory']) == norm_subsub) &
+                (_norm_series(self.data['name']) == norm_name)
+            )
+            if year:
+                mask_norm &= (self.data['year'].astype(str) == str(year))
+            filtered = self.data[mask_norm]
+
         if filtered.empty:
             error_message = "Aucune donnée disponible pour cette sélection."
             return (0.0, 0.0, 0.0, 0.0, 0.0, error_message)

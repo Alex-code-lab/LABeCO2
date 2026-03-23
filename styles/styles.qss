@@ -8,7 +8,7 @@ QMainWindow {
 /* Style des QLabel */
 QLabel {
     color: #333333; /* Texte gris foncé pour une bonne lisibilité */
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; /* Polices système pour une apparence native */
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif; /* Polices système pour une apparence native */
     font-size: 14px; /* Taille de police standard */
 }
 
@@ -18,7 +18,7 @@ QLineEdit {
     border: 1px solid #C0C0C0; /* Bordure grise claire */
     border-radius: 4px; /* Coins légèrement arrondis */
     padding: 4px 8px; /* Espacement interne pour un meilleur confort de saisie */
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
     color: #000000;
 }
@@ -35,7 +35,7 @@ QLineEdit:disabled {
     border: 1px solid #C0C0C0;
     border-radius: 4px;
     padding: 6px 12px;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
 } */
 
@@ -46,7 +46,8 @@ QPushButton {
     border: 1px solid #a9a9a9;
     border-radius: 4px;
     padding: 2px 8px;
-    font: system;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
 }
 QPushButton:hover {
     background-color: #dde3e8;
@@ -83,7 +84,7 @@ QListWidget {
     background-color: #FFFFFF;
     border: 1px solid #C0C0C0;
     border-radius: 4px;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
     color: #000000;
 }
@@ -154,7 +155,7 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
 /* Style des QMessageBox */
 QMessageBox {
     background-color: #FFFFFF;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
     color: #333333;
 }
@@ -162,7 +163,7 @@ QMessageBox {
 /* Style des QDialog */
 QDialog {
     background-color: #FFFFFF;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
     color: #333333;
 }
@@ -172,14 +173,14 @@ QToolTip {
     background-color: #FFFFE0;
     color: #000000;
     border: 1px solid #C0C0C0;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 12px;
 }
 
 /* Style des QInputDialog */
 QInputDialog {
     background-color: #FFFFFF;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 14px;
     color: #333333;
 }

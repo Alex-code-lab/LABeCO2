@@ -5,6 +5,7 @@
 # Distribué sous licence : GNU GPL v3 (non commercial)
 # windows/data_mass_window.py
 import os
+import sys
 import pandas as pd
 from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
@@ -16,16 +17,24 @@ from PySide6.QtCore import Signal
 class DataMassWindow(QMainWindow):
     data_added = Signal()
 
-    def __init__(self, parent=None, data_materials=None):
+    def __init__(self, parent=None, data_materials=None, base_path=None):
         super().__init__(parent)
 
         self.setWindowTitle("Gestion des consommables")
         self.setGeometry(100, 100, 600, 400)
-        self.nacres_hdf5_file = "./data_masse_eCO2/nacres_2022.h5"  # or adapt path
+
+        # Résolution du base_path compatible PyInstaller
+        if base_path is None:
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        self.nacres_hdf5_file = os.path.join(base_path, "data_masse_eCO2", "nacres_2022.h5")
         self._all_nacres = []  # Will store (code, description)
 
         # Nom du fichier HDF5
-        self.hdf5_file = "./data_masse_eCO2/data_eCO2_masse_consommable.hdf5"
+        self.hdf5_file = os.path.join(base_path, "data_masse_eCO2", "data_eCO2_masse_consommable.hdf5")
 
         self.columns = [
             "Consommable",
@@ -62,7 +71,7 @@ class DataMassWindow(QMainWindow):
         ]
 
         # Fichier pour les consommables liquides
-        self.hdf5_liquids = "./data_masse_eCO2/data_eCO2_liquides_consommable.hdf5"
+        self.hdf5_liquids = os.path.join(base_path, "data_masse_eCO2", "data_eCO2_liquides_consommable.hdf5")
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
@@ -489,35 +498,38 @@ class DataMassWindow(QMainWindow):
                 lab.setVisible(self.is_liquid)
             w.setVisible(self.is_liquid)
 
-    def calculer_eCO2_via_masse(self):
+    def calculer_eCO2_via_masse(self, consommable_name, quantite):
         """
-        Calcule l'eCO2 total en additionnant :
+        Calcule l'eCO2 total pour un consommable donné en additionnant :
           - matériau principal
           - deuxième matériau (si masse > 0)
           - emballage
           - conditionnement (divisé par Nbr par conditionnement)
+
+        :param consommable_name: str, nom du consommable dans self.data
+        :param quantite: int, quantité d'unités
         """
         if self.data.empty:
             QMessageBox.warning(self, "Erreur", "Aucun consommable disponible.")
             return
 
-        # Dernière ligne du tableau
-        last_obj = self.data.iloc[-1]
-
-        try:
-            quantite = int(self.qty_input.text().strip())
-        except ValueError:
-            QMessageBox.warning(self, "Erreur", "La quantité doit être un entier valide.")
-            return
-        if quantite <= 0:
-            QMessageBox.warning(self, "Erreur", "La quantité doit être positive.")
+        if not isinstance(quantite, int) or quantite <= 0:
+            QMessageBox.warning(self, "Erreur", "La quantité doit être un entier positif.")
             return
 
         if self.data_materials is None:
             QMessageBox.warning(self, "Erreur", "Les données matériaux ne sont pas chargées.")
             return
 
+        rows = self.data[self.data["Consommable"] == consommable_name]
+        if rows.empty:
+            QMessageBox.warning(self, "Erreur", f"Consommable '{consommable_name}' introuvable.")
+            return
+        last_obj = rows.iloc[0]
+
         # Rassemble toutes les paires (masse, matériau)
+        # La colonne CO2 dans data_materials s'appelle "Equivalent CO₂ (kg eCO₂/kg)"
+        CO2_COL = "Equivalent CO\u2082 (kg eCO\u2082/kg)"
         composants = [
             ("Masse unitaire (g)", "Matériau consommable"),
             ("Masse unitaire deuxieme materiaux (g)", "Matériau deuxieme materiaux"),
@@ -533,7 +545,7 @@ class DataMassWindow(QMainWindow):
             masse_g = last_obj.get(col_masse, 0)
             try:
                 masse_g = float(masse_g)
-            except ValueError:
+            except (ValueError, TypeError):
                 masse_g = 0.0
             materiau = str(last_obj.get(col_mat, "")).strip()
 
@@ -547,18 +559,18 @@ class DataMassWindow(QMainWindow):
                     nb = float(nb) if nb else 1
                     if nb > 0:
                         masse_g /= nb
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
 
             masse_kg = masse_g / 1000.0 * quantite
             total_mass_kg += masse_kg
 
-            # Chercher facteur
+            # Chercher facteur — colonne correcte du DataFrame data_materials
             mat_row = self.data_materials[self.data_materials['Materiau'] == materiau]
             if mat_row.empty:
                 details.append(f"{materiau}: facteur inconnu → ignoré")
                 continue
-            facteur = float(mat_row['eCO2_kg'].iloc[0])
+            facteur = float(mat_row[CO2_COL].iloc[0])
             eCO2 = masse_kg * facteur
             total_eCO2 += eCO2
             details.append(f"{materiau}: {masse_kg:.4f} kg × {facteur:.2f} = {eCO2:.3f} kg")

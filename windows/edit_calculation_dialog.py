@@ -402,7 +402,6 @@ class EditCalculationDialog(QDialog):
                                             'Veuillez entrer une quantité positive.')
                         return
 
-            print("Debug - Nouveau self.modified_data :", self.modified_data)
             self.accept()
 
         except ValueError as ve:

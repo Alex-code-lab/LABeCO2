@@ -14,6 +14,7 @@
 
 import sys
 import os
+import math
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
@@ -22,13 +23,13 @@ from PySide6.QtWidgets import (
     # QListWidgetItem, QSpacerItem, QDialogButtonBox, QFileDialog, QInputDialog,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap, QIntValidator
+from PySide6.QtGui import QIntValidator, QDoubleValidator
 
 # On importe DataManager et CarbonCalculator
 from windows.data_manager import DataManager
 from windows.carbon_calculator import CarbonCalculator
 
-from utils.data_loader import load_logo, resource_path
+from utils.data_loader import load_logo
 from manips_types.a_manips_type_db import ManipsTypeDB
 from windows.graphiques.graph_1_pie_chart import PieChartWindow
 from windows.graphiques.graph_2_bar_chart import BarChartWindow
@@ -61,7 +62,7 @@ class MainWindow(QMainWindow):
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
         else:
-            base_path = os.path.abspath(".")
+            base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         
         # Chemin de la base de données SQLite pour les manips type
         db_path = os.path.join(base_path, "./manips_types/manips_type.sqlite")
@@ -83,10 +84,7 @@ class MainWindow(QMainWindow):
         self.carbon_calculator = CarbonCalculator(self.data_manager)
 
         # Variables
-        self.calculs = []
-        self.calcul_data = []
         self.current_unit = None
-        self.total_emissions = 0.0
 
         # Fenêtres graphiques
         self.pie_chart_window = None
@@ -113,6 +111,8 @@ class MainWindow(QMainWindow):
         self.header_label = None
         self.input_label = None
         self.days_label = None
+        self.toggle_graph_buttons_button = None
+        self.graph_buttons_container = None
 
         # NACRES
         self.conso_filtered_label = None
@@ -126,7 +126,6 @@ class MainWindow(QMainWindow):
                 border: 1px solid #a9a9a9;
                 border-radius: 4px;
                 padding: 2px 8px;
-                font: system;
             }
             QPushButton:hover {
                 background-color: #dde3e8;
@@ -269,11 +268,10 @@ class MainWindow(QMainWindow):
         Charge l'image du logo, la redimensionne de manière proportionnelle,
         et l'affiche dans un QLabel aligné au centre. En cas d'échec du chargement, affiche un message d'erreur.
         """
-        logo_path = load_logo()
+        pixmap = load_logo()
         self.logo_label = QLabel()
-        pixmap = QPixmap(logo_path)
         if pixmap.isNull():
-            QMessageBox.warning(self, 'Erreur', f"Impossible de charger l'image : {logo_path}")
+            QMessageBox.warning(self, 'Erreur', "Impossible de charger le logo de l'application.")
         else:
             resized_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.logo_label.setPixmap(resized_pixmap)
@@ -289,6 +287,20 @@ class MainWindow(QMainWindow):
             self.header_label.setText(self.full_text)
         else:
             self.header_label.setText(self.collapsed_text)
+
+    def toggle_graph_buttons_section(self, checked):
+        """
+        Affiche ou masque la section des boutons de graphiques.
+        """
+        if self.graph_buttons_container is None:
+            return
+
+        self.graph_buttons_container.setVisible(checked)
+        if self.toggle_graph_buttons_button is not None:
+            if checked:
+                self.toggle_graph_buttons_button.setText("Masquer les options graphiques")
+            else:
+                self.toggle_graph_buttons_button.setText("Afficher les options graphiques")
 
     def initUICategorySelectors(self, main_layout):
         """
@@ -411,7 +423,7 @@ class MainWindow(QMainWindow):
         for mn in manip_names:
             self.manip_type_combo.addItem(mn)
         self.add_manip_type_button = QPushButton("Ajouter la manip sélectionnée")
-        self.delete_manip_type_button = QPushButton("Supprimer de la base de doonnée la manip sélectionnée")
+        self.delete_manip_type_button = QPushButton("Supprimer de la base de données la manip sélectionnée")
 
         # Par défaut, on masque les 3 widgets
         self.manip_type_combo.setVisible(False)
@@ -446,6 +458,9 @@ class MainWindow(QMainWindow):
         self.power_label = QLabel('Puissance de la machine (kW):')
         self.power_field = QLineEdit()
         self.power_field.setMaximumWidth(200)
+        power_validator = QDoubleValidator(0.001, 99999.0, 3, self)
+        power_validator.setNotation(QDoubleValidator.StandardNotation)
+        self.power_field.setValidator(power_validator)
 
         self.usage_time_label = QLabel("Temps d'utilisation par jour (heures):")
         self.usage_time_field = QLineEdit()
@@ -455,6 +470,7 @@ class MainWindow(QMainWindow):
         self.days_machine_label = QLabel("Nombre de jours d'utilisation:")
         self.days_machine_field = QLineEdit()
         self.days_machine_field.setMaximumWidth(200)
+        self.days_machine_field.setValidator(QIntValidator(1, 9999, self))
 
         self.electricity_label = QLabel('Type d\'électricité:')
         self.electricity_combo = QComboBox()
@@ -544,8 +560,19 @@ class MainWindow(QMainWindow):
         graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
         main_layout.addWidget(graph_summary_label)
 
+        self.toggle_graph_buttons_button = QPushButton("Afficher les options graphiques")
+        self.toggle_graph_buttons_button.setCheckable(True)
+        self.toggle_graph_buttons_button.setChecked(False)
+        self.toggle_graph_buttons_button.setToolTip("Afficher ou masquer les boutons de graphiques.")
+        main_layout.addWidget(self.toggle_graph_buttons_button)
+
+        self.graph_buttons_container = QWidget()
+        graph_buttons_layout = QVBoxLayout()
+        graph_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        self.graph_buttons_container.setLayout(graph_buttons_layout)
+
         graph_line1 = QLabel("Analyse de la consommation carbone basée sur les dépenses monétaires par catégorie d'achat :")
-        main_layout.addWidget(graph_line1)
+        graph_buttons_layout.addWidget(graph_line1)
 
         # Boutons pour les graphiques line 1 (Pie, Bar, Proportional Bar)
         self.generate_pie_button = QPushButton('Diagramme en Secteurs')
@@ -567,10 +594,10 @@ class MainWindow(QMainWindow):
         buttons_layout_graph_line1.addWidget(self.generate_pie_button)
         buttons_layout_graph_line1.addWidget(self.generate_bar_button)
         buttons_layout_graph_line1.addWidget(self.generate_proportional_bar_button)
-        main_layout.addLayout(buttons_layout_graph_line1)
+        graph_buttons_layout.addLayout(buttons_layout_graph_line1)
 
         graph_line2 = QLabel("Analyse de la consommation carbone des consommables :")
-        main_layout.addWidget(graph_line2)
+        graph_buttons_layout.addWidget(graph_line2)
 
         # Boutons pour les graphiques ligne 2 (Stacked Bar, Nacres Bar)
 
@@ -596,16 +623,16 @@ class MainWindow(QMainWindow):
         buttons_layout_graph_line2.addWidget(self.generate_stacked_bar_consumables_button)
         buttons_layout_graph_line2.addWidget(self.generate_nacres_bar_button)
         buttons_layout_graph_line2.addWidget(self.generate_proportional_bar_button_mass)
-        main_layout.addLayout(buttons_layout_graph_line2)
+        graph_buttons_layout.addLayout(buttons_layout_graph_line2)
 
-        main_layout.addSpacing(5)
+        graph_buttons_layout.addSpacing(5)
 
         # -------------------------------------------------
         # Ligne 3 — Couverture méthodologique
         # -------------------------------------------------
 
         graph_line3 = QLabel("Analyse de la couverture méthodologique du bilan carbone :")
-        main_layout.addWidget(graph_line3)
+        graph_buttons_layout.addWidget(graph_line3)
 
         self.generate_coverage_button = QPushButton("Couverture globale")
         self.generate_coverage_button.setToolTip(
@@ -623,7 +650,10 @@ class MainWindow(QMainWindow):
         buttons_layout_graph_line3.addWidget(self.generate_coverage_button)
         buttons_layout_graph_line3.addWidget(self.generate_coverage_category_button)
 
-        main_layout.addLayout(buttons_layout_graph_line3)
+        graph_buttons_layout.addLayout(buttons_layout_graph_line3)
+
+        self.graph_buttons_container.setVisible(False)
+        main_layout.addWidget(self.graph_buttons_container)
 
     def initUISignals(self):
         """
@@ -633,6 +663,7 @@ class MainWindow(QMainWindow):
         les clics sur les boutons, les changements de texte dans les champs de recherche) aux méthodes correspondantes pour gérer les interactions utilisateur.
         """
         self.header_label.linkActivated.connect(self.toggle_text_display)
+        self.toggle_graph_buttons_button.toggled.connect(self.toggle_graph_buttons_section)
         self.add_calcul_button.clicked.connect(self.show_calcul_section)
 
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
@@ -746,7 +777,6 @@ class MainWindow(QMainWindow):
         """
         # 1) Lire les champs principaux
         category = item_data.get('category', '')
-        subcategory = item_data.get('subcategory', '')
         # # On recompose un subsub_name comme "subsubcategory - name"
         # # pour simuler ce que fait `calculate_emission()` avec `split_subsub_name`
         base_subsub = item_data.get('subsubcategory', '')
@@ -779,8 +809,6 @@ class MainWindow(QMainWindow):
         if category == 'Achats' and base_subsub:
             code_nacres = subsub_name[:4]
         item_data['code_nacres'] = code_nacres
-
-        print ("ITEM DATA ", item_data)
 
         # Si la fonction 'calculate_emission' fait plus de choses, on peut les reproduire ici.
 
@@ -932,7 +960,7 @@ class MainWindow(QMainWindow):
         )
         self.refresh_manip_type_combo()
 
-    def on_search_text_changed(self, text):
+    def on_search_text_changed(self, _text):
         """
         Gère l'événement de changement de texte dans le champ de recherche.
 
@@ -1190,14 +1218,14 @@ class MainWindow(QMainWindow):
         else:
             filter_text = filter_text.lower()
 
-        for idx, row in self.data_masse.iterrows():
+        for _, row in self.data_masse.iterrows():
             full_code = row.get('Code NACRES', '').strip()
             consommable = row.get('Consommable', '').strip()
             display_text = f"{full_code} - {consommable}"
             if not filter_text or filter_text in display_text.lower():
                 self.conso_filtered_combo.addItem(display_text)
 
-        for idx, row in self.data_liquides.iterrows():
+        for _, row in self.data_liquides.iterrows():
             code = str(row.get(self.data_manager.CODE_NACRES_COL, "")).strip()
             prod = str(row.get("Produit", "")).strip()
             display = f"{code} - {prod}"
@@ -1229,7 +1257,7 @@ class MainWindow(QMainWindow):
         code_nacres_4 = subsub_name[:4]
 
         filtered_items = []
-        for idx, row in self.data_masse.iterrows():
+        for _, row in self.data_masse.iterrows():
             full_code = row.get('Code NACRES', '').strip()
             consommable = row.get('Consommable', '').strip()
             display_text = f"{full_code} - {consommable}"
@@ -1237,7 +1265,7 @@ class MainWindow(QMainWindow):
                 filtered_items.append(display_text)
 
                 # --- Ajout : intégrer les consommables liquides ---
-        for idx, row in self.data_liquides.iterrows():
+        for _, row in self.data_liquides.iterrows():
             full_code = str(row.get(self.data_manager.CODE_NACRES_COL, "")).strip()
             produit   = str(row.get("Produit", "")).strip()
             display_text = f"{full_code} - {produit}"
@@ -1370,10 +1398,8 @@ class MainWindow(QMainWindow):
 
     def split_subsub_name(self, subsub_name):
         """
-        Met à jour la visibilité de la barre "Quantité" en fonction de la catégorie sélectionnée et du consommable.
-
-        Affiche la barre "Quantité" uniquement si la catégorie est 'Achats' et qu'un consommable valide est sélectionné.
-        Pour toutes les autres catégories, la barre "Quantité" reste masquée.
+        Sépare une chaîne "subsubcategory - name" en un tuple (subsubcategory, name).
+        Si le séparateur ' - ' est absent, retourne ('', subsub_name).
         """
         if ' - ' in subsub_name:
             subsub, name = subsub_name.split(' - ', 1)
@@ -1382,9 +1408,30 @@ class MainWindow(QMainWindow):
         return subsub.strip(), name.strip()
     
     def open_data_mass_window(self):
-        # On ouvre la fenêtre DataMassWindow
-        self.data_mass_window = DataMassWindow(parent=self, data_materials=self.data_materials)
+        # On ouvre la fenêtre DataMassWindow en lui passant base_path pour les chemins PyInstaller
+        self.data_mass_window = DataMassWindow(
+            parent=self,
+            data_materials=self.data_materials,
+            base_path=self.data_manager.base_path,
+        )
+        # Recharger les données du DataManager après tout ajout de consommable
+        self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
+
+    def _reload_consumables_data(self):
+        """Recharge les DataFrames de consommables dans le DataManager après un ajout."""
+        try:
+            if os.path.exists(self.data_manager.data_masse_path):
+                self.data_manager.data_masse = pd.read_hdf(self.data_manager.data_masse_path)
+                self.data_masse = self.data_manager.get_data_masse()
+            if os.path.exists(self.data_manager.liq_path):
+                self.data_manager.data_liquides = pd.read_hdf(self.data_manager.liq_path)
+            else:
+                self.data_manager.data_liquides = pd.DataFrame()
+            self.data_liquides = self.data_manager.get_data_liquides()
+        except Exception as e:
+            QMessageBox.warning(self, "Rechargement données",
+                                f"Impossible de recharger les consommables : {e}")
     
     def define_user_manip_from_history(self):
         # 1) Vérifier si des éléments sont sélectionnés
@@ -1514,7 +1561,13 @@ class MainWindow(QMainWindow):
             return
 
         # Nombre de jours
-        days = int(self.days_field.text()) if (self.days_field.isEnabled() and self.days_field.text()) else 1
+        days = 1
+        if self.days_field.isEnabled() and self.days_field.text().strip():
+            try:
+                days = int(self.days_field.text().strip())
+            except ValueError:
+                QMessageBox.warning(self, 'Erreur', "Le nombre de jours doit être un entier valide.")
+                return
 
         # !! IMPORTANT !!
         # On NE MULTIPLIE PAS PAR `days` ICI si c’est un Véhicule.
@@ -1653,8 +1706,6 @@ class MainWindow(QMainWindow):
         2) le total (prix) uniquement pour les items massiques,
         3) le total massique.
         """
-        import math
-
         total_all_price = 0.0
         total_all_price_err_sq = 0.0
 
@@ -1719,7 +1770,6 @@ class MainWindow(QMainWindow):
         """
         category = data.get('category', '')
         subcategory = data.get('subcategory', '')
-        subsubcategory = data.get('subsubcategory', '')
         name = data.get('name', '')
         value = data.get('value', 0.0)
         unit = data.get('unit', '')
@@ -1884,7 +1934,7 @@ class MainWindow(QMainWindow):
                 df[col] = df[col].astype(str).str.strip()
 
         count_imported = 0
-        for idx, row in df.iterrows():
+        for _, row in df.iterrows():
             new_data = row.to_dict()
             self.create_or_update_history_item(new_data)
             count_imported += 1
@@ -2014,10 +2064,18 @@ class MainWindow(QMainWindow):
             # Crée une nouvelle instance de la fenêtre pour le type de graphique spécifié.
             window = window_class(self)
 
-            # Connecte le signal `finished` de la fenêtre pour réinitialiser l'attribut
-            # correspondant lorsque la fenêtre est fermée.
-            # Cela permet de recréer une nouvelle fenêtre la prochaine fois que cette fonction est appelée.
-            window.finished.connect(lambda: setattr(self, window_attr, None))
+            # Rafraîchit automatiquement le graphique dès que les données changent.
+            self.data_changed.connect(window.refresh_data)
+
+            # À la fermeture : déconnecte le signal et remet l'attribut à None.
+            def _on_finished(attr=window_attr, w=window):
+                try:
+                    self.data_changed.disconnect(w.refresh_data)
+                except RuntimeError:
+                    pass
+                setattr(self, attr, None)
+
+            window.finished.connect(_on_finished)
 
             # Stocke la fenêtre créée dans l'attribut correspondant à son type.
             setattr(self, window_attr, window)
@@ -2054,7 +2112,7 @@ class MainWindow(QMainWindow):
     def generate_coverage_category_chart(self):
         self.generate_chart('coverage_category')
 
-    def show_sources_popup(self, link_str):
+    def show_sources_popup(self, _link_str):
         """
         Affiche une fenêtre contextuelle contenant les sources et références de l'application.
 
@@ -2143,3 +2201,8 @@ class MainWindow(QMainWindow):
 
         dialog.setLayout(layout)
         dialog.exec()
+
+    def closeEvent(self, event):
+        """Ferme proprement la connexion SQLite à la fermeture de la fenêtre."""
+        self.manips_db.close()
+        super().closeEvent(event)
