@@ -27,6 +27,7 @@ class DataManager:
 
     # Spécifique NACRES / consommables
     CODE_NACRES_COL = "Code NACRES"
+    CODE_NOM_COL = "Code NOM"
     CONSOMMABLE_COL = "Consommable"
     MASSE_G_COL = "Masse unitaire (g)"
     MATERIAU_COL = "Matériau consommable"
@@ -43,23 +44,33 @@ class DataManager:
     MATERIAU_NAME_COL = "Materiau"
     EQUIV_CO2_COL = "Equivalent CO₂ (kg eCO₂/kg)"
 
+    # Colonnes prix catalogue IJM (dans data_masse)
+    PRIX_UNITAIRE_COL = "prix_unitaire_ijm"
+    PRIX_HT_COL       = "prix_ht_ijm"
+    CONDT_IJM_COL     = "condt_ijm"
+    NB_UNITES_IJM_COL = "nb_unites_ijm"
+
     # Chemins par défaut
     DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
     DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
     DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
 
 
-    def __init__(self, base_path):
+    def __init__(self, base_path, user_path=None):
         """
-        :param base_path: Répertoire de base pour charger les fichiers de données.
+        :param base_path: Répertoire des données en lecture seule (bundlées).
+        :param user_path: Répertoire des données modifiables (persistant).
+                          Si None, identique à base_path (mode développement).
         """
         self.base_path = base_path
+        self.user_path = user_path if user_path is not None else base_path
 
         # Charger la data principale
-        self.main_data = load_data()  # ta fonction existante, ex. pour "category", "subcategory", etc.
+        self.main_data = load_data()
 
-        # Construire les chemins
-        self.data_masse_path = os.path.join(base_path, "data_masse_eCO2", self.DATA_MASSE_FILENAME)
+        # Données modifiables → user_path
+        self.data_masse_path = os.path.join(self.user_path, "data_masse_eCO2", self.DATA_MASSE_FILENAME)
+        # Données en lecture seule → base_path
         self.data_materials_path = os.path.join(base_path, "data_masse_eCO2", self.DATA_MATERIALS_FILENAME)
 
         # Charger data_masse
@@ -77,11 +88,14 @@ class DataManager:
         self.data_materials = pd.read_hdf(self.data_materials_path)
 
         # Charger consommables liquides (produits chimiques / bioproduits)
-        self.liq_path = os.path.join(base_path, "data_masse_eCO2", self.DATA_LIQUID_CONSOMMABLES)
+        self.liq_path = os.path.join(self.user_path, "data_masse_eCO2", self.DATA_LIQUID_CONSOMMABLES)
         if os.path.exists(self.liq_path):
             self.data_liquides = pd.read_hdf(self.liq_path)
         else:
             self.data_liquides = pd.DataFrame()  # vide si absent
+
+        # Charger les prix du catalogue IJM (optionnel)
+        self.data_prix_ijm = self._load_prix_ijm()
 
     def get_main_data(self):
         """Retourne la DataFrame principale."""
@@ -144,6 +158,95 @@ class DataManager:
     def get_data_liquides(self):
         """Retourne la DataFrame des consommables liquides."""
         return self.data_liquides
+
+    def _load_prix_ijm(self):
+        """
+        Charge le CSV des prix du catalogue IJM.
+        Cherche dans Scrapping/output/ (dev) puis data_prix/ (production).
+        Retourne un DataFrame vide si absent.
+        """
+        candidates = [
+            os.path.join(self.base_path, "Scrapping", "output", "prix_ijm_2025.csv"),
+            os.path.join(self.base_path, "data_prix", "prix_ijm_2025.csv"),
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                try:
+                    df = pd.read_csv(path, dtype={"code_nacres": str, "designation": str})
+                    df["code_nacres"] = df["code_nacres"].fillna("").str.strip()
+                    return df
+                except Exception:
+                    pass
+        return pd.DataFrame()
+
+    def get_code_nom(self, code_nacres_full, consommable_name):
+        """
+        Retourne le Code NOM (code NACRES IJM, ex: 'HA01') correspondant à un consommable
+        identifié par son Code NACRES complet et son nom.
+        """
+        if self.CODE_NOM_COL not in self.data_masse.columns:
+            return None
+        mask = (
+            (self.data_masse[self.CODE_NACRES_COL].astype(str).str.strip() == code_nacres_full.strip()) &
+            (self.data_masse[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        )
+        filtered = self.data_masse[mask]
+        if filtered.empty:
+            return None
+        return str(filtered[self.CODE_NOM_COL].iloc[0]).strip()
+
+    def get_prix_unitaire(self, code_nacres, consommable_name=""):
+        """
+        Retourne (prix_unitaire, consommable, condt) depuis data_masse.
+        Recherche par Code NACRES (4 chars) puis fuzzy match sur le nom.
+        Retourne (None, None, None) si aucun prix disponible.
+        """
+        import pandas as pd
+        from difflib import SequenceMatcher
+
+        code = str(code_nacres).strip().upper()
+        df = self.data_masse
+
+        mask = df[self.CODE_NACRES_COL].astype(str).str.strip().str.upper() == code
+        candidates = df[mask]
+
+        if candidates.empty:
+            return None, None, None
+
+        # Garder seulement les lignes avec un prix
+        has_price = (
+            candidates[self.PRIX_UNITAIRE_COL].notna() &
+            (candidates[self.PRIX_UNITAIRE_COL].astype(str).str.strip() != "")
+        )
+        price_cands = candidates[has_price]
+        if price_cands.empty:
+            return None, None, None
+
+        if len(price_cands) == 1 or not consommable_name:
+            row = price_cands.iloc[0]
+            return (
+                float(row[self.PRIX_UNITAIRE_COL]),
+                str(row[self.CONSOMMABLE_COL]),
+                str(row[self.CONDT_IJM_COL]),
+            )
+
+        # Fuzzy match sur Consommable
+        name_lower = consommable_name.lower()
+        best_score = -1.0
+        best_row = price_cands.iloc[0]
+        for _, row in price_cands.iterrows():
+            score = SequenceMatcher(
+                None, name_lower, str(row[self.CONSOMMABLE_COL]).lower()
+            ).ratio()
+            if score > best_score:
+                best_score = score
+                best_row = row
+
+        return (
+            float(best_row[self.PRIX_UNITAIRE_COL]),
+            str(best_row[self.CONSOMMABLE_COL]),
+            str(best_row[self.CONDT_IJM_COL]),
+        )
 
     def get_liquid_data(self, code_nacres):
         """

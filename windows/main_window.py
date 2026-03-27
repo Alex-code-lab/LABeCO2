@@ -29,7 +29,7 @@ from PySide6.QtGui import QIntValidator, QDoubleValidator
 from windows.data_manager import DataManager
 from windows.carbon_calculator import CarbonCalculator
 
-from utils.data_loader import load_logo
+from utils.data_loader import load_logo, get_user_data_path, init_user_data
 from manips_types.a_manips_type_db import ManipsTypeDB
 from windows.graphiques.graph_1_pie_chart import PieChartWindow
 from windows.graphiques.graph_2_bar_chart import BarChartWindow
@@ -59,17 +59,22 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LABeCO₂ - Calculateur de Bilan Carbone")
 
         # 1) DataManager
+        init_user_data()  # copie les HDF5 modifiables au premier lancement compilé
+        # base_path  : données en lecture seule (bundlées dans l'exécutable)
+        # user_path  : données modifiables par l'utilisateur (persistantes entre sessions)
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
+            user_path = get_user_data_path()
         else:
             base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        
+            user_path = base_path
+
         # Chemin de la base de données SQLite pour les manips type
-        db_path = os.path.join(base_path, "./manips_types/manips_type.sqlite")
+        db_path = os.path.join(user_path, "./manips_types/manips_type.sqlite")
         self.manips_db = ManipsTypeDB(db_path=db_path)
 
         try:
-            self.data_manager = DataManager(base_path)
+            self.data_manager = DataManager(base_path, user_path=user_path)
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger les données : {e}")
             sys.exit(1)
@@ -119,6 +124,8 @@ class MainWindow(QMainWindow):
         self.conso_filtered_combo = None
         self.quantity_label = None
         self.quantity_input = None
+        self.prix_unitaire_label = None
+        self._current_prix_unitaire = None   # float ou None
 
         self.setStyleSheet("""
             QPushButton {
@@ -360,7 +367,16 @@ class MainWindow(QMainWindow):
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
 
-        self.manage_consumables_button = QPushButton("Gestion des Consommables")
+        self.prix_unitaire_label = QLabel("Prix unitaire : —")
+        self.prix_unitaire_label.setVisible(False)
+
+        self.masse_manquante_label = QLabel("")
+        self.masse_manquante_label.setStyleSheet("")
+        self.masse_manquante_label.setWordWrap(True)
+        self.masse_manquante_label.setVisible(False)
+
+        self.manage_consumables_button = QPushButton("Enrichir ce consommable")
+        self.add_consumable_button = QPushButton("Ajouter un consommable")
         # self.manage_consumables_button.setStyleSheet("""
         #     QPushButton {
         #         text-decoration: underline;
@@ -394,6 +410,7 @@ class MainWindow(QMainWindow):
         form_layout.addRow(self.subcategory_label, self.subcategory_combo)
         form_layout.addRow(self.subsub_name_label, nom_layout)
         form_layout.addRow(self.conso_filtered_label, conso_layout)
+        form_layout.addRow("", self.add_consumable_button)
 
         existing_layout = QVBoxLayout()
         # Ajoute ici le form_layout, les champs et le bouton "Calculer" déjà configurés
@@ -401,6 +418,8 @@ class MainWindow(QMainWindow):
         existing_layout.addLayout(form_layout)
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
+        existing_layout.addWidget(self.prix_unitaire_label)
+        existing_layout.addWidget(self.masse_manquante_label)
         existing_layout.addWidget(self.manage_consumables_button)
         existing_layout.addWidget(self.input_label)
         existing_layout.addWidget(self.input_field)
@@ -700,8 +719,10 @@ class MainWindow(QMainWindow):
         self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
         self.add_machine_button.clicked.connect(self.add_machine)
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
+        self.quantity_input.textChanged.connect(self._auto_fill_prix)
 
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
+        self.add_consumable_button.clicked.connect(self.open_data_mass_window_new)
         
         self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
         self.delete_manip_type_button.clicked.connect(self.delete_selected_user_manip)
@@ -1299,6 +1320,9 @@ class MainWindow(QMainWindow):
         if not sel_text or sel_text == "non renseignée":
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self._current_prix_unitaire = None
+            self.prix_unitaire_label.setVisible(False)
+            self.masse_manquante_label.setVisible(False)
             # Forcer subsub_name => "non renseignée"
             self.subsub_name_combo.blockSignals(True)
             idx_nr = self.subsub_name_combo.findText("non renseignée")
@@ -1372,6 +1396,98 @@ class MainWindow(QMainWindow):
         self.quantity_input.setVisible(True)
 
         self.update_unit()
+        self._update_prix_unitaire()
+        self._update_masse_warning()
+
+    def _update_prix_unitaire(self):
+        """
+        Met à jour le label de prix unitaire en fonction du consommable sélectionné.
+        Si un prix est trouvé dans le catalogue IJM, affiche le prix et stocke la valeur.
+        """
+        sel_text = self.conso_filtered_combo.currentText()
+        if not sel_text or sel_text == "non renseignée":
+            self._current_prix_unitaire = None
+            self.prix_unitaire_label.setVisible(False)
+            return
+
+        if " - " in sel_text:
+            code_nacres_full, consommable_name = sel_text.split(" - ", 1)
+        else:
+            code_nacres_full, consommable_name = sel_text, ""
+
+        # Récupérer le Code NOM (4-5 chars IJM) depuis data_masse
+        code_nom = self.data_manager.get_code_nom(code_nacres_full.strip(), consommable_name.strip())
+        if code_nom is None:
+            code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
+
+        prix, designation, condt = self.data_manager.get_prix_unitaire(code_nom, consommable_name)
+        if prix is not None:
+            self._current_prix_unitaire = prix
+            self.prix_unitaire_label.setText(f"Prix unitaire (catalogue IJM) : {prix:.4f} €  [{condt}]")
+            self.prix_unitaire_label.setVisible(True)
+        else:
+            self._current_prix_unitaire = None
+            self.prix_unitaire_label.setVisible(False)
+
+    def _update_masse_warning(self):
+        """
+        Affiche un avertissement rouge si le consommable sélectionné n'a pas
+        de données de masse enregistrées dans la base.
+        """
+        import pandas as pd
+        sel_text = self.conso_filtered_combo.currentText()
+        if not sel_text or sel_text == "non renseignée":
+            self.masse_manquante_label.setVisible(False)
+            return
+
+        if " - " in sel_text:
+            code_nacres, consommable_name = sel_text.split(" - ", 1)
+        else:
+            code_nacres, consommable_name = sel_text, ""
+
+        code_nacres = code_nacres.strip().upper()
+        df = self.data_masse
+        mask = (
+            (df[self.data_manager.CODE_NACRES_COL].astype(str).str.strip().str.upper() == code_nacres) &
+            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        )
+        row = df[mask]
+
+        if row.empty:
+            self.masse_manquante_label.setVisible(True)
+            return
+
+        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        if pd.isna(masse) or str(masse).strip() == "":
+            self.masse_manquante_label.setText(
+                "⚠ Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+            )
+            self.masse_manquante_label.setStyleSheet("color: red; font-weight: bold;")
+        else:
+            self.masse_manquante_label.setText(
+                "✔ La masse est disponible pour ce consommable : calcul de l'eCO₂ par la masse effectué."
+            )
+            self.masse_manquante_label.setStyleSheet("color: green; font-weight: bold;")
+        self.masse_manquante_label.setVisible(True)
+
+    def _auto_fill_prix(self):
+        """
+        Remplit automatiquement le champ prix (input_field) en multipliant
+        la quantité saisie par le prix unitaire du catalogue IJM.
+        """
+        if self._current_prix_unitaire is None:
+            return
+        qty_str = self.quantity_input.text().strip().replace(',', '.')
+        if not qty_str:
+            return
+        try:
+            qty = float(qty_str)
+        except ValueError:
+            return
+        prix_total = qty * self._current_prix_unitaire
+        self.input_field.blockSignals(True)
+        self.input_field.setText(f"{prix_total:.2f}")
+        self.input_field.blockSignals(False)
 
     def update_quantity_visibility(self):
         """
@@ -1408,13 +1524,31 @@ class MainWindow(QMainWindow):
         return subsub.strip(), name.strip()
     
     def open_data_mass_window(self):
-        # On ouvre la fenêtre DataMassWindow en lui passant base_path pour les chemins PyInstaller
+        """Ouvre la fenêtre de gestion pré-remplie avec le consommable sélectionné."""
+        sel_text = self.conso_filtered_combo.currentText()
+        prefill_code, prefill_name = None, None
+        if sel_text and sel_text != "non renseignée" and " - " in sel_text:
+            prefill_code, prefill_name = sel_text.split(" - ", 1)
+
         self.data_mass_window = DataMassWindow(
             parent=self,
             data_materials=self.data_materials,
             base_path=self.data_manager.base_path,
+            user_path=self.data_manager.user_path,
+            prefill_code=prefill_code,
+            prefill_name=prefill_name,
         )
-        # Recharger les données du DataManager après tout ajout de consommable
+        self.data_mass_window.data_added.connect(self._reload_consumables_data)
+        self.data_mass_window.show()
+
+    def open_data_mass_window_new(self):
+        """Ouvre la fenêtre de gestion avec le formulaire vierge pour ajouter un nouveau consommable."""
+        self.data_mass_window = DataMassWindow(
+            parent=self,
+            data_materials=self.data_materials,
+            base_path=self.data_manager.base_path,
+            user_path=self.data_manager.user_path,
+        )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
 

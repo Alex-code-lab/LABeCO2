@@ -10,14 +10,15 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QComboBox, QHBoxLayout, QLabel
+    QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog
 )
 from PySide6.QtCore import Signal
 
 class DataMassWindow(QMainWindow):
     data_added = Signal()
 
-    def __init__(self, parent=None, data_materials=None, base_path=None):
+    def __init__(self, parent=None, data_materials=None, base_path=None,
+                 user_path=None, prefill_code=None, prefill_name=None):
         super().__init__(parent)
 
         self.setWindowTitle("Gestion des consommables")
@@ -30,11 +31,16 @@ class DataMassWindow(QMainWindow):
             else:
                 base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+        # user_path : dossier persistant pour les HDF5 modifiables
+        if user_path is None:
+            user_path = base_path
+        self._user_path = user_path
+
         self.nacres_hdf5_file = os.path.join(base_path, "data_masse_eCO2", "nacres_2022.h5")
         self._all_nacres = []  # Will store (code, description)
 
-        # Nom du fichier HDF5
-        self.hdf5_file = os.path.join(base_path, "data_masse_eCO2", "data_eCO2_masse_consommable.hdf5")
+        # HDF5 modifiable → user_path
+        self.hdf5_file = os.path.join(user_path, "data_masse_eCO2", "data_eCO2_masse_consommable.hdf5")
 
         self.columns = [
             "Consommable",
@@ -70,8 +76,8 @@ class DataMassWindow(QMainWindow):
             "Note"
         ]
 
-        # Fichier pour les consommables liquides
-        self.hdf5_liquids = os.path.join(base_path, "data_masse_eCO2", "data_eCO2_liquides_consommable.hdf5")
+        # Fichier pour les consommables liquides (modifiable → user_path)
+        self.hdf5_liquids = os.path.join(user_path, "data_masse_eCO2", "data_eCO2_liquides_consommable.hdf5")
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
@@ -85,6 +91,9 @@ class DataMassWindow(QMainWindow):
 
         self.init_ui()
         self.afficher_donnees()
+
+        if prefill_code or prefill_name:
+            self.prefill_consumable(prefill_code or "", prefill_name or "")
 
     def charger_ou_initialiser_donnees(self):
         if os.path.exists(self.hdf5_file):
@@ -236,6 +245,15 @@ class DataMassWindow(QMainWindow):
         self.display_button = QPushButton("Actualiser les données")
         self.display_button.clicked.connect(self.afficher_donnees)
         main_layout.addWidget(self.display_button)
+
+        export_import_layout = QHBoxLayout()
+        self.export_button = QPushButton("⬆ Exporter la base de données")
+        self.export_button.clicked.connect(self.export_database)
+        self.import_button = QPushButton("⬇ Mise à jour de la base de données")
+        self.import_button.clicked.connect(self.import_database)
+        export_import_layout.addWidget(self.export_button)
+        export_import_layout.addWidget(self.import_button)
+        main_layout.addLayout(export_import_layout)
 
         # Tableau des données
         self.table = QTableWidget()
@@ -497,6 +515,174 @@ class DataMassWindow(QMainWindow):
             if lab:
                 lab.setVisible(self.is_liquid)
             w.setVisible(self.is_liquid)
+
+    def export_database(self):
+        """
+        Exporte la base de données consommables vers un fichier HDF5 ou CSV
+        choisi par l'utilisateur.
+        """
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Exporter la base de données",
+            "base_consommables_LABeCO2.hdf5",
+            "HDF5 (*.hdf5 *.h5);;CSV (*.csv)"
+        )
+        if not path:
+            return
+        try:
+            if path.lower().endswith(".csv"):
+                self.data.to_csv(path, index=False, encoding="utf-8")
+            else:
+                self.data.to_hdf(path, key="data", mode="w", complevel=5)
+            QMessageBox.information(
+                self, "Export réussi",
+                f"{len(self.data)} consommables exportés vers :\n{path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur export", f"Impossible d'exporter :\n{e}")
+
+    def import_database(self):
+        """
+        Importe une base de données mise à jour (HDF5) pour remplacer la base locale.
+        Un backup automatique est créé avant le remplacement.
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Charger une mise à jour de la base de données",
+            "",
+            "HDF5 (*.hdf5 *.h5)"
+        )
+        if not path:
+            return
+
+        try:
+            new_df = pd.read_hdf(path)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de lire le fichier :\n{e}")
+            return
+
+        # Vérification minimale : la colonne Consommable doit exister
+        if "Consommable" not in new_df.columns and "Code NACRES" not in new_df.columns:
+            QMessageBox.warning(
+                self, "Format invalide",
+                "Le fichier ne semble pas être une base de consommables LABeCO2 valide."
+            )
+            return
+
+        confirm = QMessageBox.question(
+            self, "Confirmer la mise à jour",
+            f"Remplacer la base actuelle ({len(self.data)} entrées) "
+            f"par le nouveau fichier ({len(new_df)} entrées) ?\n\n"
+            f"Un backup sera créé automatiquement.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        try:
+            import shutil
+            backup_path = self.hdf5_file + ".backup"
+            if os.path.exists(self.hdf5_file):
+                shutil.copy2(self.hdf5_file, backup_path)
+
+            new_df.to_hdf(self.hdf5_file, key="data", mode="w", complevel=5)
+            self.data = new_df
+            # Harmoniser les colonnes manquantes
+            for col in self.columns:
+                if col not in self.data.columns:
+                    self.data[col] = ""
+
+            self.afficher_donnees()
+            self.data_added.emit()  # recharge dans la fenêtre principale
+
+            QMessageBox.information(
+                self, "Mise à jour réussie",
+                f"Base mise à jour : {len(new_df)} consommables chargés.\n"
+                f"Backup sauvegardé : {backup_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de mettre à jour la base :\n{e}")
+
+    def prefill_consumable(self, code_nacres, consommable_name):
+        """
+        Pré-remplit le formulaire avec les données du consommable sélectionné
+        dans la fenêtre principale.  Si une ligne existe déjà dans data_masse,
+        tous les champs sont remplis (mode enrichissement).
+        Sélectionne aussi la ligne correspondante dans le tableau.
+        """
+        # ── Forcer le type "Consommable solide" ──────────────────────────────
+        self.type_combo.setCurrentIndex(0)
+
+        # ── Nom ──────────────────────────────────────────────────────────────
+        self.nom_input.setText(consommable_name)
+
+        # ── Code NACRES ───────────────────────────────────────────────────────
+        code4 = str(code_nacres).strip().upper()
+        idx = self.nacres_combo.findData(code4)
+        if idx == -1:
+            # Chercher par texte si findData échoue
+            for i in range(self.nacres_combo.count()):
+                if self.nacres_combo.itemText(i).startswith(code4):
+                    idx = i
+                    break
+        if idx != -1:
+            self.nacres_combo.setCurrentIndex(idx)
+
+        # ── Données existantes dans le HDF5 ───────────────────────────────────
+        mask = (
+            (self.data["Code NACRES"].astype(str).str.strip().str.upper() == code4) &
+            (self.data["Consommable"].astype(str).str.strip() == consommable_name.strip())
+        )
+        rows = self.data[mask]
+
+        if not rows.empty:
+            row = rows.iloc[0]
+            self.brand_input.setText(str(row.get("Marque", "") or ""))
+            self.ref_input.setText(str(row.get("Référence", "") or ""))
+
+            def _fill(field, col):
+                v = row.get(col, "")
+                if pd.notna(v) and str(v).strip() not in ("", "nan"):
+                    field.setText(str(v))
+
+            _fill(self.masse_input,     "Masse unitaire (g)")
+            _fill(self.masse2_input,    "Masse unitaire deuxieme materiaux (g)")
+            _fill(self.masse_emb_input, "Masse emballage unitaire (g)")
+            _fill(self.masse_cond_input,"Masse condionnement (g)")
+            _fill(self.nbr_cond_input,  "Nbr par conditionnement")
+            _fill(self.lien_input,      "Lien / Note / Remarque")
+            _fill(self.source_input,    "Source/Signature")
+
+            for combo, col in [
+                (self.materiau_combo,  "Matériau consommable"),
+                (self.materiau2_combo, "Matériau deuxieme materiaux"),
+                (self.mat_emb_combo,   "Matériau emballage"),
+                (self.mat_cond_combo,  "Matériau conditionnement"),
+            ]:
+                val = str(row.get(col, "") or "").strip()
+                i = combo.findText(val)
+                if i != -1:
+                    combo.setCurrentIndex(i)
+
+            # Sélectionner et scroller jusqu'à la ligne dans le tableau
+            for row_idx in range(self.table.rowCount()):
+                item = self.table.item(row_idx, 0)  # colonne Consommable
+                if item and item.text().strip() == consommable_name.strip():
+                    self.table.selectRow(row_idx)
+                    self.table.scrollToItem(item)
+                    break
+        else:
+            # Consommable IJM-only : pré-remplir ce qu'on sait depuis data_masse étendu
+            # (marque dans la colonne Marque si dispo)
+            full_data = self.data  # data déjà chargée depuis HDF5 complet
+            mask2 = full_data["Code NACRES"].astype(str).str.strip().str.upper() == code4
+            ijm_rows = full_data[mask2]
+            name_match = ijm_rows[
+                ijm_rows["Consommable"].astype(str).str.strip() == consommable_name.strip()
+            ]
+            if not name_match.empty:
+                row2 = name_match.iloc[0]
+                self.brand_input.setText(str(row2.get("Marque", "") or ""))
 
     def calculer_eCO2_via_masse(self, consommable_name, quantite):
         """
