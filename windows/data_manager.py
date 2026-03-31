@@ -151,8 +151,10 @@ class DataManager:
         if filtered.empty:
             return None, None
 
-        co2_par_kg = float(filtered[self.EQUIV_CO2_COL].iloc[0] or 0.0)
-        incert_mat = float(filtered.get(self.UNCERTAINTY_COL, pd.Series([0.0])).iloc[0] or 0.0)
+        raw_co2 = filtered[self.EQUIV_CO2_COL].iloc[0]
+        co2_par_kg = 0.0 if pd.isna(raw_co2) else float(raw_co2)
+        raw_unc = filtered.get(self.UNCERTAINTY_COL, pd.Series([0.0])).iloc[0]
+        incert_mat = 0.0 if pd.isna(raw_unc) else float(raw_unc)
         return co2_par_kg, incert_mat
     
     def get_data_liquides(self):

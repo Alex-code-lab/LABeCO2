@@ -222,12 +222,10 @@ class EditCalculationDialog(QDialog):
                 days = data.get('days', 1)
                 self.days_field.setText(str(days))
 
-                # val = distance totale (ex: 300 km)
-                # km_per_day = val / days
+                # val = km/jour (convention cohérente avec la saisie initiale)
                 try:
-                    total_distance = float(val)
-                    km_per_day = total_distance / days if days else total_distance
-                except (ValueError, ZeroDivisionError):
+                    km_per_day = float(val)
+                except ValueError:
                     km_per_day = 0
 
                 # On injecte km_per_day dans le champ input_field
@@ -339,12 +337,8 @@ class EditCalculationDialog(QDialog):
                                             'Veuillez entrer un nombre de jours valide.')
                         return
 
-            # Pour la catégorie Véhicules, on considère value_entered comme km/jour
-            if category == 'Véhicules':
-                total_distance = value_entered * days
-                final_value = total_distance
-            else:
-                final_value = value_entered
+            # Pour tous les cas, value est km/jour (Véhicules) ou la valeur directe
+            final_value = value_entered
 
             # Assemblage initial des données modifiées
             self.modified_data = {
@@ -354,7 +348,7 @@ class EditCalculationDialog(QDialog):
                 'name': name,
                 'year': year,
                 'unit': self.current_unit,
-                'value': final_value,   # total pour Véhicules, direct sinon
+                'value': final_value,   # km/jour pour Véhicules, valeur directe sinon
                 'days': days,
                 'code_nacres': 'NA',    # valeurs par défaut qui peuvent être modifiées plus loin
                 'consommable': 'NA',

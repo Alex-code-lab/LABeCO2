@@ -148,12 +148,21 @@ class CarbonCalculator:
                 tm     = m_liq
             else:
                 # 2) Sinon, calcul classique pour consommables solides
-                e_mass, t_mass, e_mass_err = self._calculate_mass_based_emissions_old(
+                e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
                     code_nacres, consommable, quantity
                 )
                 em     = e_mass
                 em_err = e_mass_err
                 tm     = t_mass
+                if missing_mats:
+                    noms = ", ".join(missing_mats)
+                    QMessageBox.warning(
+                        None,
+                        "Matériaux non trouvés",
+                        f"Les matériaux suivants sont absents de la base de données "
+                        f"et n'ont pas été comptabilisés dans le calcul :\n\n{noms}\n\n"
+                        f"Vérifiez la base « empreinte_carbone_materiaux »."
+                    )
 
         return (ep, ep_err, em, em_err, tm, error_message)
 
@@ -164,7 +173,7 @@ class CarbonCalculator:
         """
         # 1) Cas où aucun code NACRES valide n'est fourni
         if not code_nacres or code_nacres == 'NA':
-            return (0.0, 0.0, 0.0)
+            return (0.0, 0.0, 0.0, [])
 
         # 2) Récupérer la ligne correspondante dans data_masse
         df_row = self.data_masse[
@@ -172,7 +181,7 @@ class CarbonCalculator:
             (self.data_masse[self.dm.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
         ]
         if df_row.empty:
-            return (0.0, 0.0, 0.0)
+            return (0.0, 0.0, 0.0, [])
         row = df_row.iloc[0]
 
         # 3) Définir les composants à traiter, y compris le second matériau du produit
@@ -189,13 +198,15 @@ class CarbonCalculator:
         total_mass_kg = 0.0
         total_emission = 0.0
         total_unc_sq = 0.0
+        missing_materials = []
 
         # 4) Pour chaque composant, calculer sa contribution
         for col_masse, col_mat in composants:
             if col_masse is None or col_mat is None:
                 continue
-            # Lecture brute de la masse (g)
-            raw_masse = float(row.get(col_masse, 0.0) or 0.0)
+            # Lecture brute de la masse (g) — NaN doit être traité comme 0
+            _raw = row.get(col_masse, 0.0)
+            raw_masse = 0.0 if pd.isna(_raw) else float(_raw)
             # Si on est dans le conditionnement, on divise par le nombre par conditionnement
             if col_masse == self.dm.MASSE_CONDITIONNEMENT_COL:
                 nombre = row.get(self.dm.NOMBRE_PAR_COND_COL, 1) or 1
@@ -210,14 +221,16 @@ class CarbonCalculator:
             if masse_g <= 0 or not materiau:
                 continue
 
+            # Récupérer le facteur CO₂ (kgCO₂/kg) et son incertitude
+            # AVANT d’accumuler la masse, pour ne pas compter une masse sans émission
+            co2_per_kg, uncert_mat = self.dm.get_material_data(materiau)
+            if co2_per_kg is None:
+                missing_materials.append(materiau)
+                continue
+
             # Conversion en kg et application de la quantité
             masse_kg = quantity * masse_g / 1000.0
             total_mass_kg += masse_kg
-
-            # Récupérer le facteur CO₂ (kgCO₂/kg) et son incertitude
-            co2_per_kg, uncert_mat = self.dm.get_material_data(materiau)
-            if co2_per_kg is None:
-                continue
 
             # Calcul de l’émission pour ce composant
             emission = masse_kg * co2_per_kg
@@ -227,7 +240,7 @@ class CarbonCalculator:
             total_unc_sq += (emission * uncert_mat) ** 2
 
         total_unc = total_unc_sq ** 0.5
-        return (total_emission, total_mass_kg, total_unc)
+        return (total_emission, total_mass_kg, total_unc, missing_materials)
     
 
     def _calculate_liquid_emissions(self, code_nacres, volume_ml):

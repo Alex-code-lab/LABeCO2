@@ -1930,7 +1930,7 @@ class MainWindow(QMainWindow):
             days = data.get('days', 1)
             
             try:
-                km_per_day = float(value) #/ days if days else float(total_km)
+                km_per_day = float(value)
                 total_km = km_per_day * days
             except (ValueError, ZeroDivisionError):
                 km_per_day = 0
