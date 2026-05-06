@@ -18,9 +18,9 @@ import math
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
-    QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
-    QFormLayout,  QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
-    # QListWidgetItem, QSpacerItem, QDialogButtonBox, QFileDialog, QInputDialog,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+    QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
+    QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
@@ -587,17 +587,28 @@ class MainWindow(QMainWindow):
         self.history_label = QLabel('Historique des calculs:')
         main_layout.addWidget(self.history_label)
 
-        # self.history_list = QListWidget()
-        self.history_list = QListWidget()
-        # self.history_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.history_list = QTableWidget()
+        self.history_list.setColumnCount(5)
+        self.history_list.setHorizontalHeaderLabels([
+            "Catégorie", "Élément", "Valeur", "eCO₂ prix (kg)", "eCO₂ masse (kg)"
+        ])
+        self.history_list.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.history_list.setSelectionMode(QAbstractItemView.MultiSelection)
-        self.history_list.setMaximumHeight(100)
-
-        history_scroll = QScrollArea()
-        history_scroll.setWidgetResizable(True)
-        history_scroll.setWidget(self.history_list)
-        history_scroll.setFixedHeight(100)
-        main_layout.addWidget(history_scroll)
+        self.history_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.history_list.verticalHeader().setVisible(False)
+        self.history_list.verticalHeader().setDefaultSectionSize(24)
+        self.history_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.history_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.history_list.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.history_list.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.history_list.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.history_list.setFixedHeight(155)
+        self.history_list.setStyleSheet(
+            "QTableWidget { color: black; }"
+            "QHeaderView::section { color: black; font-weight: bold;"
+            " background-color: #f3f4f6; padding: 3px; }"
+        )
+        main_layout.addWidget(self.history_list)
 
         self.delete_button = QPushButton('Supprimer le(s) calcul(s) sélectionné(s)')
         self.modify_button = QPushButton('Modifier le calcul sélectionné')
@@ -627,15 +638,6 @@ class MainWindow(QMainWindow):
         main_layout.addSpacing(5)
 
     def initUIGraphButtons(self, main_layout):
-        """
-        Initialise les boutons pour générer des graphiques dans l'interface utilisateur.
-
-        Configure les boutons pour créer différents types de graphiques (diagramme en secteurs, barres empilées, etc.)
-        et les connecte aux méthodes correspondantes pour afficher les graphiques.
-        
-        Args:
-            main_layout (QVBoxLayout): Le layout principal auquel ajouter les boutons de graphiques.
-        """
         graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
         main_layout.addWidget(graph_summary_label)
 
@@ -647,90 +649,95 @@ class MainWindow(QMainWindow):
 
         self.graph_buttons_container = QWidget()
         graph_buttons_layout = QVBoxLayout()
-        graph_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        graph_buttons_layout.setContentsMargins(0, 6, 0, 0)
+        graph_buttons_layout.setSpacing(4)
         self.graph_buttons_container.setLayout(graph_buttons_layout)
 
-        graph_line1 = QLabel("Analyse de la consommation carbone basée sur les dépenses monétaires par catégorie d'achat :")
-        graph_buttons_layout.addWidget(graph_line1)
+        _HEADER_FIRST = (
+            "font-weight: 700; font-size: 13px; color: #374151;"
+            " padding-top: 4px; margin-top: 2px;"
+        )
+        _HEADER = (
+            "border-top: 1px solid #cbd5e1;"
+            " font-weight: 700; font-size: 13px; color: #374151;"
+            " padding-top: 8px; margin-top: 8px;"
+        )
 
-        # Boutons pour les graphiques line 1 (Pie, Bar, Proportional Bar)
-        self.generate_pie_button = QPushButton('Diagramme en Secteurs')
+        def _section_header(text, first=False):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(_HEADER_FIRST if first else _HEADER)
+            return lbl
+
+        # ── Section 1 : Émissions globales ──────────────────────────────
+        graph_buttons_layout.addWidget(_section_header("Émissions globales", first=True))
+
+        self.generate_pie_button = QPushButton("Camembert")
         self.generate_pie_button.setToolTip(
-            "Affiche un diagramme en secteurs pour les émissions totales."
+            "Diagramme en secteurs : répartition des émissions totales par catégorie."
         )
-        self.generate_bar_button = QPushButton('Barres Empilées à 100%')
+        self.generate_bar_button = QPushButton("Barres par catégorie")
         self.generate_bar_button.setToolTip(
-            "Affiche un graphique en barres empilées à 100% pour les émissions totales."
+            "Barres empilées à 100% : distribution relative des émissions par catégorie."
         )
-
-        self.generate_proportional_bar_button = QPushButton('Barres Empilées (montétaire/catégorie)')
+        self.generate_proportional_bar_button = QPushButton("Répartition monétaire")
         self.generate_proportional_bar_button.setToolTip(
-            "Affiche un graphique en barres empilées pour les émissions totales."
+            "Barres proportionnelles : émissions par catégorie, pondérées par les dépenses monétaires."
         )
 
-        # Layout pour les boutons de graphiques line 1
-        buttons_layout_graph_line1 = QHBoxLayout()
-        buttons_layout_graph_line1.addWidget(self.generate_pie_button)
-        buttons_layout_graph_line1.addWidget(self.generate_bar_button)
-        buttons_layout_graph_line1.addWidget(self.generate_proportional_bar_button)
-        graph_buttons_layout.addLayout(buttons_layout_graph_line1)
+        row1 = QHBoxLayout()
+        row1.setSpacing(4)
+        row1.addWidget(self.generate_pie_button)
+        row1.addWidget(self.generate_bar_button)
+        row1.addWidget(self.generate_proportional_bar_button)
+        graph_buttons_layout.addLayout(row1)
 
-        graph_line2 = QLabel("Analyse de la consommation carbone des consommables :")
-        graph_buttons_layout.addWidget(graph_line2)
+        # ── Section 2 : Consommables ─────────────────────────────────────
+        graph_buttons_layout.addWidget(_section_header("Consommables"))
 
-        # Boutons pour les graphiques ligne 2 (Stacked Bar, Nacres Bar)
-
-        self.generate_stacked_bar_consumables_button = QPushButton("Barres Empilées - Prix vs Masse")
+        self.generate_stacked_bar_consumables_button = QPushButton("Prix vs Masse")
         self.generate_stacked_bar_consumables_button.setToolTip(
-            "Génère un graphique en barres empilées comparant la consommation carbone des consommables, "
-            "calculée en fonction de leur coût monétaire et de leur masse."
+            "Barres empilées : comparaison des émissions carbone calculées"
+            " par le coût monétaire et par la masse."
         )
-
-        self.generate_nacres_bar_button = QPushButton("Barres NACRES - Basées sur le Coût")
+        self.generate_nacres_bar_button = QPushButton("Par code NACRES (coût)")
         self.generate_nacres_bar_button.setToolTip(
-            "Affiche un graphique en barres pour les consommables, montrant leur empreinte carbone "
-            "calculée à partir de leur valeur monétaire, groupée par codes NACRES."
+            "Empreinte carbone des consommables calculée à partir de leur valeur monétaire,"
+            " groupée par code NACRES."
         )
-
-        self.generate_proportional_bar_button_mass = QPushButton('Barres NACRES - Basées sur la Masse')
+        self.generate_proportional_bar_button_mass = QPushButton("Par code NACRES (masse)")
         self.generate_proportional_bar_button_mass.setToolTip(
-            "Affiche un graphique en barres proportionnelles pour les consommables, montrant leur empreinte carbone "
-            "calculée à partir de leur masse, groupée par codes NACRES."
+            "Empreinte carbone des consommables calculée à partir de leur masse,"
+            " groupée par code NACRES."
         )
-        # Layout pour les boutons de graphiques line 2
-        buttons_layout_graph_line2 = QHBoxLayout()
-        buttons_layout_graph_line2.addWidget(self.generate_stacked_bar_consumables_button)
-        buttons_layout_graph_line2.addWidget(self.generate_nacres_bar_button)
-        buttons_layout_graph_line2.addWidget(self.generate_proportional_bar_button_mass)
-        graph_buttons_layout.addLayout(buttons_layout_graph_line2)
 
-        graph_buttons_layout.addSpacing(5)
+        row2 = QHBoxLayout()
+        row2.setSpacing(4)
+        row2.addWidget(self.generate_stacked_bar_consumables_button)
+        row2.addWidget(self.generate_nacres_bar_button)
+        row2.addWidget(self.generate_proportional_bar_button_mass)
+        graph_buttons_layout.addLayout(row2)
 
-        # -------------------------------------------------
-        # Ligne 3 — Couverture méthodologique
-        # -------------------------------------------------
-
-        graph_line3 = QLabel("Analyse de la couverture méthodologique du bilan carbone :")
-        graph_buttons_layout.addWidget(graph_line3)
+        # ── Section 3 : Couverture ───────────────────────────────────────
+        graph_buttons_layout.addWidget(_section_header("Couverture méthodologique"))
 
         self.generate_coverage_button = QPushButton("Couverture globale")
         self.generate_coverage_button.setToolTip(
-            "Affiche la couverture méthodologique globale (quantitatif physique, "
-            "proxy monétaire, non couvert)."
+            "Répartition globale de la couverture : quantitatif physique,"
+            " proxy monétaire, non couvert."
         )
-
         self.generate_coverage_category_button = QPushButton("Couverture par catégorie")
         self.generate_coverage_category_button.setToolTip(
-            "Affiche la répartition des émissions selon la méthode de calcul "
-            "(quantitatif physique, proxy monétaire, non couvert)."
+            "Répartition par catégorie de la méthode de calcul utilisée."
         )
 
-        buttons_layout_graph_line3 = QHBoxLayout()
-        buttons_layout_graph_line3.addWidget(self.generate_coverage_button)
-        buttons_layout_graph_line3.addWidget(self.generate_coverage_category_button)
+        row3 = QHBoxLayout()
+        row3.setSpacing(4)
+        row3.addWidget(self.generate_coverage_button)
+        row3.addWidget(self.generate_coverage_category_button)
+        row3.addStretch()
+        graph_buttons_layout.addLayout(row3)
 
-        graph_buttons_layout.addLayout(buttons_layout_graph_line3)
-
+        graph_buttons_layout.addSpacing(5)
         self.graph_buttons_container.setVisible(False)
         main_layout.addWidget(self.graph_buttons_container)
 
@@ -776,7 +783,7 @@ class MainWindow(QMainWindow):
         self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
         self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
 
-        self.history_list.itemDoubleClicked.connect(self.modify_selected_calculation)
+        self.history_list.cellDoubleClicked.connect(lambda r, c: self.modify_selected_calculation())
         self.add_machine_button.clicked.connect(self.add_machine)
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
         self.quantity_input.textChanged.connect(self._auto_fill_prix)
@@ -793,6 +800,10 @@ class MainWindow(QMainWindow):
         self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
         self.delete_manip_type_button.clicked.connect(self.delete_selected_user_manip)
         self.manip_type_combo.currentIndexChanged.connect(self.update_delete_manip_button)
+
+        self.history_list.model().rowsInserted.connect(self._update_graph_buttons_state)
+        self.history_list.model().rowsRemoved.connect(self._update_graph_buttons_state)
+        self._update_graph_buttons_state()
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
@@ -1613,6 +1624,21 @@ class MainWindow(QMainWindow):
         color = CATEGORY_COLORS.get(self.category_combo.currentText(), '#888888')
         self.category_color_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
 
+    def _update_graph_buttons_state(self, *_):
+        has_data = self.history_list is not None and self.history_list.rowCount() > 0
+        for btn in (
+            self.generate_pie_button,
+            self.generate_bar_button,
+            self.generate_proportional_bar_button,
+            self.generate_stacked_bar_consumables_button,
+            self.generate_nacres_bar_button,
+            self.generate_proportional_bar_button_mass,
+            self.generate_coverage_button,
+            self.generate_coverage_category_button,
+        ):
+            if btn is not None:
+                btn.setEnabled(has_data)
+
     def _set_indicator(self, label, ok):
         if label is None:
             return
@@ -1832,16 +1858,22 @@ class MainWindow(QMainWindow):
     
     def define_user_manip_from_history(self):
         # 1) Préparer les lignes d'historique à afficher dans la fenêtre de création
+        selected_rows = {idx.row() for idx in self.history_list.selectionModel().selectedRows()}
         history_items = []
-        for row in range(self.history_list.count()):
-            lw_item = self.history_list.item(row)
-            data = lw_item.data(Qt.UserRole)
+        for row in range(self.history_list.rowCount()):
+            cell0 = self.history_list.item(row, 0)
+            data = cell0.data(Qt.UserRole) if cell0 else None
             if not data:
                 continue
+            cols = [
+                self.history_list.item(row, c).text()
+                if self.history_list.item(row, c) else ""
+                for c in range(5)
+            ]
             history_items.append({
-                "text": lw_item.text(),
+                "text": " | ".join(cols),
                 "data": data,
-                "selected": lw_item.isSelected(),
+                "selected": row in selected_rows,
             })
 
         if not history_items:
@@ -2060,12 +2092,13 @@ class MainWindow(QMainWindow):
         Ouvre une boîte de dialogue pour permettre à l'utilisateur de modifier les données d'un calcul existant.
         Si la modification est acceptée, recalcule les émissions et met à jour l'historique ainsi que les totaux.
         """
-        selected_item = self.history_list.currentItem()
-        if not selected_item:
+        current_row = self.history_list.currentRow()
+        if current_row < 0:
             QMessageBox.warning(self, 'Erreur', 'Veuillez sélectionner un calcul à modifier.')
             return
 
-        old_data = selected_item.data(Qt.UserRole)
+        cell0 = self.history_list.item(current_row, 0)
+        old_data = cell0.data(Qt.UserRole) if cell0 else None
         if not old_data:
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
             return
@@ -2092,7 +2125,7 @@ class MainWindow(QMainWindow):
             modified_data['emission_mass_error'] = em_err
             modified_data['total_mass'] = tm
 
-            self.history_list.takeItem(self.history_list.row(selected_item))
+            self.history_list.removeRow(current_row)
             self.create_or_update_history_item(modified_data)
             self.update_total_emissions()
             self.data_changed.emit()
@@ -2119,9 +2152,9 @@ class MainWindow(QMainWindow):
         total_mass = 0.0
         total_mass_err_sq = 0.0
 
-        for i in range(self.history_list.count()):
-            item = self.history_list.item(i)
-            data = item.data(Qt.UserRole)
+        for i in range(self.history_list.rowCount()):
+            item = self.history_list.item(i, 0)
+            data = item.data(Qt.UserRole) if item else None
             if not data:
                 continue
 
@@ -2159,81 +2192,67 @@ class MainWindow(QMainWindow):
         )
 
     def create_or_update_history_item(self, data, item=None):
-        """
-        Crée ou met à jour un élément dans l'historique des calculs.
-
-        Formate le texte de l'élément en fonction de la catégorie du calcul et ajoute l'élément à la liste historique.
-        Si un élément existe déjà, le met à jour avec les nouvelles données.
-        
-        Args:
-            data (dict): Le dictionnaire contenant les données du calcul à ajouter ou mettre à jour.
-            item (QListWidgetItem, optional): L'élément existant à mettre à jour. Par défaut, None.
-        
-        Returns:
-            QListWidgetItem: L'élément ajouté ou mis à jour dans l'historique.
-        """
-        category = data.get('category', '')
+        category    = data.get('category', '')
         subcategory = data.get('subcategory', '')
-        name = data.get('name', '')
-        value = data.get('value', 0.0)
-        unit = data.get('unit', '')
-        ep = data.get('emissions_price', 0.0)
-        ep_err = data.get('emissions_price_error', 0.0)
-        em = data.get('emission_mass', 0.0)
-        em_err = data.get('emission_mass_error', 0.0)
-        tm = data.get('total_mass', 0.0)
+        name        = data.get('name', '')
+        value       = data.get('value', 0.0)
+        unit        = data.get('unit', '')
+        ep          = data.get('emissions_price', 0.0)
+        ep_err      = data.get('emissions_price_error', 0.0)
+        em          = data.get('emission_mass', 0.0)
+        em_err      = data.get('emission_mass_error', 0.0)
+        tm          = data.get('total_mass', 0.0)
         code_nacres = data.get('code_nacres', 'NA')
         consommable = data.get('consommable', 'NA')
 
-        def fmt_err(val, err):
-            if err is not None and err > 0:
+        def fmt(val, err):
+            if err and err > 0:
                 return f"{val:.4f} ± {err:.4f}"
-            else:
-                return f"{val:.4f}"
+            return f"{val:.4f}"
 
+        # ── Colonne "Élément" ────────────────────────────────────────────
         if category == 'Machine':
-            item_text = (
-                f"Machine - {subcategory} - {data.get('electricity_type')} - {value:.2f} kWh : "
-                f"{fmt_err(ep, ep_err)} kg CO₂e"
-            )
+            elec = data.get('electricity_type', '')
+            element = f"{subcategory} : {elec}" if elec else subcategory
+        elif category == 'Véhicules':
+            parts = [p for p in (subcategory, code_nacres, name) if p and p != 'NA']
+            element = " : ".join(parts)
+        else:
+            parts = [p for p in (subcategory[:20], code_nacres, name) if p and p != 'NA']
+            element = " : ".join(parts)
+            if consommable and consommable != 'NA':
+                element += f" ({consommable})"
+
+        # ── Colonne "Valeur" ─────────────────────────────────────────────
+        if category == 'Machine':
+            valeur = f"{float(value):.2f} kWh"
         elif category == 'Véhicules':
             days = data.get('days', 1)
-            
             try:
-                km_per_day = float(value)
-                total_km = km_per_day * days
-            except (ValueError, ZeroDivisionError):
-                km_per_day = 0
-                total_km = km_per_day * days
-            
-            item_text = (
-                f"{category} - {subcategory} - {code_nacres} - {name} : "
-                f"{km_per_day:.2f} km/jour sur {days} jours, total {total_km} {unit} : "
-                f"{fmt_err(ep, ep_err)} kg CO₂e"
-            )
+                total_km = float(value) * int(days)
+                valeur = f"{float(value):.2f} km/j × {days} j = {total_km:.0f} km"
+            except (ValueError, TypeError):
+                valeur = f"{value} {unit}"
         else:
-            # Achats / Autres
-            prix_str = fmt_err(ep, ep_err)
-            item_text = (
-                f"{category} - {subcategory[:12]} - {code_nacres} - {name} - "
-                f"Dépense: {value} {unit} : {prix_str} kg CO₂e"
-            )
-            if consommable != 'NA':
-                item_text += f" [Consommable: {consommable}]"
-            if em != 0.0 and tm != 0.0:
-                mass_str = fmt_err(em, em_err)
-                item_text += f" - Masse {tm:.4f} kg : {mass_str} kg CO₂e"
+            valeur = f"{value} {unit}"
 
-        if item:
-            item.setText(item_text)
-            item.setData(Qt.UserRole, data)
-            return item
-        else:
-            from PySide6.QtWidgets import QListWidgetItem
-            new_item = QListWidgetItem(item_text)
-            new_item.setData(Qt.UserRole, data)
-            self.history_list.addItem(new_item)
-            return new_item
+        # ── Colonnes eCO₂ ────────────────────────────────────────────────
+        eco2_prix  = fmt(ep, ep_err)
+        eco2_masse = fmt(em, em_err) if em and em != 0.0 else ""
+
+        # ── Insérer la ligne ─────────────────────────────────────────────
+        row = self.history_list.rowCount()
+        self.history_list.insertRow(row)
+
+        cell0 = QTableWidgetItem(category)
+        cell0.setData(Qt.UserRole, data)
+        self.history_list.setItem(row, 0, cell0)
+        self.history_list.setItem(row, 1, QTableWidgetItem(element))
+        self.history_list.setItem(row, 2, QTableWidgetItem(valeur))
+        self.history_list.setItem(row, 3, QTableWidgetItem(eco2_prix))
+        self.history_list.setItem(row, 4, QTableWidgetItem(eco2_masse))
+
+        return row
 
     def delete_selected_calculation(self):
         """
@@ -2241,13 +2260,16 @@ class MainWindow(QMainWindow):
 
         Retire l'élément sélectionné de la liste historique et met à jour le total des émissions.
         """
-        selected_items = self.history_list.selectedItems()
-        if not selected_items:
+        selected_rows = sorted(
+            {idx.row() for idx in self.history_list.selectionModel().selectedRows()},
+            reverse=True
+        )
+        if not selected_rows:
             QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un ou plusieurs calculs à supprimer.")
             return
 
-        for item in selected_items:
-            self.history_list.takeItem(self.history_list.row(item))
+        for row in selected_rows:
+            self.history_list.removeRow(row)
 
         self.update_total_emissions()
         self.data_changed.emit()
@@ -2269,9 +2291,9 @@ class MainWindow(QMainWindow):
             return
 
         rows = []
-        for i in range(self.history_list.count()):
-            itm = self.history_list.item(i)
-            d = itm.data(Qt.UserRole)
+        for i in range(self.history_list.rowCount()):
+            cell0 = self.history_list.item(i, 0)
+            d = cell0.data(Qt.UserRole) if cell0 else None
             if d:
                 rows.append(d)
 
