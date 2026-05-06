@@ -8,7 +8,7 @@
 import math
 import pandas as pd
 from PySide6.QtWidgets import QMessageBox
-from windows.data_manager import DataManager
+from ui.data_manager import DataManager
 
 class CarbonCalculator:
     """

@@ -69,9 +69,9 @@ class DataManager:
         self.main_data = load_data()
 
         # Données modifiables → user_path
-        self.data_masse_path = os.path.join(self.user_path, "data_masse_eCO2", self.DATA_MASSE_FILENAME)
+        self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)
         # Données en lecture seule → base_path
-        self.data_materials_path = os.path.join(base_path, "data_masse_eCO2", self.DATA_MATERIALS_FILENAME)
+        self.data_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
 
         # Charger data_masse
         if not os.path.exists(self.data_masse_path):
@@ -88,7 +88,7 @@ class DataManager:
         self.data_materials = pd.read_hdf(self.data_materials_path)
 
         # Charger consommables liquides (produits chimiques / bioproduits)
-        self.liq_path = os.path.join(self.user_path, "data_masse_eCO2", self.DATA_LIQUID_CONSOMMABLES)
+        self.liq_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_LIQUID_CONSOMMABLES)
         if os.path.exists(self.liq_path):
             self.data_liquides = pd.read_hdf(self.liq_path)
         else:
@@ -168,7 +168,7 @@ class DataManager:
         Retourne un DataFrame vide si absent.
         """
         candidates = [
-            os.path.join(self.base_path, "Scrapping", "output", "prix_ijm_2025.csv"),
+            os.path.join(self.base_path, "tools", "scraping", "output", "prix_ijm_2025.csv"),
             os.path.join(self.base_path, "data_prix", "prix_ijm_2025.csv"),
         ]
         for path in candidates:

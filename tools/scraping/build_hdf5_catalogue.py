@@ -4,10 +4,10 @@ build_hdf5_catalogue.py
 Convertit catalogue_complet.csv en HDF5 pour l'application LABeCO2.
 
 Usage :
-    python Scrapping/build_hdf5_catalogue.py
+    python tools/scraping/build_hdf5_catalogue.py
 
 Sortie :
-    data_masse_eCO2/data_eCO2_masse_consommable.hdf5  (remplace l'existant)
+    data/mass_factors/data_eCO2_masse_consommable.hdf5  (remplace l'existant)
 """
 
 import os
@@ -15,9 +15,9 @@ import re
 import pandas as pd
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR   = os.path.dirname(BASE_DIR)
+ROOT_DIR   = os.path.dirname(os.path.dirname(BASE_DIR))
 CSV_PATH   = os.path.join(BASE_DIR, "output", "catalogue_complet.csv")
-HDF5_PATH  = os.path.join(ROOT_DIR, "data_masse_eCO2", "data_eCO2_masse_consommable.hdf5")
+HDF5_PATH  = os.path.join(ROOT_DIR, "data", "mass_factors", "data_eCO2_masse_consommable.hdf5")
 BACKUP_PATH = HDF5_PATH + ".backup"
 
 # Colonnes numériques à convertir (virgule → point)

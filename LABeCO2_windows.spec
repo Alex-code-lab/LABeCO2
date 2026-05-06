@@ -8,23 +8,23 @@ a = Analysis(
     binaries=[],
     datas=[
         # --- Base de données GES1point5 ---
-        ('data_base_GES1point5\\data_base_GES1point5.hdf5',  'data_base_GES1point5'),
+        ('data\\ges1point5\\data_base_GES1point5.hdf5',  'data\\ges1point5'),
 
         # --- Base de données masse / consommables ---
-        ('data_masse_eCO2\\data_eCO2_masse_consommable.hdf5',   'data_masse_eCO2'),
-        ('data_masse_eCO2\\data_eCO2_liquides_consommable.hdf5', 'data_masse_eCO2'),
-        ('data_masse_eCO2\\empreinte_carbone_materiaux.h5',      'data_masse_eCO2'),
-        ('data_masse_eCO2\\empreinte_carbone_solvants.h5',       'data_masse_eCO2'),
-        ('data_masse_eCO2\\materiaux_labo.h5',                   'data_masse_eCO2'),
-        ('data_masse_eCO2\\nacres_2022.h5',                      'data_masse_eCO2'),
+        ('data\\mass_factors\\data_eCO2_masse_consommable.hdf5',   'data\\mass_factors'),
+        ('data\\mass_factors\\data_eCO2_liquides_consommable.hdf5', 'data\\mass_factors'),
+        ('data\\mass_factors\\empreinte_carbone_materiaux.h5',      'data\\mass_factors'),
+        ('data\\mass_factors\\empreinte_carbone_solvants.h5',       'data\\mass_factors'),
+        ('data\\mass_factors\\materiaux_labo.h5',                   'data\\mass_factors'),
+        ('data\\mass_factors\\nacres_2022.h5',                      'data\\mass_factors'),
 
         # --- Base SQLite types de manips ---
-        ('manips_types\\manips_type.sqlite', 'manips_types'),
+        ('scenarios\\manips_type.sqlite', 'scenarios'),
 
         # --- Interface ---
         ('styles\\styles.qss',  'styles'),
-        ('images\\Logo.png',    'images'),
-        ('images\\icon.ico',    'images'),
+        ('assets\\Logo.png',    'assets'),
+        ('assets\\icon.ico',    'assets'),
     ],
     hiddenimports=[
         # PyTables / HDF5
@@ -97,5 +97,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['images\\icon.ico'],
+    icon=['assets\\icon.ico'],
 )

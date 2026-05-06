@@ -36,11 +36,11 @@ class DataMassWindow(QMainWindow):
             user_path = base_path
         self._user_path = user_path
 
-        self.nacres_hdf5_file = os.path.join(base_path, "data_masse_eCO2", "nacres_2022.h5")
+        self.nacres_hdf5_file = os.path.join(base_path, "data", "mass_factors", "nacres_2022.h5")
         self._all_nacres = []  # Will store (code, description)
 
         # HDF5 modifiable → user_path
-        self.hdf5_file = os.path.join(user_path, "data_masse_eCO2", "data_eCO2_masse_consommable.hdf5")
+        self.hdf5_file = os.path.join(user_path, "data", "mass_factors", "data_eCO2_masse_consommable.hdf5")
 
         self.columns = [
             "Consommable",
@@ -77,7 +77,7 @@ class DataMassWindow(QMainWindow):
         ]
 
         # Fichier pour les consommables liquides (modifiable → user_path)
-        self.hdf5_liquids = os.path.join(user_path, "data_masse_eCO2", "data_eCO2_liquides_consommable.hdf5")
+        self.hdf5_liquids = os.path.join(user_path, "data", "mass_factors", "data_eCO2_liquides_consommable.hdf5")
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()

@@ -25,23 +25,22 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator, QDoubleValidator
 
-# On importe DataManager et CarbonCalculator
-from windows.data_manager import DataManager
-from windows.carbon_calculator import CarbonCalculator
+from ui.data_manager import DataManager
+from ui.carbon_calculator import CarbonCalculator
 
 from utils.data_loader import load_logo, get_user_data_path, init_user_data
-from manips_types.a_manips_type_db import ManipsTypeDB
-from windows.graphiques.graph_1_pie_chart import PieChartWindow
-from windows.graphiques.graph_2_bar_chart import BarChartWindow
-from windows.graphiques.graph_3_proportional_bar_chart import ProportionalBarChartWindow
-from windows.data_mass_window import DataMassWindow
-from windows.edit_calculation_dialog import EditCalculationDialog
-from windows.graphiques.graph_4_stacked_bar_consumables import StackedBarConsumablesWindow
-from windows.graphiques.graph_5_nacres_bar_chart import NacresBarChartWindow
-from windows.graphiques.graph_6_proportional_bar_chart_mass import ProportionalBarChartNacresWindow
-from windows.graphiques.graph_7_CoverageWindow import CoverageWindow
-from windows.graphiques.graph_8_CoverageCategory import CoverageCategoryWindow
-from windows.UserManipDialog import UserManipDialog
+from scenarios.manip_type_db import ManipsTypeDB
+from ui.charts.pie_chart import PieChartWindow
+from ui.charts.bar_chart_price_mass import BarChartWindow
+from ui.charts.bar_chart_proportional import ProportionalBarChartWindow
+from ui.data_mass_window import DataMassWindow
+from ui.edit_calculation_dialog import EditCalculationDialog
+from ui.charts.bar_chart_consumables import StackedBarConsumablesWindow
+from ui.charts.nacres_bar_chart import NacresBarChartWindow
+from ui.charts.nacres_proportional import ProportionalBarChartNacresWindow
+from ui.charts.coverage_overview import CoverageWindow
+from ui.charts.coverage_by_category import CoverageCategoryWindow
+from ui.user_manip_dialog import UserManipDialog
 
 
 
@@ -70,7 +69,7 @@ class MainWindow(QMainWindow):
             user_path = base_path
 
         # Chemin de la base de données SQLite pour les manips type
-        db_path = os.path.join(user_path, "./manips_types/manips_type.sqlite")
+        db_path = os.path.join(user_path, "scenarios", "manips_type.sqlite")
         self.manips_db = ManipsTypeDB(db_path=db_path)
 
         try:

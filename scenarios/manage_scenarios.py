@@ -3,14 +3,14 @@
 #
 # Ce fichier fait partie du projet LABeCO2.
 # Distribué sous licence : GNU GPL v3 (non commercial)
-# manips_types/c_manage_manips.py
+# scenarios/manage_scenarios.py
 import sys
 import os
-from a_manips_type_db import ManipsTypeDB
+from manip_type_db import ManipsTypeDB
 
 def main():
     # On suppose que le fichier .sqlite est dans un dossier particulier :
-    db_path = os.path.join("manips_types", "manips_type.sqlite")
+    db_path = os.path.join("scenarios", "manips_type.sqlite")
     db = ManipsTypeDB(db_path=db_path)
 
     while True:

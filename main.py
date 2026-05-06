@@ -20,7 +20,7 @@ from PySide6.QtWidgets import QApplication, QSplashScreen
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import Qt
 
-from windows.main_window import MainWindow
+from ui.main_window import MainWindow
 from utils.data_loader import resource_path
 
 def main():
@@ -31,7 +31,7 @@ def main():
 
         # Splash screen
         try:
-            splash_pix = QPixmap(resource_path(os.path.join("images", "Logo.png")))
+            splash_pix = QPixmap(resource_path(os.path.join("assets", "Logo.png")))
             splash = QSplashScreen(splash_pix)
             splash.setWindowFlag(Qt.FramelessWindowHint)
             splash.showMessage("Chargement de LABeCO2...", Qt.AlignBottom | Qt.AlignCenter, Qt.white)
@@ -56,7 +56,7 @@ def main():
 
         # Appliquer l'icône
         try:
-            icon_path = resource_path(os.path.join("images", "icon.icns"))
+            icon_path = resource_path(os.path.join("assets", "icon.icns"))
             print(f"Chargement icône : {icon_path}")
             if os.path.exists(icon_path):
                 app.setWindowIcon(QIcon(icon_path))

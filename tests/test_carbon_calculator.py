@@ -23,7 +23,7 @@ for _mod in [
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from windows.carbon_calculator import CarbonCalculator
+from ui.carbon_calculator import CarbonCalculator
 
 
 # ── Fabrique de DataManager mocké ────────────────────────────────────────────
@@ -355,7 +355,7 @@ class TestGetMaterialData(unittest.TestCase):
 
     def _make_real_dm(self, co2_value, uncert_value):
         """Crée un DataManager minimal avec data_materials injectée à la main."""
-        from windows.data_manager import DataManager
+        from ui.data_manager import DataManager
         dm = DataManager.__new__(DataManager)
         dm.data_materials = pd.DataFrame([{
             'Materiau': 'Plastique',

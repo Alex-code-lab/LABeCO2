@@ -6,13 +6,13 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('manips_types/manips_type.sqlite', 'manips_types'),
-        ('data_base_GES1point5/data_base_GES1point5.hdf5', 'data_base_GES1point5'),
-        ('data_masse_eCO2/data_eCO2_masse_consommable.hdf5', 'data_masse_eCO2'),
-        ('data_masse_eCO2/empreinte_carbone_materiaux.h5', 'data_masse_eCO2'),
+        ('scenarios/manips_type.sqlite', 'scenarios'),
+        ('data/ges1point5/data_base_GES1point5.hdf5', 'data/ges1point5'),
+        ('data/mass_factors/data_eCO2_masse_consommable.hdf5', 'data/mass_factors'),
+        ('data/mass_factors/empreinte_carbone_materiaux.h5', 'data/mass_factors'),
         ('styles/styles.qss', 'styles'),
-        ('images/icon.icns', 'images'),
-        ('images/Logo.png', 'images'),
+        ('assets/icon.icns', 'assets'),
+        ('assets/Logo.png', 'assets'),
     ],
     hiddenimports=[],
     hookspath=[],
@@ -42,12 +42,12 @@ exe = EXE(
     console=False,                # GUI → pas de console
     disable_windowed_traceback=False,
     argv_emulation=False,         # Utile surtout pour .app signées
-    icon='images/icon.icns',      # ← chaîne, pas liste
+    icon='assets/icon.icns',
 )
 app = BUNDLE(
     exe,
     name='LABeCO2.app',
-    icon='images/icon.icns',
+    icon='assets/icon.icns',
     bundle_identifier='com.labeco2.LABeCO2'
 )
 

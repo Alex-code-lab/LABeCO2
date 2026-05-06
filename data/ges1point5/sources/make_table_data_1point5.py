@@ -11,7 +11,7 @@ import glob
 import os
 
 # 1) Définir le chemin vers le dossier contenant tous les .tsv
-input_folder = './data_base_GES1point5/data_initiales/'
+input_folder = './'
 
 # 2) Récupérer la liste de tous les fichiers .tsv
 all_files = glob.glob(os.path.join(input_folder, '*.tsv'))
@@ -40,13 +40,13 @@ final_df = pd.concat(df_list, ignore_index=True)
 
 # 6) Exporter le DataFrame final au format HDF5
 #    Le paramètre 'key' est obligatoire, vous pouvez lui donner le nom que vous voulez
-output_file = './data_base_GES1point5/data_initiales/table_unique.csv'
+output_file = './table_unique.csv'
 final_df.to_csv(output_file)#, key='data', mode='w')
 
 print(f"Fichier HDF5 généré : {output_file}")
 
 # 7) Exporter le DataFrame final au format HDF5
-output_hdf5 = './data_base_GES1point5/data_initiales/data_base_GES1point5.hdf5'
+output_hdf5 = '../data_base_GES1point5.hdf5'
 
 # Conversion explicite des colonnes string pandas en object (compat PyTables)
 final_df_h5 = final_df.copy()

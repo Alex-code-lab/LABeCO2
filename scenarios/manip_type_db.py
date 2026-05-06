@@ -3,7 +3,7 @@
 #
 # Ce fichier fait partie du projet LABeCO2.
 # Distribué sous licence : GNU GPL v3 (non commercial)
-# manips_types/a_manips_type_db.py
+# scenarios/manip_type_db.py
 
 import sqlite3
 import os
@@ -32,7 +32,7 @@ class ManipsTypeDB:
             return [cls.SOURCE_USER, cls.SOURCE_USER_LEGACY]
         return [normalized]
 
-    def __init__(self, db_path='manips_types/manips_type.sqlite'):
+    def __init__(self, db_path='scenarios/manips_type.sqlite'):
         """
         Initialise la connexion SQLite et crée les tables si elles n'existent pas.
         :param db_path: Chemin du fichier de base de données SQLite.

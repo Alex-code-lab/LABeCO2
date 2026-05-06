@@ -47,9 +47,9 @@ def init_user_data():
 
     # Fichiers écrits par l'utilisateur → doivent être dans user_path
     writable_files = [
-        os.path.join("data_masse_eCO2", "data_eCO2_masse_consommable.hdf5"),
-        os.path.join("data_masse_eCO2", "data_eCO2_liquides_consommable.hdf5"),
-        os.path.join("manips_types", "manips_type.sqlite"),
+        os.path.join("data", "mass_factors", "data_eCO2_masse_consommable.hdf5"),
+        os.path.join("data", "mass_factors", "data_eCO2_liquides_consommable.hdf5"),
+        os.path.join("scenarios", "manips_type.sqlite"),
     ]
 
     for rel_path in writable_files:
@@ -73,7 +73,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 def load_logo():
-    image_path = resource_path('images/Logo.png')
+    image_path = resource_path('assets/Logo.png')
     if not os.path.isfile(image_path):
         raise FileNotFoundError(f"Impossible de charger l'image: {image_path}")
     
@@ -82,7 +82,7 @@ def load_logo():
 
 
 def load_data():
-    data_file = resource_path('data_base_GES1point5/data_base_GES1point5.hdf5')
+    data_file = resource_path('data/ges1point5/data_base_GES1point5.hdf5')
     try:
         df = pd.read_hdf(data_file, key='purchases_factors')
     except (KeyError, ValueError):

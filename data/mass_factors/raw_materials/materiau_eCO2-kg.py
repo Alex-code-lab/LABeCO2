@@ -85,5 +85,5 @@ print(d_mat)
 print(d_solv)
 
 # Enregistrer dans un fichier HDF5
-d_mat.to_hdf("./data_masse_eCO2/empreinte_carbone_materiaux.h5", key='data', mode='w')
-d_solv.to_hdf("./data_masse_eCO2/empreinte_carbone_solvants.h5", key='data', mode='w')
+d_mat.to_hdf("../../empreinte_carbone_materiaux.h5", key='data', mode='w')
+d_solv.to_hdf("../../empreinte_carbone_solvants.h5", key='data', mode='w')

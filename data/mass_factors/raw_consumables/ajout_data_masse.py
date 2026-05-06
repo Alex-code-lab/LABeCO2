@@ -25,13 +25,13 @@ class MainWindow(QMainWindow):
 
         # 1) Dossier de base : on part du répertoire courant
         base_dir = os.path.abspath(os.getcwd())
-        self.nacres_hdf5_file = os.path.join(base_dir, 'data_masse_eCO2', 'nacres_2022.h5')
+        self.nacres_hdf5_file = os.path.join(base_dir, 'data', 'mass_factors', 'nacres_2022.h5')
         self._all_nacres = []  # List of (code, description) tuples
 
         # 2) Chemins vers les fichiers HDF5
         #    Adapte si ton répertoire n'est pas celui-ci
-        self.hdf5_data_path = os.path.join(base_dir, 'data_masse_eCO2', 'data_eCO2_masse_consommable.hdf5')
-        self.hdf5_materials_path = os.path.join(base_dir, 'data_masse_eCO2', 'empreinte_carbone_materiaux.h5')
+        self.hdf5_data_path = os.path.join(base_dir, 'data', 'mass_factors', 'data_eCO2_masse_consommable.hdf5')
+        self.hdf5_materials_path = os.path.join(base_dir, 'data', 'mass_factors', 'empreinte_carbone_materiaux.h5')
 
         # 3) Nom des colonnes pour le DataFrame principal
         self.columns = [

@@ -3,10 +3,10 @@
 #
 # Ce fichier fait partie du projet LABeCO2.
 # Distribué sous licence : GNU GPL v3 (non commercial)
-# manips_types/b_create_manip_type_file.py
-from a_manips_type_db import ManipsTypeDB
+# scenarios/create_sample_data.py
+from manip_type_db import ManipsTypeDB
 
-db = ManipsTypeDB('manips_types/manips_type.sqlite')
+db = ManipsTypeDB('scenarios/manips_type.sqlite')
 
 NATIVE_MANIPS = [
     # {
