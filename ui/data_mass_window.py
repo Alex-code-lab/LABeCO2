@@ -6,13 +6,18 @@
 # windows/data_mass_window.py
 import os
 import sys
+import html
+import re
+from datetime import date
 import pandas as pd
 from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog
+    QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog, QToolTip,
+    QScrollArea, QSizePolicy
 )
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCursor, QDoubleValidator, QIntValidator
 
 class DataMassWindow(QMainWindow):
     data_added = Signal()
@@ -22,7 +27,8 @@ class DataMassWindow(QMainWindow):
         super().__init__(parent)
 
         self.setWindowTitle("Gestion des consommables")
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(100, 100, 860, 620)
+        self.setMinimumSize(760, 520)
 
         # Résolution du base_path compatible PyInstaller
         if base_path is None:
@@ -46,18 +52,32 @@ class DataMassWindow(QMainWindow):
             "Consommable",
             "Marque",
             "Référence",
+            "Code CAS",
+            "Catégorie",
             "Code NACRES",
             "Masse unitaire (g)",
             "Matériau consommable",
             "Masse unitaire deuxieme materiaux (g)",
             "Matériau deuxieme materiaux",
+            "Masse unitaire troisième materiaux (g)",
+            "Matériau troisième materiaux",
             "Masse emballage unitaire (g)",
             "Matériau emballage",
             "Masse condionnement (g)",
             "Matériau conditionnement",
             "Nbr par conditionnement",
+            "Prix du conditionnement",
+            "date d'ajout",
             "Source/Signature",
             "Lien / Note / Remarque",
+            "prix_ht_ijm",
+            "condt_ijm",
+            "nb_unites_ijm",
+            "prix_unitaire_ijm",
+            "designation_ijm",
+            "code_ijm",
+            "marque_ijm",
+            "score_match",
         ]
 
         # Spécifique consommables liquides
@@ -81,6 +101,7 @@ class DataMassWindow(QMainWindow):
 
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
+        self.prefill_row_index = None
 
         # data_materials transmis par MainWindow
         # data_materials doit contenir 'Materiau' et 'eCO2_kg'
@@ -107,17 +128,32 @@ class DataMassWindow(QMainWindow):
                 "Consommable": "Tube Falcon 15ml",
                 "Marque": "N/A",
                 "Référence": "N/A",
+                "Code CAS": "",
+                "Catégorie": "Consommable",
                 "Code NACRES": "NB13",
                 "Masse unitaire (g)": 6.7,
                 "Matériau consommable": "Polypropylène (PP)",
                 "Masse unitaire deuxieme materiaux (g)": "N/A",
                 "Matériau deuxieme materiaux": "N/A",
+                "Masse unitaire troisième materiaux (g)": "",
+                "Matériau troisième materiaux": "",
                 "Masse emballage unitaire (g)": "N/A",
                 "Matériau emballage": "N/A",
                 "Masse condionnement (g)": "N/A",
                 "Matériau conditionnement": "N/A",
                 "Nbr par conditionnement": "N/A",
-                "Source/Signature": "Alexandre Souchaud"
+                "Prix du conditionnement": "",
+                "date d'ajout": "",
+                "Source/Signature": "Alexandre Souchaud",
+                "Lien / Note / Remarque": "",
+                "prix_ht_ijm": "",
+                "condt_ijm": "",
+                "nb_unites_ijm": "",
+                "prix_unitaire_ijm": "",
+                "designation_ijm": "",
+                "code_ijm": "",
+                "marque_ijm": "",
+                "score_match": "",
             }], columns=self.columns)
             self.sauvegarder_donnees(df)
         # --- Harmoniser les colonnes manquantes ---
@@ -140,12 +176,49 @@ class DataMassWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Erreur", f"Impossible de sauvegarder le fichier HDF5 : {e}")
 
+    def add_section_header(self, title, mode=None):
+        header = QLabel(title)
+        header.setStyleSheet(
+            "border-top: 1px solid #cbd5e1; "
+            "color: #374151; font-weight: 700; "
+            "padding-top: 8px; margin-top: 8px;"
+        )
+        self.form_layout.addRow(header)
+        if mode == "solid":
+            self.solid_section_headers.append(header)
+        elif mode == "liquid":
+            self.liquid_section_headers.append(header)
+        return header
+
+    def create_material_selector(self, combo):
+        selector = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        info_button = QPushButton("i")
+        info_button.setFixedWidth(28)
+        info_button.setToolTip("Afficher le facteur eCO₂ et la source du matériau")
+        info_button.clicked.connect(
+            lambda _checked=False, material_combo=combo, button=info_button:
+                self.show_material_info(material_combo, button)
+        )
+
+        layout.addWidget(combo, 1)
+        layout.addWidget(info_button)
+        selector.setLayout(layout)
+        return selector
+
     def init_ui(self):
         main_layout = QVBoxLayout()
 
         self.form_layout = QFormLayout()
+        self.required_fields = []
+        self.solid_section_headers = []
+        self.liquid_section_headers = []
 
         # Sélecteur de type
+        self.add_section_header("Identification")
         self.type_combo = QComboBox()
         self.type_combo.addItems(["Consommable solide", "Consommable liquide"])
         self.type_combo.currentIndexChanged.connect(self.on_type_changed)
@@ -155,6 +228,9 @@ class DataMassWindow(QMainWindow):
         self.nom_input = QLineEdit()
         self.brand_input = QLineEdit()
         self.ref_input = QLineEdit()
+        self.nom_input.setPlaceholderText("Nom du consommable")
+        self.brand_input.setPlaceholderText("Marque / fournisseur")
+        self.ref_input.setPlaceholderText("Référence catalogue ou interne")
 
         # Définir la liste des matériaux avant toute création de ComboBox qui l'utilise
         if self.data_materials is not None:
@@ -177,6 +253,24 @@ class DataMassWindow(QMainWindow):
         self.mat_cond_combo = QComboBox()
         self.mat_cond_combo.addItems(mats)
         self.nbr_cond_input = QLineEdit()
+        self.nbr_cond_input.setValidator(QIntValidator(1, 999999, self))
+        self.nbr_cond_input.setPlaceholderText("1 si vendu à l'unité")
+
+        # Prix manuel
+        self.price_mode_combo = QComboBox()
+        self.price_mode_combo.addItems(["Prix par conditionnement", "Prix par unité"])
+        self.price_input = QLineEdit()
+        self.price_input.setValidator(QDoubleValidator(0.0, 999999999.0, 6, self))
+        self.price_input.setPlaceholderText("Prix obligatoire")
+        self.price_preview_label = QLabel("Prix unitaire calculé : —")
+        self.price_preview_label.setStyleSheet("color: #4b5563;")
+
+        self.price_row_widget = QWidget()
+        price_layout = QHBoxLayout()
+        price_layout.setContentsMargins(0, 0, 0, 0)
+        price_layout.addWidget(self.price_mode_combo, 2)
+        price_layout.addWidget(self.price_input, 1)
+        self.price_row_widget.setLayout(price_layout)
 
         # Lien / Note
         self.lien_input = QLineEdit()
@@ -184,6 +278,7 @@ class DataMassWindow(QMainWindow):
         # Instead of form_layout.addRow("Code NACRES:", self.nacres_input)
         self.nacres_combo = QComboBox()
         nacres_layout = QVBoxLayout()
+        nacres_layout.setContentsMargins(0, 0, 0, 0)
         nacres_layout.addWidget(self.nacres_combo)
 
         search_layout = QHBoxLayout()
@@ -193,33 +288,55 @@ class DataMassWindow(QMainWindow):
         search_layout.addWidget(self.nacres_search)
 
         nacres_layout.addLayout(search_layout)
-        self.form_layout.addRow("Code NACRES:", nacres_layout)
+        self.nacres_widget = QWidget()
+        self.nacres_widget.setLayout(nacres_layout)
+        self.form_layout.addRow("Code NACRES:", self.nacres_widget)
 
         self.masse_input = QLineEdit()
+        self.masse_input.setPlaceholderText("Optionnel, mais nécessaire pour calculer l'eCO₂ par masse")
 
         # Peupler la liste des matériaux depuis data_materials
         self.materiau_combo = QComboBox()
         self.materiau_combo.addItems(mats)
 
         self.source_input = QLineEdit()
+        self.source_input.setPlaceholderText("Nom, équipe, source documentaire...")
+
+        self.materiau_row_widget = self.create_material_selector(self.materiau_combo)
+        self.materiau2_row_widget = self.create_material_selector(self.materiau2_combo)
+        self.mat_emb_row_widget = self.create_material_selector(self.mat_emb_combo)
+        self.mat_cond_row_widget = self.create_material_selector(self.mat_cond_combo)
 
         self.form_layout.addRow("Consommable:", self.nom_input)
         self.form_layout.addRow("Marque:", self.brand_input)
         self.form_layout.addRow("Référence:", self.ref_input)
-        self.form_layout.addRow("Masse unitaire (g):", self.masse_input)
-        self.form_layout.addRow("Matériau consommable:", self.materiau_combo)
-        self.form_layout.addRow("Masse unitaire 2 (g):", self.masse2_input)
-        self.form_layout.addRow("Matériau 2:", self.materiau2_combo)
 
+        self.add_section_header("Matériau consommable 1", mode="solid")
+        self.form_layout.addRow("Matériau consommable 1:", self.materiau_row_widget)
+        self.form_layout.addRow("Masse matériau 1 (g):", self.masse_input)
+
+        self.add_section_header("Matériau consommable 2 (optionnel)", mode="solid")
+        self.form_layout.addRow("Matériau consommable 2:", self.materiau2_row_widget)
+        self.form_layout.addRow("Masse matériau 2 (g):", self.masse2_input)
+
+        self.add_section_header("Emballage", mode="solid")
+        self.form_layout.addRow("Matériau emballage:", self.mat_emb_row_widget)
         self.form_layout.addRow("Masse emballage (g):", self.masse_emb_input)
-        self.form_layout.addRow("Matériau emballage:", self.mat_emb_combo)
 
-        self.form_layout.addRow("Masse conditionnement (g):", self.masse_cond_input)
-        self.form_layout.addRow("Matériau conditionnement:", self.mat_cond_combo)
+        self.add_section_header("Conditionnement et prix", mode="solid")
         self.form_layout.addRow("Nbr par conditionnement:", self.nbr_cond_input)
+        self.form_layout.addRow("Matériau conditionnement:", self.mat_cond_row_widget)
+        self.form_layout.addRow("Masse conditionnement (g):", self.masse_cond_input)
+        self.form_layout.addRow("Prix:", self.price_row_widget)
+        self.form_layout.addRow("", self.price_preview_label)
 
-        self.form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
-        self.form_layout.addRow("Source/Signature:", self.source_input)
+        self.register_required_field(self.type_combo, "Type d'objet")
+        self.register_required_field(self.nacres_widget, "Code NACRES", control=self.nacres_combo)
+        self.register_required_field(self.nom_input, "Consommable")
+        self.register_required_field(self.brand_input, "Marque")
+        self.register_required_field(self.ref_input, "Référence")
+        self.register_required_field(self.nbr_cond_input, "Nbr par conditionnement")
+        self.register_required_field(self.price_row_widget, "Prix", control=self.price_input)
 
         # --- Widgets spécifiques Liquide ---
         self.dens_input    = QLineEdit()
@@ -227,24 +344,37 @@ class DataMassWindow(QMainWindow):
         self.factor_input  = QLineEdit()
         self.uncert_input  = QLineEdit()
 
+        self.add_section_header("Données liquide", mode="liquid")
         self.form_layout.addRow("Densité (g/mL):",      self.dens_input)
         self.form_layout.addRow("Concentration (mg/mL):", self.conc_input)
         self.form_layout.addRow("Facteur CO₂ (kg/kg):", self.factor_input)
         self.form_layout.addRow("Incertitude (%) :",    self.uncert_input)
 
+        self.register_required_field(self.dens_input, "Densité")
+        self.register_required_field(self.factor_input, "Facteur CO₂")
+
+        self.add_section_header("Source et notes")
+        self.form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
+        self.form_layout.addRow("Source/Signature:", self.source_input)
+        self.register_required_field(self.source_input, "Source/Signature")
+
         # Masquer ces lignes initialement
         for w in (self.dens_input, self.conc_input, self.factor_input, self.uncert_input):
             w.setVisible(False)
 
-        main_layout.addLayout(self.form_layout)
+        form_container = QWidget()
+        form_container.setLayout(self.form_layout)
+        self.form_scroll_area = QScrollArea()
+        self.form_scroll_area.setWidgetResizable(True)
+        self.form_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.form_scroll_area.setMinimumHeight(280)
+        self.form_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.form_scroll_area.setWidget(form_container)
+        main_layout.addWidget(self.form_scroll_area, 1)
 
         self.add_button = QPushButton("Ajouter l'objet")
         self.add_button.clicked.connect(self.ajouter_objet_utilisateur)
         main_layout.addWidget(self.add_button)
-
-        self.display_button = QPushButton("Actualiser les données")
-        self.display_button.clicked.connect(self.afficher_donnees)
-        main_layout.addWidget(self.display_button)
 
         export_import_layout = QHBoxLayout()
         self.export_button = QPushButton("⬆ Exporter la base de données")
@@ -259,6 +389,8 @@ class DataMassWindow(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
+        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.set_table_visible_rows(4)
 
         # Appliquer le style pour avoir le texte en noir
         self.table.setStyleSheet("""
@@ -270,7 +402,7 @@ class DataMassWindow(QMainWindow):
                                 }
                             """)
 
-        main_layout.addWidget(self.table)
+        main_layout.addWidget(self.table, 0)
 
         container = QWidget()
         container.setLayout(main_layout)
@@ -279,7 +411,20 @@ class DataMassWindow(QMainWindow):
         # Applique la visibilité initiale (solide)
         self.update_form_visibility()
         self.nacres_search.textChanged.connect(self.filter_nacres_list)
+        self.nacres_combo.currentIndexChanged.connect(self.update_required_indicators)
+        self.type_combo.currentIndexChanged.connect(self.update_required_indicators)
+        self.price_mode_combo.currentIndexChanged.connect(self.update_price_preview)
+        self.price_input.textChanged.connect(self.update_price_preview)
+        self.nbr_cond_input.textChanged.connect(self.update_price_preview)
+        for field in (
+            self.nom_input, self.brand_input, self.ref_input,
+            self.nbr_cond_input, self.price_input, self.source_input,
+            self.dens_input, self.factor_input
+        ):
+            field.textChanged.connect(self.update_required_indicators)
         self.load_nacres_list()
+        self.update_required_indicators()
+        self.update_price_preview()
 
     def on_type_changed(self, idx):
         """Bascule solide/liquide : met à jour visibilité + table."""
@@ -288,6 +433,8 @@ class DataMassWindow(QMainWindow):
         if self.is_liquid:
             self.data_liquids = self.load_liquid_df()
         self.update_form_visibility()             # masque/affiche les bons champs
+        self.update_required_indicators()
+        self.update_price_preview()
         self.afficher_donnees()                   # recharge la table avec le bon DF
 
     def load_nacres_list(self):
@@ -319,16 +466,251 @@ class DataMassWindow(QMainWindow):
     def filter_nacres_list(self):
         search_text = self.nacres_search.text().strip().lower()
         self.nacres_combo.clear()
+        self.nacres_combo.addItem("Sélectionnez un code NACRES...", None)
         for (code, desc) in self._all_nacres:
             if search_text in code.lower() or search_text in desc.lower():
                 display_text = f"{code} - {desc}"
                 self.nacres_combo.addItem(display_text, code)
+        self.update_required_indicators()
 
-    def verifier_existence_objet(self, nom, reference, code_nacres):
-        if not self.data[self.data["Consommable"] == nom].empty:
+    def show_material_info(self, material_combo, button):
+        material_name = material_combo.currentText().strip()
+        info_text = self.format_material_info(material_name)
+        QToolTip.showText(
+            QCursor.pos(),
+            info_text,
+            button,
+            button.rect(),
+            20000,
+        )
+
+    def format_material_info(self, material_name):
+        if self.data_materials is None or self.data_materials.empty:
+            return "Données matériaux non chargées."
+        if not material_name:
+            return "Aucun matériau sélectionné."
+
+        mat_col = "Materiau"
+        co2_col = "Equivalent CO₂ (kg eCO₂/kg)"
+        uncertainty_col = "uncertainty"
+        source_col = "Source"
+
+        if mat_col not in self.data_materials.columns:
+            return "Colonne matériau introuvable dans la base."
+
+        mask = self.data_materials[mat_col].astype(str).str.strip() == material_name
+        rows = self.data_materials[mask]
+        if rows.empty:
+            return f"Matériau introuvable : {html.escape(material_name)}"
+
+        row = rows.iloc[0]
+
+        def clean(value):
+            if pd.isna(value):
+                return ""
+            text = str(value).strip()
+            return "" if text.lower() in ("", "nan", "none", "n/a") else text
+
+        co2_value = clean(row.get(co2_col, ""))
+        uncertainty = clean(row.get(uncertainty_col, ""))
+        source = clean(row.get(source_col, ""))
+
+        lines = [
+            f"<b>{html.escape(material_name)}</b>",
+            f"Facteur : <b>{html.escape(co2_value or '/')} kg eCO₂/kg</b>",
+        ]
+        if uncertainty:
+            lines.append(f"Incertitude : {html.escape(uncertainty)}")
+        lines.append("Source :")
+        lines.append(self.linkify_source(source) if source else "/")
+        return "<br>".join(lines)
+
+    def linkify_source(self, source):
+        source_text = str(source)
+        source_text = self.add_known_source_links(source_text)
+        parts = re.split(r"(https?://[^\s<]+)", source_text)
+        html_parts = []
+        for part in parts:
+            if part.startswith(("http://", "https://")):
+                trailing = ""
+                while part and part[-1] in ".,;)":
+                    trailing = part[-1] + trailing
+                    part = part[:-1]
+                safe_url = html.escape(part)
+                html_parts.append(f'<a href="{safe_url}">{safe_url}</a>{html.escape(trailing)}')
+            else:
+                html_parts.append(html.escape(part))
+        return "".join(html_parts).replace("DOI: ", "DOI : ")
+
+    @staticmethod
+    def add_known_source_links(source_text):
+        additions = []
+        if "Base Empreinte" in source_text and "base-empreinte.ademe.fr" not in source_text:
+            additions.append("https://base-empreinte.ademe.fr")
+        if "France Stratégie" in source_text and "strategie.gouv.fr" not in source_text:
+            additions.append("https://www.strategie.gouv.fr")
+
+        doi_match = re.search(r"DOI:\s*([^\s]+)", source_text)
+        if doi_match:
+            doi = doi_match.group(1).rstrip(".,;)")
+            doi_url = f"https://doi.org/{doi}"
+            if doi_url not in source_text:
+                additions.append(doi_url)
+
+        if additions:
+            return f"{source_text} - " + " - ".join(additions)
+        return source_text
+
+    def register_required_field(self, field_widget, label_text, control=None):
+        label = self.form_layout.labelForField(field_widget)
+        if label is None:
+            return
+        self.required_fields.append({
+            "field": field_widget,
+            "control": control or field_widget,
+            "label": label,
+            "label_text": label_text,
+        })
+
+    def is_required_field_filled(self, control):
+        if isinstance(control, QLineEdit):
+            return bool(control.text().strip())
+        if isinstance(control, QComboBox):
+            if control.currentIndex() < 0:
+                return False
+            data = control.currentData()
+            if data is None:
+                current_text = control.currentText().strip()
+                return bool(current_text) and not current_text.startswith("Sélectionnez")
+            return bool(str(data).strip())
+        return True
+
+    def set_required_style(self, control, filled):
+        if filled:
+            control.setStyleSheet("")
+            return
+
+        control.setStyleSheet(
+            "border: 2px solid #dc2626; border-radius: 4px; "
+            "background-color: #fff5f5;"
+        )
+
+    def update_required_indicators(self):
+        for item in self.required_fields:
+            field = item["field"]
+            control = item["control"]
+            label = item["label"]
+            label_text = item["label_text"]
+            active = not field.isHidden()
+            if self.is_liquid and label_text in {"Marque", "Nbr par conditionnement"}:
+                active = False
+
+            if not active:
+                label.setText(f"{label_text}:")
+                label.setStyleSheet("")
+                control.setStyleSheet("")
+                continue
+
+            filled = self.is_required_field_filled(control)
+            if filled:
+                label.setText(f"✓ {label_text}:")
+                label.setStyleSheet("color: #15803d; font-weight: 600;")
+            else:
+                label.setText(f"✗ {label_text}:")
+                label.setStyleSheet("color: #dc2626; font-weight: 600;")
+            self.set_required_style(control, filled)
+
+    @staticmethod
+    def _parse_optional_float(raw_text, field_name):
+        text = str(raw_text).strip().replace(',', '.')
+        if text == "" or text.lower() in ("n/a", "nan", "none"):
+            return ""
+        try:
+            value = float(text)
+        except ValueError:
+            raise ValueError(f"{field_name} doit être un nombre valide.")
+        if value < 0:
+            raise ValueError(f"{field_name} doit être positif.")
+        return text
+
+    def compute_manual_price_fields(self, nbr_cond):
+        price_text = self.price_input.text().strip().replace(',', '.')
+        if not price_text:
+            return {
+                "Prix du conditionnement": "",
+                "prix_ht_ijm": "",
+                "condt_ijm": "",
+                "nb_unites_ijm": "",
+                "prix_unitaire_ijm": "",
+            }
+
+        try:
+            price = float(price_text)
+        except ValueError:
+            raise ValueError("Le prix doit être un nombre valide.")
+        if price < 0:
+            raise ValueError("Le prix doit être positif.")
+
+        if self.price_mode_combo.currentText() == "Prix par unité":
+            prix_unitaire = price
+            prix_conditionnement = price * nbr_cond
+        else:
+            prix_conditionnement = price
+            prix_unitaire = price / nbr_cond
+
+        return {
+            "Prix du conditionnement": prix_conditionnement,
+            "prix_ht_ijm": prix_conditionnement,
+            "condt_ijm": "1" if nbr_cond == 1 else f"1x{nbr_cond}",
+            "nb_unites_ijm": nbr_cond,
+            "prix_unitaire_ijm": prix_unitaire,
+        }
+
+    def update_price_preview(self):
+        if self.is_liquid:
+            self.price_preview_label.setText("Prix unitaire calculé : /")
+            self.price_preview_label.setStyleSheet("color: #4b5563;")
+            return
+
+        price_text = self.price_input.text().strip().replace(',', '.')
+        nbr_text = self.nbr_cond_input.text().strip()
+        if not price_text:
+            self.price_preview_label.setText("Prix unitaire calculé : —")
+            self.price_preview_label.setStyleSheet("color: #4b5563;")
+            return
+
+        try:
+            price = float(price_text)
+            nbr_cond = int(nbr_text)
+            if price < 0 or nbr_cond <= 0:
+                raise ValueError
+        except ValueError:
+            self.price_preview_label.setText("Prix unitaire calculé : valeur à vérifier")
+            self.price_preview_label.setStyleSheet("color: #dc2626; font-weight: 600;")
+            return
+
+        if self.price_mode_combo.currentText() == "Prix par unité":
+            prix_unitaire = price
+            prix_conditionnement = price * nbr_cond
+        else:
+            prix_conditionnement = price
+            prix_unitaire = price / nbr_cond
+
+        self.price_preview_label.setText(
+            f"Prix unitaire calculé : {prix_unitaire:.4g} € "
+            f"| Prix du conditionnement : {prix_conditionnement:.4g} €"
+        )
+        self.price_preview_label.setStyleSheet("color: #15803d; font-weight: 600;")
+
+    def verifier_existence_objet(self, nom, reference, code_nacres, ignore_index=None):
+        df = self.data
+        if ignore_index is not None:
+            df = df.drop(index=ignore_index, errors="ignore")
+
+        if not df[df["Consommable"] == nom].empty:
             return f"Un objet avec le nom '{nom}' existe déjà."
 
-        if not self.data[(self.data["Référence"] == reference) & (self.data["Code NACRES"] == code_nacres)].empty:
+        if not df[(df["Référence"] == reference) & (df["Code NACRES"] == code_nacres)].empty:
             return f"La combinaison Référence='{reference}' et Code NACRES='{code_nacres}' existe déjà."
 
         return None
@@ -348,8 +730,10 @@ class DataMassWindow(QMainWindow):
         masse_cond_str = self.masse_cond_input.text().strip().replace(',', '.')
         mat_cond     = self.mat_cond_combo.currentText()
         nbr_cond     = self.nbr_cond_input.text().strip()
+        price_text   = self.price_input.text().strip()
         lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
+        self.update_required_indicators()
 
         if is_liq:
             dens       = self.dens_input.text().strip().replace(',', '.')
@@ -360,24 +744,50 @@ class DataMassWindow(QMainWindow):
             dens = conc = facteur = incert = ""
 
         if is_liq:
-            required_ok = all([nom, nacres, dens, facteur, source])
+            required_ok = all([nom, reference, nacres, dens, facteur, source])
         else:
-            required_ok = all([nom, marque, reference, materiau, nacres, masse_str, source])
+            required_ok = all([nom, marque, reference, nacres, nbr_cond, price_text, source])
         if not required_ok:
             QMessageBox.warning(self, "Erreur", "Tous les champs obligatoires doivent être remplis.")
             return
 
+        nbr_cond_value = None
         if not is_liq:
             try:
-                masse = float(masse_str)
+                nbr_cond_value = int(nbr_cond)
+                if nbr_cond_value <= 0:
+                    raise ValueError
             except ValueError:
-                QMessageBox.warning(self, "Erreur", "La masse unitaire doit être un nombre valide.")
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "Le nombre par conditionnement doit être un entier positif."
+                )
                 return
 
-        erreur = self.verifier_existence_objet(nom, reference, nacres)
+            try:
+                masse_str = self._parse_optional_float(masse_str, "La masse unitaire")
+                masse2_str = self._parse_optional_float(masse2_str, "La masse unitaire 2")
+                masse_emb_str = self._parse_optional_float(masse_emb_str, "La masse emballage")
+                masse_cond_str = self._parse_optional_float(masse_cond_str, "La masse conditionnement")
+                price_fields = self.compute_manual_price_fields(nbr_cond_value)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Erreur", str(exc))
+                return
+        else:
+            price_fields = {}
+
+        ignore_index = None if is_liq else self.prefill_row_index
+        erreur = self.verifier_existence_objet(nom, reference, nacres, ignore_index=ignore_index)
         if erreur:
             QMessageBox.warning(self, "Erreur", erreur)
             return
+
+        was_update = (
+            not is_liq
+            and self.prefill_row_index is not None
+            and self.prefill_row_index in self.data.index
+        )
 
         if is_liq:
             nouvel_objet = {
@@ -395,27 +805,51 @@ class DataMassWindow(QMainWindow):
                 "Note": lien_note
             }
         else:
-            nouvel_objet = {
+            nouvel_objet = {col: "" for col in self.columns}
+            if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
+                existing = self.data.loc[self.prefill_row_index].to_dict()
+                nouvel_objet.update(existing)
+
+            nouvel_objet.update({
                 "Consommable": nom,
                 "Marque": marque,
                 "Référence": reference,
+                "Code CAS": "",
+                "Catégorie": "Consommable",
                 "Code NACRES": nacres,
                 "Masse unitaire (g)": masse_str,
                 "Matériau consommable": materiau,
                 "Masse unitaire deuxieme materiaux (g)": masse2_str,
                 "Matériau deuxieme materiaux": materiau2,
+                "Masse unitaire troisième materiaux (g)": "",
+                "Matériau troisième materiaux": "",
                 "Masse emballage unitaire (g)": masse_emb_str,
                 "Matériau emballage": mat_emb,
                 "Masse condionnement (g)": masse_cond_str,
                 "Matériau conditionnement": mat_cond,
-                "Nbr par conditionnement": nbr_cond,
+                "Nbr par conditionnement": nbr_cond_value,
+                "date d'ajout": date.today().isoformat(),
                 "Lien / Note / Remarque": lien_note,
                 "Source/Signature": source
-            }
+            })
+
+            if price_fields:
+                nouvel_objet.update(price_fields)
+                nouvel_objet.update({
+                    "designation_ijm": nom,
+                    "code_ijm": reference,
+                    "marque_ijm": marque,
+                    "score_match": "saisie utilisateur",
+                })
+
         if is_liq:
             self.save_liquid(nouvel_objet)
         else:
-            self.data = self.ajouter_objet_df(self.data, nouvel_objet)
+            if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
+                for col in self.columns:
+                    self.data.at[self.prefill_row_index, col] = nouvel_objet.get(col, "")
+            else:
+                self.data = self.ajouter_objet_df(self.data, nouvel_objet)
             self.sauvegarder_donnees()
 
         # Efface les champs
@@ -431,16 +865,24 @@ class DataMassWindow(QMainWindow):
         self.masse_cond_input.clear()
         self.mat_cond_combo.setCurrentIndex(0)
         self.nbr_cond_input.clear()
+        self.price_mode_combo.setCurrentIndex(0)
+        self.price_input.clear()
         self.lien_input.clear()
         self.source_input.clear()
-        self.nacres_combo.setCurrentIndex(-1)
+        self.nacres_combo.setCurrentIndex(0 if self.nacres_combo.count() else -1)
         self.dens_input.clear()
         self.conc_input.clear()
         self.factor_input.clear()
         self.uncert_input.clear()
+        self.prefill_row_index = None
+        self.add_button.setText("Ajouter l'objet")
+        self.update_required_indicators()
+        self.update_price_preview()
 
-        QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été ajouté avec succès.")
+        action = "mis à jour" if was_update else "ajouté"
+        QMessageBox.information(self, "Succès", f"L'objet '{nom}' a été {action} avec succès.")
         self.data_added.emit()
+        self.afficher_donnees()
 
     def save_liquid(self, obj_dict):
         """Ajoute une ligne au fichier HDF5 des liquides."""
@@ -490,16 +932,36 @@ class DataMassWindow(QMainWindow):
             for j, col in enumerate(cols):
                 self.table.setItem(i, j, QTableWidgetItem(str(row.get(col, ""))))
         self.table.resizeColumnsToContents()
+        self.set_table_visible_rows(4)
+
+    def set_table_visible_rows(self, row_count=4):
+        header_height = (
+            self.table.horizontalHeader().height()
+            or self.table.horizontalHeader().sizeHint().height()
+        )
+        row_height = self.table.verticalHeader().defaultSectionSize()
+        scrollbar_height = self.table.horizontalScrollBar().sizeHint().height()
+        frame_height = self.table.frameWidth() * 2
+        table_height = header_height + row_height * row_count + scrollbar_height + frame_height + 6
+        self.table.setMinimumHeight(table_height)
+        self.table.setMaximumHeight(table_height)
     
     def update_form_visibility(self):
         """Montre/masque les champs en fonction de self.is_liquid."""
+        for header in self.solid_section_headers:
+            header.setVisible(not self.is_liquid)
+        for header in self.liquid_section_headers:
+            header.setVisible(self.is_liquid)
+
         # Champs propres aux solides
         for w in (
-            self.masse_input, self.materiau_combo,
-            self.masse2_input, self.materiau2_combo,
-            self.masse_emb_input, self.mat_emb_combo,
-            self.masse_cond_input, self.mat_cond_combo,
-            self.nbr_cond_input
+            self.masse_input, self.materiau_row_widget,
+            self.masse2_input, self.materiau2_row_widget,
+            self.masse_emb_input, self.mat_emb_row_widget,
+            self.masse_cond_input, self.mat_cond_row_widget,
+            self.nbr_cond_input,
+            self.price_row_widget,
+            self.price_preview_label
         ):
             lab = self.form_layout.labelForField(w)
             if lab:
@@ -515,6 +977,8 @@ class DataMassWindow(QMainWindow):
             if lab:
                 lab.setVisible(self.is_liquid)
             w.setVisible(self.is_liquid)
+        self.update_required_indicators()
+        self.update_price_preview()
 
     def export_database(self):
         """
@@ -610,6 +1074,15 @@ class DataMassWindow(QMainWindow):
         tous les champs sont remplis (mode enrichissement).
         Sélectionne aussi la ligne correspondante dans le tableau.
         """
+        self.prefill_row_index = None
+        self.add_button.setText("Ajouter l'objet")
+
+        def _clean_value(value):
+            if pd.isna(value):
+                return ""
+            text = str(value).strip()
+            return "" if text.lower() in ("", "nan", "n/a", "none") else text
+
         # ── Forcer le type "Consommable solide" ──────────────────────────────
         self.type_combo.setCurrentIndex(0)
 
@@ -637,21 +1110,37 @@ class DataMassWindow(QMainWindow):
 
         if not rows.empty:
             row = rows.iloc[0]
-            self.brand_input.setText(str(row.get("Marque", "") or ""))
-            self.ref_input.setText(str(row.get("Référence", "") or ""))
+            self.prefill_row_index = rows.index[0]
+            self.add_button.setText("Enregistrer les informations")
+            self.brand_input.setText(_clean_value(row.get("Marque", "")) or _clean_value(row.get("marque_ijm", "")))
+            self.ref_input.setText(_clean_value(row.get("Référence", "")) or _clean_value(row.get("code_ijm", "")))
 
             def _fill(field, col):
-                v = row.get(col, "")
-                if pd.notna(v) and str(v).strip() not in ("", "nan"):
-                    field.setText(str(v))
+                v = _clean_value(row.get(col, ""))
+                if v:
+                    field.setText(v)
 
             _fill(self.masse_input,     "Masse unitaire (g)")
             _fill(self.masse2_input,    "Masse unitaire deuxieme materiaux (g)")
             _fill(self.masse_emb_input, "Masse emballage unitaire (g)")
             _fill(self.masse_cond_input,"Masse condionnement (g)")
             _fill(self.nbr_cond_input,  "Nbr par conditionnement")
+            if not self.nbr_cond_input.text().strip():
+                _fill(self.nbr_cond_input, "nb_unites_ijm")
             _fill(self.lien_input,      "Lien / Note / Remarque")
             _fill(self.source_input,    "Source/Signature")
+
+            prix_conditionnement = (
+                _clean_value(row.get("Prix du conditionnement", ""))
+                or _clean_value(row.get("prix_ht_ijm", ""))
+            )
+            prix_unitaire = _clean_value(row.get("prix_unitaire_ijm", ""))
+            if prix_conditionnement:
+                self.price_mode_combo.setCurrentText("Prix par conditionnement")
+                self.price_input.setText(prix_conditionnement)
+            elif prix_unitaire:
+                self.price_mode_combo.setCurrentText("Prix par unité")
+                self.price_input.setText(prix_unitaire)
 
             for combo, col in [
                 (self.materiau_combo,  "Matériau consommable"),
@@ -659,7 +1148,7 @@ class DataMassWindow(QMainWindow):
                 (self.mat_emb_combo,   "Matériau emballage"),
                 (self.mat_cond_combo,  "Matériau conditionnement"),
             ]:
-                val = str(row.get(col, "") or "").strip()
+                val = _clean_value(row.get(col, ""))
                 i = combo.findText(val)
                 if i != -1:
                     combo.setCurrentIndex(i)
@@ -682,7 +1171,23 @@ class DataMassWindow(QMainWindow):
             ]
             if not name_match.empty:
                 row2 = name_match.iloc[0]
-                self.brand_input.setText(str(row2.get("Marque", "") or ""))
+                self.brand_input.setText(_clean_value(row2.get("Marque", "")) or _clean_value(row2.get("marque_ijm", "")))
+                self.ref_input.setText(_clean_value(row2.get("Référence", "")) or _clean_value(row2.get("code_ijm", "")))
+
+                prix_conditionnement = (
+                    _clean_value(row2.get("Prix du conditionnement", ""))
+                    or _clean_value(row2.get("prix_ht_ijm", ""))
+                )
+                prix_unitaire = _clean_value(row2.get("prix_unitaire_ijm", ""))
+                if prix_conditionnement:
+                    self.price_mode_combo.setCurrentText("Prix par conditionnement")
+                    self.price_input.setText(prix_conditionnement)
+                elif prix_unitaire:
+                    self.price_mode_combo.setCurrentText("Prix par unité")
+                    self.price_input.setText(prix_unitaire)
+
+        self.update_required_indicators()
+        self.update_price_preview()
 
     def calculer_eCO2_via_masse(self, consommable_name, quantite):
         """

@@ -19,11 +19,11 @@ import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
-    QFormLayout,  QDialog, QScrollArea, QSizePolicy, QAbstractItemView,
+    QFormLayout,  QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
     # QListWidgetItem, QSpacerItem, QDialogButtonBox, QFileDialog, QInputDialog,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIntValidator, QDoubleValidator
+from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
 
 from ui.data_manager import DataManager
 from ui.carbon_calculator import CarbonCalculator
@@ -125,6 +125,8 @@ class MainWindow(QMainWindow):
         self.quantity_label = None
         self.quantity_input = None
         self.prix_unitaire_label = None
+        self.prix_info_button = None
+        self._current_prix_unitaire_info_text = ""
         self._current_prix_unitaire = None   # float ou None
         self.category_color_dot = None
         self.indicator_nacres = None
@@ -382,14 +384,27 @@ class MainWindow(QMainWindow):
 
         self.prix_unitaire_label = QLabel("Prix unitaire : —")
         self.prix_unitaire_label.setVisible(False)
+        self.prix_info_button = QPushButton("Plus d'info")
+        self.prix_info_button.setVisible(False)
+
+        prix_unitaire_layout = QHBoxLayout()
+        prix_unitaire_layout.setContentsMargins(0, 0, 0, 0)
+        prix_unitaire_layout.setSpacing(6)
+        prix_unitaire_layout.addWidget(self.prix_unitaire_label)
+        prix_unitaire_layout.addWidget(self.prix_info_button)
+        prix_unitaire_layout.addStretch()
 
         self.masse_manquante_label = QLabel("")
         self.masse_manquante_label.setStyleSheet("")
         self.masse_manquante_label.setWordWrap(True)
         self.masse_manquante_label.setVisible(False)
 
-        self.manage_consumables_button = QPushButton("Enrichir ce consommable")
+        self.manage_consumables_button = QPushButton("Enrichir le consommable choisi")
+        self.manage_consumables_button.setToolTip("Enrichir le consommable choisi")
+        self.manage_consumables_button.setEnabled(False)
+        self.manage_consumables_button.setMaximumWidth(230)
         self.add_consumable_button = QPushButton("Ajouter un consommable")
+        self.add_consumable_button.setMaximumWidth(190)
         # self.manage_consumables_button.setStyleSheet("""
         #     QPushButton {
         #         text-decoration: underline;
@@ -448,7 +463,15 @@ class MainWindow(QMainWindow):
         form_layout.addRow(self.subcategory_label, self.subcategory_combo)
         form_layout.addRow(self.subsub_name_label, nom_layout)
         form_layout.addRow(self.conso_filtered_label, conso_layout)
-        form_layout.addRow("", self.add_consumable_button)
+        consumable_actions_layout = QHBoxLayout()
+        consumable_actions_layout.setContentsMargins(0, 0, 0, 0)
+        consumable_actions_layout.setSpacing(6)
+        consumable_actions_layout.addWidget(self.manage_consumables_button)
+        consumable_actions_layout.addWidget(self.add_consumable_button)
+        consumable_actions_layout.addStretch()
+        self.consumable_actions_widget = QWidget()
+        self.consumable_actions_widget.setLayout(consumable_actions_layout)
+        form_layout.addRow("", self.consumable_actions_widget)
 
         existing_layout = QVBoxLayout()
         # Ajoute ici le form_layout, les champs et le bouton "Calculer" déjà configurés
@@ -456,9 +479,8 @@ class MainWindow(QMainWindow):
         existing_layout.addLayout(form_layout)
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
-        existing_layout.addWidget(self.prix_unitaire_label)
+        existing_layout.addLayout(prix_unitaire_layout)
         existing_layout.addWidget(self.masse_manquante_label)
-        existing_layout.addWidget(self.manage_consumables_button)
         existing_layout.addWidget(self.input_label)
         existing_layout.addWidget(self.input_field)
         existing_layout.addWidget(self.days_label)
@@ -758,6 +780,7 @@ class MainWindow(QMainWindow):
         self.add_machine_button.clicked.connect(self.add_machine)
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
         self.quantity_input.textChanged.connect(self._auto_fill_prix)
+        self.prix_info_button.clicked.connect(self.show_prix_unitaire_info)
 
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         self.add_consumable_button.clicked.connect(self.open_data_mass_window_new)
@@ -1083,12 +1106,18 @@ class MainWindow(QMainWindow):
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             # Masquer les contrôles liés aux consommables
             self.manage_consumables_button.setVisible(False)
+            self.manage_consumables_button.setEnabled(False)
             self.conso_filtered_label.setVisible(False)
             self.conso_filtered_combo.setVisible(False)
             self.conso_search_label.setVisible(False)
             self.conso_search_field.setVisible(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
+            self.prix_unitaire_label.setToolTip("")
+            self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
         else:
             # Afficher les éléments standards
             self.subcategory_label.setVisible(True)
@@ -1107,9 +1136,11 @@ class MainWindow(QMainWindow):
             # Afficher ou masquer le bouton "Gestion des Consommables" pour 'Achats'
             if category == 'Achats':
                 self.manage_consumables_button.setVisible(True)
+                self.update_manage_consumable_button_state()
                 self.subsub_name_label.setText('Code NACRES :')
             else:
                 self.manage_consumables_button.setVisible(False)
+                self.manage_consumables_button.setEnabled(False)
                 self.subsub_name_label.setText('Nom :')
             # Pour "Véhicules", afficher le champ "Nombre de jours"
             if category == 'Véhicules':
@@ -1127,7 +1158,19 @@ class MainWindow(QMainWindow):
             self.update_subsubcategory_names()
             self.update_nacres_visibility()
         self._update_category_color()
+        self.update_manage_consumable_button_state()
         self._update_field_indicators()
+
+    def has_selected_consumable(self):
+        if self.conso_filtered_combo is None or self.conso_filtered_combo.isHidden():
+            return False
+        selected_text = self.conso_filtered_combo.currentText().strip()
+        return bool(selected_text and selected_text != "non renseignée" and " - " in selected_text)
+
+    def update_manage_consumable_button_state(self):
+        if not hasattr(self, "manage_consumables_button"):
+            return
+        self.manage_consumables_button.setEnabled(self.has_selected_consumable())
 
     def update_nacres_visibility(self):
         """
@@ -1156,6 +1199,7 @@ class MainWindow(QMainWindow):
             self.conso_search_field.setVisible(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+        self.update_manage_consumable_button_state()
 
     def update_subsubcategory_names(self):
         """
@@ -1304,6 +1348,7 @@ class MainWindow(QMainWindow):
 
         self.conso_filtered_combo.blockSignals(False)
         self.update_quantity_visibility()
+        self.update_manage_consumable_button_state()
 
     def on_subsub_name_changed(self):
         """
@@ -1321,6 +1366,7 @@ class MainWindow(QMainWindow):
             self.conso_filtered_combo.blockSignals(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.update_manage_consumable_button_state()
             return
 
         # Récupère les 4 premiers caractères comme code NACRES approximatif
@@ -1356,6 +1402,7 @@ class MainWindow(QMainWindow):
             self.conso_filtered_combo.setCurrentIndex(0)
 
         self.update_quantity_visibility()
+        self.update_manage_consumable_button_state()
 
     def on_conso_filtered_changed(self):
         """
@@ -1367,10 +1414,14 @@ class MainWindow(QMainWindow):
         """
         sel_text = self.conso_filtered_combo.currentText()
         if not sel_text or sel_text == "non renseignée":
+            self.update_manage_consumable_button_state()
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
             self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
+            self.prix_unitaire_label.setToolTip("")
             self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
             # Forcer subsub_name => "non renseignée"
             self.subsub_name_combo.blockSignals(True)
@@ -1447,6 +1498,7 @@ class MainWindow(QMainWindow):
         self.update_unit()
         self._update_prix_unitaire()
         self._update_masse_warning()
+        self.update_manage_consumable_button_state()
 
     def _update_prix_unitaire(self):
         """
@@ -1456,7 +1508,10 @@ class MainWindow(QMainWindow):
         sel_text = self.conso_filtered_combo.currentText()
         if not sel_text or sel_text == "non renseignée":
             self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
+            self.prix_unitaire_label.setToolTip("")
             self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
             return
 
         if " - " in sel_text:
@@ -1469,9 +1524,11 @@ class MainWindow(QMainWindow):
         if code_nom is None:
             code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
 
-        prix, designation, condt = self.data_manager.get_prix_unitaire(code_nom, consommable_name)
-        if prix is not None:
+        prix_info = self.data_manager.get_prix_unitaire_info(code_nom, consommable_name)
+        if prix_info and prix_info.get("prix_unitaire") is not None:
+            prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
+            condt = prix_info.get("conditionnement", "")
             condt_text = str(condt or "").strip()
             if condt_text and condt_text.lower() != "nan":
                 label_text = (
@@ -1481,14 +1538,74 @@ class MainWindow(QMainWindow):
             else:
                 label_text = f"ℹ  Prix par unité (catalogue IJM) : {prix:.4f} €"
             self.prix_unitaire_label.setText(label_text)
+            self._current_prix_unitaire_info_text = self._format_prix_unitaire_tooltip(prix_info)
+            self.prix_unitaire_label.setToolTip(self._current_prix_unitaire_info_text)
+            self.prix_unitaire_label.setToolTipDuration(20000)
             self.prix_unitaire_label.setStyleSheet(
                 "color: #1e40af; background-color: #eff6ff; "
                 "border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 8px;"
             )
             self.prix_unitaire_label.setVisible(True)
+            self.prix_info_button.setVisible(True)
         else:
             self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
+            self.prix_unitaire_label.setToolTip("")
             self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
+
+    def show_prix_unitaire_info(self):
+        """Affiche immédiatement le détail du prix IJM associé au consommable."""
+        if not self._current_prix_unitaire_info_text:
+            return
+
+        QToolTip.showText(
+            QCursor.pos(),
+            self._current_prix_unitaire_info_text,
+            self.prix_info_button,
+            self.prix_info_button.rect(),
+            20000,
+        )
+
+    def _format_prix_unitaire_tooltip(self, prix_info):
+        """Construit l'infobulle de détail du produit catalogue IJM."""
+        lines = ["Produit catalogue IJM utilisé pour le prix :"]
+        fields = [
+            ("Désignation", prix_info.get("designation")),
+            ("Code IJM", prix_info.get("code_ijm")),
+            ("Marque", prix_info.get("marque")),
+            ("Prix HT conditionnement", prix_info.get("prix_ht")),
+            ("Conditionnement", prix_info.get("conditionnement")),
+            ("Nombre d'unités", prix_info.get("nb_unites")),
+            ("Prix par unité", prix_info.get("prix_unitaire")),
+            ("Score de rapprochement", prix_info.get("score_match")),
+        ]
+
+        for label, value in fields:
+            value_text = str(value or "").strip()
+            if value_text and value_text.lower() != "nan":
+                if label == "Prix par unité":
+                    try:
+                        value_text = f"{float(value):.4f} €"
+                    except (TypeError, ValueError):
+                        pass
+                elif label == "Prix HT conditionnement":
+                    try:
+                        value_text = f"{float(value):.2f} €"
+                    except (TypeError, ValueError):
+                        pass
+                lines.append(f"{label} : {value_text}")
+
+        score_text = str(prix_info.get("score_match") or "").strip()
+        try:
+            score = float(score_text)
+        except ValueError:
+            score = None
+        if score is not None and score < 0.55:
+            lines.append("")
+            lines.append("Attention : rapprochement catalogue approximatif, à vérifier.")
+
+        return "\n".join(lines)
 
     def _update_category_color(self):
         if self.category_color_dot is None or self.category_combo is None:
@@ -1668,6 +1785,9 @@ class MainWindow(QMainWindow):
     
     def open_data_mass_window(self):
         """Ouvre la fenêtre de gestion pré-remplie avec le consommable sélectionné."""
+        if not self.has_selected_consumable():
+            return
+
         sel_text = self.conso_filtered_combo.currentText()
         prefill_code, prefill_name = None, None
         if sel_text and sel_text != "non renseignée" and " - " in sel_text:
@@ -2275,6 +2395,7 @@ class MainWindow(QMainWindow):
                 'subsubcategory': '',
                 'electricity_type': electricity_type,
                 'value': total_usage,  # kWh
+                'days': days,
                 'unit': 'kWh',
                 'emissions_price': ep,
                 'emissions_price_error': ep_err,
@@ -2436,6 +2557,10 @@ class MainWindow(QMainWindow):
             <li>
                 <b><a href="https://plasticseurope.org/fr/">PlasticsEurope</a></b><br>
                 Organisation représentant les fabricants de plastiques en Europe, fournissant des données sur l'industrie.
+            </li>
+            <li>
+                <b><a href="https://www.petrochemistry.eu/wp-content/uploads/2018/01/PMMA-Eco-profile-EPD-1-15-1.pdf">PlasticsEurope / Petrochemistry - PMMA Eco-profile EPD</a></b><br>
+                Environmental Product Declaration du PMMA, janvier 2015. Valeur utilisée pour le PMMA : 3,75 kg CO₂e/kg pour la résine PMMA, périmètre cradle-to-gate.
             </li>
             <li>
                 <b><a href="https://www.oecd.org/fr/data/">OCDE</a></b><br>

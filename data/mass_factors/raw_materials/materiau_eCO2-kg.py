@@ -8,6 +8,9 @@
 # ADEME - Base Empreinte® = source.
 
 import pandas as pd
+from pathlib import Path
+
+OUTPUT_DIR = Path(__file__).resolve().parents[1]
 
 # Données des matériaux
 data_materiau = {
@@ -21,7 +24,7 @@ data_materiau = {
     "Equivalent CO₂ (kg eCO₂/kg)": [
         3.0, 2.5, 3.5,
         4.0, 2.7, 6.5,
-        5.0, 6.0, 6.5,
+        5.0, 3.75, 6.5,
         11.0, 1.05, 0.95,
         0.8, 6.4
     ],
@@ -35,7 +38,7 @@ data_materiau = {
     "Source": [
         "Base Empreinte® - ADEME", "Base Empreinte® - ADEME", "Base Empreinte® - ADEME",
         "Base Empreinte® - ADEME", "Base Empreinte® - ADEME", "Base Empreinte® - ADEME",
-        "Base Empreinte® - ADEME", "Base Empreinte® - ADEME", "France Stratégie",
+        "Base Empreinte® - ADEME", "PlasticsEurope PMMA Eco-profile EPD 2015 (résine PMMA, cradle-to-gate) - https://www.petrochemistry.eu/wp-content/uploads/2018/01/PMMA-Eco-profile-EPD-1-15-1.pdf", "France Stratégie",
         "France Stratégie", "Base Empreinte® - ADEME", "Base Empreinte® - ADEME",
         "Base Empreinte® - ADEME", "Using life cycle assessments to guide reduction in the carbon footprint of single-use lab consum DOI: 10.1371/journal.pstr.0000080"
 
@@ -85,5 +88,5 @@ print(d_mat)
 print(d_solv)
 
 # Enregistrer dans un fichier HDF5
-d_mat.to_hdf("../../empreinte_carbone_materiaux.h5", key='data', mode='w')
-d_solv.to_hdf("../../empreinte_carbone_solvants.h5", key='data', mode='w')
+d_mat.to_hdf(OUTPUT_DIR / "empreinte_carbone_materiaux.h5", key='data', mode='w')
+d_solv.to_hdf(OUTPUT_DIR / "empreinte_carbone_solvants.h5", key='data', mode='w')

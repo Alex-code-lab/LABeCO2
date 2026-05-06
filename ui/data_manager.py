@@ -49,6 +49,10 @@ class DataManager:
     PRIX_HT_COL       = "prix_ht_ijm"
     CONDT_IJM_COL     = "condt_ijm"
     NB_UNITES_IJM_COL = "nb_unites_ijm"
+    DESIGNATION_IJM_COL = "designation_ijm"
+    CODE_IJM_COL = "code_ijm"
+    MARQUE_IJM_COL = "marque_ijm"
+    SCORE_MATCH_COL = "score_match"
 
     # Chemins par défaut
     DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
@@ -197,23 +201,50 @@ class DataManager:
             return None
         return str(filtered[self.CODE_NOM_COL].iloc[0]).strip()
 
-    def get_prix_unitaire(self, code_nacres, consommable_name=""):
+    @staticmethod
+    def _clean_cell(value):
+        """Retourne une chaîne propre pour une cellule pandas possiblement vide."""
+        if pd.isna(value):
+            return ""
+        return str(value).strip()
+
+    def _prix_info_from_row(self, row):
+        """Construit les métadonnées du produit IJM associé à une ligne data_masse."""
+        def get(col_name):
+            return self._clean_cell(row.get(col_name, ""))
+
+        raw_price = row.get(self.PRIX_UNITAIRE_COL, None)
+        prix_unitaire = None if pd.isna(raw_price) else float(raw_price)
+
+        return {
+            "prix_unitaire": prix_unitaire,
+            "consommable": get(self.CONSOMMABLE_COL),
+            "designation": get(self.DESIGNATION_IJM_COL) or get(self.CONSOMMABLE_COL),
+            "conditionnement": get(self.CONDT_IJM_COL),
+            "nb_unites": get(self.NB_UNITES_IJM_COL),
+            "prix_ht": get(self.PRIX_HT_COL),
+            "code_ijm": get(self.CODE_IJM_COL),
+            "marque": get(self.MARQUE_IJM_COL),
+            "score_match": get(self.SCORE_MATCH_COL),
+        }
+
+    def _find_prix_unitaire_row(self, code_nacres, consommable_name=""):
         """
-        Retourne (prix_unitaire, consommable, condt) depuis data_masse.
-        Recherche par Code NACRES (4 chars) puis fuzzy match sur le nom.
-        Retourne (None, None, None) si aucun prix disponible.
+        Retourne la ligne data_masse contenant le prix IJM le plus pertinent.
+        Retourne None si aucun prix disponible.
         """
-        import pandas as pd
         from difflib import SequenceMatcher
 
         code = str(code_nacres).strip().upper()
         df = self.data_masse
+        if self.PRIX_UNITAIRE_COL not in df.columns:
+            return None
 
         mask = df[self.CODE_NACRES_COL].astype(str).str.strip().str.upper() == code
         candidates = df[mask]
 
         if candidates.empty:
-            return None, None, None
+            return None
 
         # Garder seulement les lignes avec un prix
         has_price = (
@@ -222,15 +253,10 @@ class DataManager:
         )
         price_cands = candidates[has_price]
         if price_cands.empty:
-            return None, None, None
+            return None
 
         if len(price_cands) == 1 or not consommable_name:
-            row = price_cands.iloc[0]
-            return (
-                float(row[self.PRIX_UNITAIRE_COL]),
-                str(row[self.CONSOMMABLE_COL]),
-                str(row[self.CONDT_IJM_COL]),
-            )
+            return price_cands.iloc[0]
 
         # Fuzzy match sur Consommable
         name_lower = consommable_name.lower()
@@ -244,10 +270,32 @@ class DataManager:
                 best_score = score
                 best_row = row
 
+        return best_row
+
+    def get_prix_unitaire_info(self, code_nacres, consommable_name=""):
+        """
+        Retourne les métadonnées du produit IJM utilisé pour le prix unitaire.
+        Retourne None si aucun prix disponible.
+        """
+        row = self._find_prix_unitaire_row(code_nacres, consommable_name)
+        if row is None:
+            return None
+        return self._prix_info_from_row(row)
+
+    def get_prix_unitaire(self, code_nacres, consommable_name=""):
+        """
+        Retourne (prix_unitaire, designation, condt) depuis data_masse.
+        Recherche par Code NACRES (4 chars) puis fuzzy match sur le nom.
+        Retourne (None, None, None) si aucun prix disponible.
+        """
+        info = self.get_prix_unitaire_info(code_nacres, consommable_name)
+        if not info:
+            return None, None, None
+
         return (
-            float(best_row[self.PRIX_UNITAIRE_COL]),
-            str(best_row[self.CONSOMMABLE_COL]),
-            str(best_row[self.CONDT_IJM_COL]),
+            info["prix_unitaire"],
+            info["designation"],
+            info["conditionnement"],
         )
 
     def get_liquid_data(self, code_nacres):

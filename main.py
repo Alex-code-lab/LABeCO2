@@ -18,10 +18,11 @@ import multiprocessing
 
 from PySide6.QtWidgets import QApplication, QSplashScreen
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 
 from ui.main_window import MainWindow
 from utils.data_loader import resource_path
+
 
 def main():
     print("\n===== Démarrage de l'application LABeCO2 =====")
@@ -30,6 +31,7 @@ def main():
         print("QApplication créée")
 
         # Splash screen
+        splash = None
         try:
             splash_pix = QPixmap(resource_path(os.path.join("assets", "Logo.png")))
             splash = QSplashScreen(splash_pix)
@@ -44,25 +46,19 @@ def main():
         # Appliquer le style QSS
         try:
             qss_path = resource_path(os.path.join("styles", "styles.qss"))
-            print(f"Chargement QSS : {qss_path}")
             if os.path.exists(qss_path):
                 with open(qss_path, "r") as f:
                     app.setStyleSheet(f.read())
                 print("QSS appliqué")
-            else:
-                print("Fichier QSS non trouvé.")
         except Exception as e:
             print("Erreur QSS :", e)
 
         # Appliquer l'icône
         try:
             icon_path = resource_path(os.path.join("assets", "icon.icns"))
-            print(f"Chargement icône : {icon_path}")
             if os.path.exists(icon_path):
                 app.setWindowIcon(QIcon(icon_path))
                 print("Icône appliquée")
-            else:
-                print("Fichier icône non trouvé.")
         except Exception as e:
             print("Erreur icône :", e)
 
@@ -71,26 +67,11 @@ def main():
             print("Création de MainWindow…")
             window = MainWindow()
             window.show()
-            splash.finish(window)
+            if splash:
+                splash.finish(window)
+            window.raise_()
+            window.activateWindow()
             print("MainWindow affichée")
-
-            if sys.platform == "darwin":
-                def _bring_to_front():
-                    try:
-                        import subprocess
-                        subprocess.Popen([
-                            "osascript", "-e",
-                            f"tell application \"System Events\" to set frontmost of"
-                            f" every process whose unix id is {os.getpid()} to true"
-                        ])
-                    except Exception:
-                        pass
-                    window.raise_()
-                    window.activateWindow()
-                QTimer.singleShot(200, _bring_to_front)
-            else:
-                window.raise_()
-                window.activateWindow()
             sys.exit(app.exec())
         except Exception as e:
             print("Erreur dans MainWindow :", e)
@@ -103,10 +84,9 @@ def main():
         traceback.print_exc()
         input("Appuyez sur Entrée pour quitter...")
 
-if __name__ == "__main__":
-    # Nécessaire pour les exécutables PyInstaller qui utilisent multiprocessing
-    multiprocessing.freeze_support()
 
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
     try:
         main()
     except Exception:

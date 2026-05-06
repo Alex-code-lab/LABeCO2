@@ -150,7 +150,7 @@ class UserManipDialog(QDialog):
             data.get("code_nacres", ""),
             data.get("name", ""),
             self.format_value(data),
-            self.format_number(data.get("days", ""), 0),
+            self.format_days(data),
             self.format_number(data.get("quantity", ""), 2),
             data.get("consommable", ""),
             self.format_emission(data.get("emissions_price", 0.0), data.get("emissions_price_error", 0.0)),
@@ -197,6 +197,12 @@ class UserManipDialog(QDialog):
         value = self.format_number(data.get("value", ""), 2)
         unit = str(data.get("unit", "") or "")
         return f"{value} {unit}".strip()
+
+    def format_days(self, data):
+        category = str(data.get("category", "") or "")
+        if category not in {"Véhicules", "Machine"}:
+            return "/"
+        return self.format_number(data.get("days", ""), 0) or "/"
 
     def format_emission(self, value, error):
         value_text = self.format_number(value, 4)
