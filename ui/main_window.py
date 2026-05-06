@@ -18,7 +18,7 @@ import math
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
-    QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget,
+    QListWidget, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
     QFormLayout,  QDialog, QScrollArea, QSizePolicy, QAbstractItemView,
     # QListWidgetItem, QSpacerItem, QDialogButtonBox, QFileDialog, QInputDialog,
 )
@@ -29,6 +29,7 @@ from ui.data_manager import DataManager
 from ui.carbon_calculator import CarbonCalculator
 
 from utils.data_loader import load_logo, get_user_data_path, init_user_data
+from utils.color_utils import CATEGORY_COLORS
 from scenarios.manip_type_db import ManipsTypeDB
 from ui.charts.pie_chart import PieChartWindow
 from ui.charts.bar_chart_price_mass import BarChartWindow
@@ -125,6 +126,9 @@ class MainWindow(QMainWindow):
         self.quantity_input = None
         self.prix_unitaire_label = None
         self._current_prix_unitaire = None   # float ou None
+        self.category_color_dot = None
+        self.indicator_nacres = None
+        self.indicator_conso = None
 
         self.setStyleSheet("""
             QPushButton {
@@ -340,7 +344,12 @@ class MainWindow(QMainWindow):
         self.search_field = QLineEdit()
         self.search_field.setFixedWidth(200)
 
+        self.indicator_nacres = QLabel("✗")
+        self.indicator_nacres.setFixedWidth(20)
+        self.indicator_nacres.setStyleSheet("color: #dc2626; font-size: 15px; font-weight: bold;")
+
         nom_layout = QHBoxLayout()
+        nom_layout.addWidget(self.indicator_nacres)
         nom_layout.addWidget(self.subsub_name_combo)
         nom_layout.addWidget(self.search_label)
         nom_layout.addWidget(self.search_field)
@@ -353,7 +362,12 @@ class MainWindow(QMainWindow):
         self.conso_search_field = QLineEdit()
         self.conso_search_field.setFixedWidth(200)
 
+        self.indicator_conso = QLabel("✗")
+        self.indicator_conso.setFixedWidth(20)
+        self.indicator_conso.setStyleSheet("color: #dc2626; font-size: 15px; font-weight: bold;")
+
         conso_layout = QHBoxLayout()
+        conso_layout.addWidget(self.indicator_conso)
         conso_layout.addWidget(self.conso_filtered_combo)
         conso_layout.addWidget(self.conso_search_label)
         conso_layout.addWidget(self.conso_search_field)
@@ -400,12 +414,37 @@ class MainWindow(QMainWindow):
         self.days_field.setVisible(False)
 
         self.calculate_button = QPushButton('Calculer le Bilan Carbone')
+        self.calculate_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1a7f4b;
+                color: #ffffff;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover { background-color: #15693f; }
+            QPushButton:pressed { background-color: #0f5231; }
+            QPushButton:disabled { background-color: #a8d5bc; color: #ffffff; }
+        """)
+
+        # Indicateur coloré de catégorie (pastille)
+        self.category_color_dot = QFrame()
+        self.category_color_dot.setFixedSize(12, 12)
+        self.category_color_dot.setStyleSheet("background-color: #888888; border-radius: 6px;")
+        category_row = QHBoxLayout()
+        category_row.setContentsMargins(0, 0, 0, 0)
+        category_row.setSpacing(6)
+        category_row.addWidget(self.category_color_dot)
+        category_row.addWidget(self.category_combo)
+        category_row_widget = QWidget()
+        category_row_widget.setLayout(category_row)
 
         form_layout = QFormLayout()
         form_layout.setSpacing(5)
         form_layout.setLabelAlignment(Qt.AlignRight)
 
-        form_layout.addRow(self.category_label, self.category_combo)
+        form_layout.addRow(self.category_label, category_row_widget)
         form_layout.addRow(self.subcategory_label, self.subcategory_combo)
         form_layout.addRow(self.subsub_name_label, nom_layout)
         form_layout.addRow(self.conso_filtered_label, conso_layout)
@@ -722,7 +761,12 @@ class MainWindow(QMainWindow):
 
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         self.add_consumable_button.clicked.connect(self.open_data_mass_window_new)
-        
+
+        self.subsub_name_combo.currentIndexChanged.connect(self._update_field_indicators)
+        self.conso_filtered_combo.currentIndexChanged.connect(self._update_field_indicators)
+        self.input_field.textChanged.connect(self._update_field_indicators)
+        self.quantity_input.textChanged.connect(self._update_field_indicators)
+
         self.add_manip_type_button.clicked.connect(self.add_manip_type_to_history)
         self.delete_manip_type_button.clicked.connect(self.delete_selected_user_manip)
         self.manip_type_combo.currentIndexChanged.connect(self.update_delete_manip_button)
@@ -764,6 +808,7 @@ class MainWindow(QMainWindow):
         self.subcategory_combo.setEnabled(True)
         self.existing_group.setVisible(True)
         self.existing_group.adjustSize()
+        self._update_field_indicators()
 
     def calculate_emission_for_item(self, item_data: dict) -> dict:
         """
@@ -1062,8 +1107,10 @@ class MainWindow(QMainWindow):
             # Afficher ou masquer le bouton "Gestion des Consommables" pour 'Achats'
             if category == 'Achats':
                 self.manage_consumables_button.setVisible(True)
+                self.subsub_name_label.setText('Code NACRES :')
             else:
                 self.manage_consumables_button.setVisible(False)
+                self.subsub_name_label.setText('Nom :')
             # Pour "Véhicules", afficher le champ "Nombre de jours"
             if category == 'Véhicules':
                 self.days_label.setVisible(True)
@@ -1079,6 +1126,8 @@ class MainWindow(QMainWindow):
             self.subcategory_combo.addItems(sorted(subcats.astype(str)))
             self.update_subsubcategory_names()
             self.update_nacres_visibility()
+        self._update_category_color()
+        self._update_field_indicators()
 
     def update_nacres_visibility(self):
         """
@@ -1218,6 +1267,7 @@ class MainWindow(QMainWindow):
             else:
                 self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
+        self._update_field_indicators()
 
     def update_conso_filtered_combo(self, filter_text=None):
         """
@@ -1422,11 +1472,91 @@ class MainWindow(QMainWindow):
         prix, designation, condt = self.data_manager.get_prix_unitaire(code_nom, consommable_name)
         if prix is not None:
             self._current_prix_unitaire = prix
-            self.prix_unitaire_label.setText(f"Prix unitaire (catalogue IJM) : {prix:.4f} €  [{condt}]")
+            self.prix_unitaire_label.setText(f"ℹ  Prix unitaire (catalogue IJM) : {prix:.4f} €  [{condt}]")
+            self.prix_unitaire_label.setStyleSheet(
+                "color: #1e40af; background-color: #eff6ff; "
+                "border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 8px;"
+            )
             self.prix_unitaire_label.setVisible(True)
         else:
             self._current_prix_unitaire = None
             self.prix_unitaire_label.setVisible(False)
+
+    def _update_category_color(self):
+        if self.category_color_dot is None or self.category_combo is None:
+            return
+        color = CATEGORY_COLORS.get(self.category_combo.currentText(), '#888888')
+        self.category_color_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
+
+    def _set_indicator(self, label, ok):
+        if label is None:
+            return
+        if ok:
+            label.setText("✔")
+            label.setStyleSheet("color: #16a34a; font-size: 15px; font-weight: bold;")
+        else:
+            label.setText("✗")
+            label.setStyleSheet("color: #dc2626; font-size: 15px; font-weight: bold;")
+
+    def _update_field_indicators(self):
+        if self.indicator_nacres is None:
+            return
+        category = self.category_combo.currentText() if self.category_combo else ""
+
+        # NACRES indicator: valid when subsub_name_combo is not "non renseignée" and is visible
+        nacres_visible = (
+            self.subsub_name_combo is not None
+            and self.subsub_name_combo.isVisible()
+            and category != "Machine"
+        )
+        if nacres_visible:
+            subsub_ok = (
+                self.subsub_name_combo.currentText()
+                and self.subsub_name_combo.currentText() != "non renseignée"
+            )
+            self._set_indicator(self.indicator_nacres, subsub_ok)
+            self.indicator_nacres.setVisible(True)
+        else:
+            self.indicator_nacres.setVisible(False)
+
+        # Consommable indicator: valid when conso_filtered_combo is visible and not "non renseignée"
+        conso_visible = (
+            self.conso_filtered_combo is not None
+            and self.conso_filtered_combo.isVisible()
+        )
+        if conso_visible:
+            conso_ok = (
+                self.conso_filtered_combo.currentText()
+                and self.conso_filtered_combo.currentText() != "non renseignée"
+            )
+            self._set_indicator(self.indicator_conso, conso_ok)
+            self.indicator_conso.setVisible(True)
+        else:
+            self.indicator_conso.setVisible(False)
+
+        # input_field border: green when filled and enabled, red when empty and enabled
+        if self.input_field is not None and self.input_field.isVisible():
+            if not self.input_field.isEnabled():
+                self.input_field.setStyleSheet("")
+            elif self.input_field.text().strip():
+                self.input_field.setStyleSheet(
+                    "border: 1.5px solid #86efac; border-radius: 3px;"
+                )
+            else:
+                self.input_field.setStyleSheet(
+                    "border: 1.5px solid #fca5a5; border-radius: 3px;"
+                )
+
+        # quantity_input border
+        if self.quantity_input is not None and self.quantity_input.isVisible():
+            if self.quantity_input.text().strip():
+                self.quantity_input.setStyleSheet(
+                    "border: 1.5px solid #86efac; border-radius: 3px;"
+                )
+            else:
+                self.quantity_input.setStyleSheet(
+                    "border: 1.5px solid #fca5a5; border-radius: 3px;"
+                )
 
     def _update_masse_warning(self):
         """
@@ -1459,14 +1589,20 @@ class MainWindow(QMainWindow):
         masse = row[self.data_manager.MASSE_G_COL].iloc[0]
         if pd.isna(masse) or str(masse).strip() == "":
             self.masse_manquante_label.setText(
-                "⚠ Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+                "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
             )
-            self.masse_manquante_label.setStyleSheet("color: red; font-weight: bold;")
+            self.masse_manquante_label.setStyleSheet(
+                "color: #92400e; background-color: #fef3c7; "
+                "border: 1px solid #f59e0b; border-radius: 4px; padding: 4px 8px;"
+            )
         else:
             self.masse_manquante_label.setText(
-                "✔ La masse est disponible pour ce consommable : calcul de l'eCO₂ par la masse effectué."
+                "✔  Masse disponible — calcul eCO₂ par la masse effectué."
             )
-            self.masse_manquante_label.setStyleSheet("color: green; font-weight: bold;")
+            self.masse_manquante_label.setStyleSheet(
+                "color: #166534; background-color: #dcfce7; "
+                "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
+            )
         self.masse_manquante_label.setVisible(True)
 
     def _auto_fill_prix(self):

@@ -18,7 +18,7 @@ import multiprocessing
 
 from PySide6.QtWidgets import QApplication, QSplashScreen
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 from ui.main_window import MainWindow
 from utils.data_loader import resource_path
@@ -73,6 +73,24 @@ def main():
             window.show()
             splash.finish(window)
             print("MainWindow affichée")
+
+            if sys.platform == "darwin":
+                def _bring_to_front():
+                    try:
+                        import subprocess
+                        subprocess.Popen([
+                            "osascript", "-e",
+                            f"tell application \"System Events\" to set frontmost of"
+                            f" every process whose unix id is {os.getpid()} to true"
+                        ])
+                    except Exception:
+                        pass
+                    window.raise_()
+                    window.activateWindow()
+                QTimer.singleShot(200, _bring_to_front)
+            else:
+                window.raise_()
+                window.activateWindow()
             sys.exit(app.exec())
         except Exception as e:
             print("Erreur dans MainWindow :", e)
