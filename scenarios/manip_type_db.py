@@ -88,6 +88,10 @@ class ManipsTypeDB:
         cursor = self.conn.cursor()
         cursor.execute(create_manips_table)
         cursor.execute(create_manips_items_table)
+        cursor.execute("PRAGMA table_info(manips_items)")
+        item_columns = {row[1] for row in cursor.fetchall()}
+        if "code_nacres" not in item_columns:
+            cursor.execute("ALTER TABLE manips_items ADD COLUMN code_nacres TEXT")
         self.conn.commit()
 
     def add_manip(self, manip_name, items_list, source=None):
@@ -128,14 +132,15 @@ class ManipsTypeDB:
         # 2) Insérer chaque item dans la table manips_items
         for item in items_list:
             cursor.execute("""
-                INSERT INTO manips_items 
-                    (manip_id, category, subcategory, subsubcategory, name, value, unit, days, year, electricity_type, quantity, consommable)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO manips_items
+                    (manip_id, category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 manip_id,
                 item.get("category", ""),
                 item.get("subcategory", ""),
                 item.get("subsubcategory", ""),
+                item.get("code_nacres", ""),
                 item.get("name", ""),
                 item.get("value", 0.0),
                 item.get("unit", ""),
@@ -275,7 +280,7 @@ class ManipsTypeDB:
         manip_id = row["id"]
         # Maintenant on récupère tous les items associés à ce manip_id
         cursor.execute("""
-            SELECT category, subcategory, subsubcategory, name, value, unit, days, year, electricity_type, quantity, consommable
+            SELECT category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable
             FROM manips_items
             WHERE manip_id = ?
         """, (manip_id,))
@@ -287,6 +292,7 @@ class ManipsTypeDB:
                 "category": r["category"],
                 "subcategory": r["subcategory"],
                 "subsubcategory": r["subsubcategory"],
+                "code_nacres": r["code_nacres"],
                 "name": r["name"],
                 "value": r["value"],
                 "unit": r["unit"],

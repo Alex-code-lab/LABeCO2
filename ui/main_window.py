@@ -1472,7 +1472,15 @@ class MainWindow(QMainWindow):
         prix, designation, condt = self.data_manager.get_prix_unitaire(code_nom, consommable_name)
         if prix is not None:
             self._current_prix_unitaire = prix
-            self.prix_unitaire_label.setText(f"ℹ  Prix unitaire (catalogue IJM) : {prix:.4f} €  [{condt}]")
+            condt_text = str(condt or "").strip()
+            if condt_text and condt_text.lower() != "nan":
+                label_text = (
+                    f"ℹ  Prix par unité (catalogue IJM) : {prix:.4f} €  |  "
+                    f"Conditionnement : {condt_text}"
+                )
+            else:
+                label_text = f"ℹ  Prix par unité (catalogue IJM) : {prix:.4f} €"
+            self.prix_unitaire_label.setText(label_text)
             self.prix_unitaire_label.setStyleSheet(
                 "color: #1e40af; background-color: #eff6ff; "
                 "border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 8px;"
@@ -1703,36 +1711,41 @@ class MainWindow(QMainWindow):
                                 f"Impossible de recharger les consommables : {e}")
     
     def define_user_manip_from_history(self):
-        # 1) Vérifier si des éléments sont sélectionnés
-        selected_items = self.history_list.selectedItems()
-        if not selected_items:
+        # 1) Préparer les lignes d'historique à afficher dans la fenêtre de création
+        history_items = []
+        for row in range(self.history_list.count()):
+            lw_item = self.history_list.item(row)
+            data = lw_item.data(Qt.UserRole)
+            if not data:
+                continue
+            history_items.append({
+                "text": lw_item.text(),
+                "data": data,
+                "selected": lw_item.isSelected(),
+            })
+
+        if not history_items:
             QMessageBox.warning(
                 self,
-                "Aucun item sélectionné",
-                "Pour définir une manip type :\n"
-                "1) Sélectionnez les éléments dans l'historique.\n"
-                "2) Puis cliquez à nouveau sur ce bouton et entrez un nom.\n\n"
-                "La nouvelle manip apparaîtra ensuite dans «Ajouter une manip type»."
+                "Historique vide",
+                "Ajoutez au moins un calcul dans l'historique avant de définir une manip type."
             )
-            return  # On arrête là si rien n'est sélectionné
+            return
 
-        # 2) Si des éléments sont bien sélectionnés, on affiche le QDialog pour saisir le nom
-        dialog = UserManipDialog(self)
+        # 2) Afficher le dialogue pour sélectionner les lignes et saisir le nom
+        dialog = UserManipDialog(self, history_items=history_items)
         if dialog.exec() == QDialog.Accepted:
             manip_name = dialog.get_manip_name()
-            if not manip_name.strip():
-                return  # L'utilisateur a cliqué sur OK mais n'a rien saisi
+            selected_history_data = dialog.get_selected_history_data()
 
-            # 3) Construire la liste des items à partir de la sélection
+            # 3) Construire la liste des items à partir de la sélection du dialogue
             items_list = []
-            for lw_item in selected_items:
-                data = lw_item.data(Qt.UserRole)
-                if not data:
-                    continue
+            for data in selected_history_data:
                 items_list.append({
                     "category": data.get("category", ""),
                     "subcategory": data.get("subcategory", ""),
                     "subsubcategory": data.get("subsubcategory", ""),
+                    "code_nacres": data.get("code_nacres", ""),
                     "year": data.get("year", 0),
                     "days": data.get("days", 0),
                     "name": data.get("name", ""),
@@ -1916,6 +1929,8 @@ class MainWindow(QMainWindow):
         self.create_or_update_history_item(new_data)
         self.update_total_emissions()
         self.input_field.clear()
+        if self.quantity_input is not None:
+            self.quantity_input.clear()
         self.data_changed.emit()
 
     def modify_selected_calculation(self):
