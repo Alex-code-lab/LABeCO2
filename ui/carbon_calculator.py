@@ -9,6 +9,7 @@ import math
 import pandas as pd
 from PySide6.QtWidgets import QMessageBox
 from ui.data_manager import DataManager
+from ui.display_utils import clean_text, normalize_nacres_prefix
 
 class CarbonCalculator:
     """
@@ -46,7 +47,7 @@ class CarbonCalculator:
 
         code_nacres    = data_dict.get('code_nacres', 'NA')
         consommable    = data_dict.get('consommable', 'NA')
-        quantity       = int(data_dict.get('quantity', 0))
+        quantity       = float(data_dict.get('quantity', 0) or 0.0)
         
         # Valeurs de sortie par défaut
         ep = 0.0
@@ -139,10 +140,10 @@ class CarbonCalculator:
         # Cas spécial pour Achats + code NACRES : distinction liquides vs solides
         if category == 'Achats' and code_nacres != 'NA':
             # 1) On regarde si c'est un liquide
-            liq_row = self.dm.get_liquid_data(code_nacres)
+            liq_row = self.dm.get_liquid_data(code_nacres, consommable)
             if liq_row is not None:
                 # volume (mL) = quantity
-                e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity)
+                e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity, consommable)
                 em     = e_liq
                 em_err = err_liq
                 tm     = m_liq
@@ -176,8 +177,17 @@ class CarbonCalculator:
             return (0.0, 0.0, 0.0, [])
 
         # 2) Récupérer la ligne correspondante dans data_masse
+        code_series = self.data_masse[self.dm.CODE_NACRES_COL]
+        if hasattr(self.dm, "nacres_code_mask") and callable(self.dm.nacres_code_mask):
+            code_mask = self.dm.nacres_code_mask(code_series, code_nacres)
+        else:
+            code_clean = clean_text(code_nacres).upper()
+            prefix = normalize_nacres_prefix(code_clean)
+            clean_series = code_series.fillna("").astype(str).str.strip().str.upper()
+            code_mask = (clean_series == code_clean) | (clean_series.str[:4] == prefix)
+
         df_row = self.data_masse[
-            (self.data_masse[self.dm.CODE_NACRES_COL].astype(str).str.strip() == code_nacres.strip()) &
+            code_mask &
             (self.data_masse[self.dm.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
         ]
         if df_row.empty:
@@ -189,6 +199,7 @@ class CarbonCalculator:
             # Produit principal : matériau 1 puis matériau 2
             (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL),
             (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None)),
+            (getattr(self.dm, "MASSE_G3_COL", None), getattr(self.dm, "MATERIAU3_COL", None)),
             # Emballage
             (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL),
             # Conditionnement
@@ -243,11 +254,11 @@ class CarbonCalculator:
         return (total_emission, total_mass_kg, total_unc, missing_materials)
     
 
-    def _calculate_liquid_emissions(self, code_nacres, volume_ml):
+    def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None):
         """
         Calcule l'empreinte carbone d'un consommable liquide via volume (mL).
         """
-        row = self.dm.get_liquid_data(code_nacres)
+        row = self.dm.get_liquid_data(code_nacres, consommable)
         if row is None:
             return (0.0, 0.0, 0.0)
 

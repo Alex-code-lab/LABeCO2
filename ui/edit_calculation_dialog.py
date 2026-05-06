@@ -12,6 +12,12 @@ from PySide6.QtWidgets import (
     QPushButton, QMessageBox, QWidget
 )
 from PySide6.QtCore import Qt
+from ui.display_utils import (
+    clean_text,
+    format_subcategory_label,
+    is_consumables_subcategory,
+    normalize_nacres_prefix,
+)
 
 class EditCalculationDialog(QDialog):
     """
@@ -25,7 +31,8 @@ class EditCalculationDialog(QDialog):
     data_materials : DataFrame pour les matériaux (self.data_materials du main_window)
     """
 
-    def __init__(self, parent=None, data=None, main_data=None, data_masse=None, data_materials=None):
+    def __init__(self, parent=None, data=None, main_data=None, data_masse=None,
+                 data_materials=None, data_liquides=None):
         super().__init__(parent)
         self.setWindowTitle("Modifier le calcul")
         
@@ -34,6 +41,7 @@ class EditCalculationDialog(QDialog):
         self.main_data = main_data
         self.data_masse = data_masse
         self.data_materials = data_materials
+        self.data_liquides = data_liquides if data_liquides is not None else pd.DataFrame()
         
         # Variables internes
         self.current_unit = None
@@ -88,7 +96,10 @@ class EditCalculationDialog(QDialog):
         self.days_label.setVisible(False)
         self.days_field.setVisible(False)
 
-        self.nacres_filtered_label = QLabel("Code NACRES Filtré :")
+        self.nacres_filtered_label = QLabel("Consommables :")
+        self.nacres_filtered_label.setToolTip(
+            "Matières premières, produits chimiques/biologiques et organismes vivants"
+        )
         self.nacres_filtered_combo = QComboBox()
         self.nacres_filtered_label.setVisible(False)
         self.nacres_filtered_combo.setVisible(False)
@@ -161,6 +172,104 @@ class EditCalculationDialog(QDialog):
         self.validate_button.clicked.connect(self.on_validate)
         self.cancel_button.clicked.connect(self.reject)
 
+    def _populate_subcategory_combo(self, subcategories):
+        self.subcategory_combo.clear()
+        for subcategory in sorted(clean_text(s) for s in subcategories if clean_text(s)):
+            display, tooltip = format_subcategory_label(subcategory)
+            self.subcategory_combo.addItem(display, userData=subcategory)
+            index = self.subcategory_combo.count() - 1
+            if tooltip:
+                self.subcategory_combo.setItemData(index, tooltip, Qt.ToolTipRole)
+
+    def _current_subcategory(self):
+        data = self.subcategory_combo.currentData()
+        return clean_text(data) or clean_text(self.subcategory_combo.currentText())
+
+    def _set_subcategory(self, subcategory):
+        subcategory = clean_text(subcategory)
+        index = self.subcategory_combo.findData(subcategory)
+        if index < 0:
+            display, _ = format_subcategory_label(subcategory)
+            index = self.subcategory_combo.findText(display)
+        if index >= 0:
+            self.subcategory_combo.setCurrentIndex(index)
+
+    def _add_consumable_item(self, code_nacres, consommable, source="solid"):
+        code = clean_text(code_nacres)
+        name = clean_text(consommable)
+        if not code and not name:
+            return
+        self.nacres_filtered_combo.addItem(
+            name or code,
+            userData={"code_nacres": code, "consommable": name, "source": source}
+        )
+        index = self.nacres_filtered_combo.count() - 1
+        tooltip = [f"Code NACRES : {code}"] if code else []
+        if source == "liquid":
+            tooltip.append("Consommable liquide")
+        if tooltip:
+            self.nacres_filtered_combo.setItemData(index, "\n".join(tooltip), Qt.ToolTipRole)
+
+    def _selected_consumable_data(self):
+        data = self.nacres_filtered_combo.currentData()
+        if isinstance(data, dict):
+            code = clean_text(data.get("code_nacres"))
+            name = clean_text(data.get("consommable"))
+            if code or name:
+                return {
+                    "code_nacres": code,
+                    "consommable": name,
+                    "source": clean_text(data.get("source")) or "solid",
+                }
+        text = clean_text(self.nacres_filtered_combo.currentText())
+        if not text or text == "Aucune correspondance":
+            return None
+        if " - " in text:
+            code, name = text.split(" - ", 1)
+            return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid"}
+        return {"code_nacres": "", "consommable": text, "source": "solid"}
+
+    def _select_consumable_item(self, code_nacres, consommable):
+        code_prefix = normalize_nacres_prefix(code_nacres)
+        name = clean_text(consommable)
+        for index in range(self.nacres_filtered_combo.count()):
+            data = self.nacres_filtered_combo.itemData(index)
+            if not isinstance(data, dict):
+                continue
+            item_code = clean_text(data.get("code_nacres"))
+            item_name = clean_text(data.get("consommable"))
+            if item_name == name and normalize_nacres_prefix(item_code) == code_prefix:
+                self.nacres_filtered_combo.setCurrentIndex(index)
+                return True
+        return False
+
+    def _set_subsub_name(self, subsubcategory, name):
+        code_prefix = normalize_nacres_prefix(subsubcategory)
+        target = clean_text(f"{clean_text(subsubcategory)} - {clean_text(name)}").strip(" - ").casefold()
+        fallback_index = -1
+        for index in range(self.subsub_name_combo.count()):
+            item_text = clean_text(self.subsub_name_combo.itemText(index))
+            if item_text.casefold() == target:
+                self.subsub_name_combo.setCurrentIndex(index)
+                return
+            if code_prefix and normalize_nacres_prefix(item_text) == code_prefix and fallback_index < 0:
+                fallback_index = index
+        if fallback_index >= 0:
+            self.subsub_name_combo.setCurrentIndex(fallback_index)
+        elif target:
+            self.subsub_name_combo.setCurrentText(target)
+
+    def _is_current_consumables(self):
+        return (
+            self.category_combo.currentText() == "Achats"
+            and is_consumables_subcategory(self._current_subcategory())
+        )
+
+    def _update_year_visibility(self):
+        show_year = self.year_combo.count() > 1 and not self._is_current_consumables()
+        self.year_label.setVisible(show_year)
+        self.year_combo.setVisible(show_year)
+
     def populate_fields(self, data):
         """
         Pré-remplit les champs avec les données du calcul existant 
@@ -185,16 +294,12 @@ class EditCalculationDialog(QDialog):
 
         else:
             # --- Cas Achats / Véhicules / Autres ---
-            self.subcategory_combo.setCurrentText(data.get('subcategory', ''))
+            self._set_subcategory(data.get('subcategory', ''))
             self.update_subsubcategory_names()
 
             subsubcategory = data.get('subsubcategory', '')
             name = data.get('name', '')
-            if subsubcategory and name:
-                subsub_name = f"{subsubcategory} - {name}"
-            else:
-                subsub_name = name if name else subsubcategory
-            self.subsub_name_combo.setCurrentText(subsub_name)
+            self._set_subsub_name(subsubcategory, name)
 
             self.update_years()
             self.year_combo.setCurrentText(str(data.get('year', '')))
@@ -205,10 +310,15 @@ class EditCalculationDialog(QDialog):
             self.current_unit = data.get('unit', '')
 
             if self.current_unit:
-                self.input_label.setText(f'Entrez la valeur journalière en {self.current_unit}:')
+                if category == 'Véhicules':
+                    self.input_label.setText(f'Entrez la valeur journalière en {self.current_unit}:')
+                elif self._is_current_consumables():
+                    self.input_label.setText(f'Montant en {self.current_unit}:')
+                else:
+                    self.input_label.setText(f'Entrez la valeur en {self.current_unit}:')
                 self.input_field.setEnabled(True)
             else:
-                self.input_label.setText('Entrez la valeur journalière:')
+                self.input_label.setText('Entrez la valeur:')
                 self.input_field.setEnabled(False)
 
             # --- Spécifique Véhicules : on stocke un total dans 'value',
@@ -237,16 +347,13 @@ class EditCalculationDialog(QDialog):
                 self.days_field.setEnabled(False)
 
             # --- Cas Achats + Consommables => NACRES
-            if category == 'Achats' and 'Consommables' in data.get('subcategory', ''):
+            if category == 'Achats' and is_consumables_subcategory(data.get('subcategory', '')):
                 self.update_nacres_filtered_combo()
                 
                 code_nacres = data.get('code_nacres', '')
                 consommable = data.get('consommable', '')
                 if code_nacres and consommable:
-                    nacres_text = f"{code_nacres} - {consommable}"
-                    index = self.nacres_filtered_combo.findText(nacres_text)
-                    if index >= 0:
-                        self.nacres_filtered_combo.setCurrentIndex(index)
+                    self._select_consumable_item(code_nacres, consommable)
 
                 self.quantity_label.setVisible(True)
                 self.quantity_input.setVisible(True)
@@ -260,12 +367,11 @@ class EditCalculationDialog(QDialog):
                 self.nacres_filtered_combo.clear()
                 self.quantity_label.setVisible(False)
                 self.quantity_input.setVisible(False)
+            self._update_year_visibility()
 
     def on_validate(self):
         try:
             category = self.category_combo.currentText()
-            prev_code_nacres = self.data.get('code_nacres', 'NA')
-            prev_consommable = self.data.get('consommable', 'NA')
 
             # --------------------------------------------------------------------------
             #  CAS "Machine"
@@ -303,8 +409,9 @@ class EditCalculationDialog(QDialog):
                     'usage_time': usage_time,
                     'days_machine': days_machine,
                     'electricity_type': electricity_type,
-                    'code_nacres': prev_code_nacres,
-                    'consommable': prev_consommable,
+                    'code_nacres': 'NA',
+                    'consommable': 'NA',
+                    'quantity': 0.0,
                 }
                 self.accept()
                 return
@@ -312,7 +419,7 @@ class EditCalculationDialog(QDialog):
             # --------------------------------------------------------------------------
             #  CAS Achats, Véhicules ou autres
             # --------------------------------------------------------------------------
-            subcategory = self.subcategory_combo.currentText()
+            subcategory = self._current_subcategory()
             subsub_name = self.subsub_name_combo.currentText()
             subsubcategory, name = self.split_subsub_name(subsub_name)
             year = self.year_combo.currentText()
@@ -357,18 +464,18 @@ class EditCalculationDialog(QDialog):
             # Gestion du champ "Nombre de jours" pour Véhicules déjà prise en compte ci-dessus.
 
             # --- Gestion NACRES pour Achats de Consommables ---
-            if category == 'Achats' and 'Consommables' in subcategory:
+            if category == 'Achats' and is_consumables_subcategory(subcategory):
                 code_nacres = 'NA'
                 consommable = 'NA'
                 # Si on a un soussubcategory, en prendre les 4 premiers caractères pour NACRES de base
                 if subsubcategory:
                     code_nacres = subsubcategory[:4]
                 if self.nacres_filtered_combo.isVisible():
-                    selected_nacres = self.nacres_filtered_combo.currentText().strip()
-                    if selected_nacres and selected_nacres != "Aucune correspondance":
-                        if " - " in selected_nacres:
-                            code_nacres, consommable = selected_nacres.split(" - ", 1)
-                    elif selected_nacres == "Aucune correspondance":
+                    selected = self._selected_consumable_data()
+                    if selected:
+                        code_nacres = selected["code_nacres"] or code_nacres
+                        consommable = selected["consommable"] or "NA"
+                    else:
                         if subsubcategory:
                             code_nacres = subsubcategory[:4]
                         else:
@@ -384,10 +491,10 @@ class EditCalculationDialog(QDialog):
                     q_str = self.quantity_input.text().strip()
                     if not q_str:
                         QMessageBox.warning(self, 'Erreur', 
-                                            "Le champ quantité est vide, veuillez saisir un entier.")
+                                            "Le champ quantité est vide, veuillez saisir une quantité.")
                         return
                     try:
-                        quantity_val = int(q_str)
+                        quantity_val = float(q_str.replace(',', '.'))
                         if quantity_val <= 0:
                             raise ValueError
                         self.modified_data['quantity'] = quantity_val
@@ -424,8 +531,7 @@ class EditCalculationDialog(QDialog):
             
             # Charger les sous-catégories
             subcategories = self.main_data[self.main_data['category'] == category]['subcategory'].dropna().unique()
-            self.subcategory_combo.clear()
-            self.subcategory_combo.addItems(sorted(subcategories.astype(str)))
+            self._populate_subcategory_combo(subcategories.astype(str))
 
             self.update_subsubcategory_names()
 
@@ -441,7 +547,7 @@ class EditCalculationDialog(QDialog):
 
     def update_subsubcategory_names(self):
         category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
+        subcategory = self._current_subcategory()
         search_text = self.search_field.text().lower()
         mask = (self.main_data['category'] == category) & (self.main_data['subcategory'] == subcategory)
         filtered_data = self.main_data[mask]
@@ -459,7 +565,7 @@ class EditCalculationDialog(QDialog):
 
     def update_years(self):
         category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
+        subcategory = self._current_subcategory()
         subsub_name = self.subsub_name_combo.currentText()
         subsubcategory, name = self.split_subsub_name(subsub_name)
 
@@ -472,11 +578,12 @@ class EditCalculationDialog(QDialog):
         years = self.main_data[mask]['year'].dropna().astype(str).unique()
         self.year_combo.clear()
         self.year_combo.addItems(sorted(years))
+        self._update_year_visibility()
         self.update_unit()
 
     def update_unit(self):
         category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
+        subcategory = self._current_subcategory()
         subsub_name = self.subsub_name_combo.currentText()
         year = self.year_combo.currentText()
         subsubcategory, name = self.split_subsub_name(subsub_name)
@@ -493,38 +600,62 @@ class EditCalculationDialog(QDialog):
         if not filtered_data.empty:
             unit = filtered_data['unit'].values[0] or 'valeur'
             self.current_unit = unit
-            self.input_label.setText(f'Entrez la valeur journalière en {unit}:')
+            if category == "Véhicules":
+                self.input_label.setText(f'Entrez la valeur journalière en {unit}:')
+            elif self._is_current_consumables():
+                self.input_label.setText(f'Montant en {unit}:')
+            else:
+                self.input_label.setText(f'Entrez la valeur en {unit}:')
             self.input_field.setEnabled(True)
         else:
             self.current_unit = None
-            self.input_label.setText('Entrez la valeur journalière:')
+            if category == "Véhicules":
+                self.input_label.setText('Entrez la valeur journalière:')
+            else:
+                self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
 
     def update_nacres_filtered_combo(self):
         category = self.category_combo.currentText()
-        subcategory = self.subcategory_combo.currentText()
+        subcategory = self._current_subcategory()
         subsub_name = self.subsub_name_combo.currentText()
 
-        if category == 'Achats' and 'Consommables' in subcategory:
+        if category == 'Achats' and is_consumables_subcategory(subcategory):
             self.nacres_filtered_label.setVisible(True)
             self.nacres_filtered_combo.setVisible(True)
+            self.nacres_filtered_combo.blockSignals(True)
             self.nacres_filtered_combo.clear()
 
             if subsub_name:
                 subsubcategory, name = self.split_subsub_name(subsub_name)
-                code_nacres_prefix = subsubcategory[:4]
+                code_nacres_prefix = normalize_nacres_prefix(subsubcategory)
                 filtered_entries = self.data_masse[
-                    self.data_masse['Code NACRES'].str.strip().str.startswith(code_nacres_prefix, na=False)
+                    self.data_masse['Code NACRES'].astype(str).str.strip().str[:4].str.upper() == code_nacres_prefix
                 ]
 
                 if not filtered_entries.empty:
-                    for idx, row in filtered_entries.iterrows():
-                        nom_objet_val = row["Consommable"]
-                        display_text = f"{row['Code NACRES']} - {nom_objet_val}"
-                        self.nacres_filtered_combo.addItem(display_text)
+                    entries = []
+                    for _, row in filtered_entries.iterrows():
+                        nom_objet_val = clean_text(row.get("Consommable", ""))
+                        code_val = clean_text(row.get("Code NACRES", ""))
+                        if nom_objet_val:
+                            entries.append((nom_objet_val.casefold(), code_val, nom_objet_val, "solid"))
+                    for _, code, name, source in sorted(entries):
+                        self._add_consumable_item(code, name, source)
+
+                if self.data_liquides is not None and not self.data_liquides.empty:
+                    liquid_entries = []
+                    for _, row in self.data_liquides.iterrows():
+                        code_val = clean_text(row.get("Code NACRES", ""))
+                        produit = clean_text(row.get("Produit", ""))
+                        if produit and normalize_nacres_prefix(code_val) == code_nacres_prefix:
+                            liquid_entries.append((produit.casefold(), code_val, produit, "liquid"))
+                    for _, code, name, source in sorted(liquid_entries):
+                        self._add_consumable_item(code, name, source)
 
             # Toujours ajouter "Aucune correspondance"
-            self.nacres_filtered_combo.addItem("Aucune correspondance")
+            self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)
+            self.nacres_filtered_combo.blockSignals(False)
             self.nacres_filtered_combo.setCurrentText("Aucune correspondance")
 
         else:
@@ -535,10 +666,17 @@ class EditCalculationDialog(QDialog):
             self.quantity_input.setVisible(False)
 
     def on_nacres_filtered_changed(self):
-        selected_text = self.nacres_filtered_combo.currentText()
-        if selected_text == "Aucune correspondance":
+        selected = self._selected_consumable_data()
+        if not selected:
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
         else:
             self.quantity_label.setVisible(True)
             self.quantity_input.setVisible(True)
+
+            code_prefix = normalize_nacres_prefix(selected["code_nacres"])
+            if code_prefix:
+                for index in range(self.subsub_name_combo.count()):
+                    if normalize_nacres_prefix(self.subsub_name_combo.itemText(index)) == code_prefix:
+                        self.subsub_name_combo.setCurrentIndex(index)
+                        break

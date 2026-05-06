@@ -8,6 +8,7 @@
 import os
 import pandas as pd
 from utils.data_loader import load_data  # Ajuster si nécessaire selon ta structure
+from ui.display_utils import clean_text, normalize_nacres_prefix
 
 class DataManager:
     """
@@ -34,6 +35,8 @@ class DataManager:
     # Second matériau pour le consommable
     MASSE_G2_COL      = "Masse unitaire deuxieme materiaux (g)"
     MATERIAU2_COL     = "Matériau deuxieme materiaux"
+    MASSE_G3_COL      = "Masse unitaire troisième materiaux (g)"
+    MATERIAU3_COL     = "Matériau troisième materiaux"
     MASSE_EMBALLAGE_COL = "Masse emballage unitaire (g)"
     MATERIAU_EMBALLAGE_COL = "Matériau emballage"
     MASSE_CONDITIONNEMENT_COL = "Masse condionnement (g)"
@@ -165,6 +168,25 @@ class DataManager:
         """Retourne la DataFrame des consommables liquides."""
         return self.data_liquides
 
+    def nacres_code_mask(self, series, code_nacres):
+        """
+        Masque robuste pour comparer des codes NACRES courts ou longs.
+
+        La base peut contenir seulement le code court ("NB13") ou un libellé complet
+        ("NB13 Culture cellulaire..."). On compare d'abord la chaîne complète, puis
+        le préfixe NACRES.
+        """
+        code_clean = clean_text(code_nacres).upper()
+        if not code_clean:
+            return series.astype(str).str.len() < 0
+
+        clean_series = series.fillna("").astype(str).str.strip().str.upper()
+        mask = clean_series == code_clean
+        prefix = normalize_nacres_prefix(code_clean)
+        if prefix:
+            mask |= clean_series.str[:4] == prefix
+        return mask
+
     def _load_prix_ijm(self):
         """
         Charge le CSV des prix du catalogue IJM.
@@ -193,7 +215,7 @@ class DataManager:
         if self.CODE_NOM_COL not in self.data_masse.columns:
             return None
         mask = (
-            (self.data_masse[self.CODE_NACRES_COL].astype(str).str.strip() == code_nacres_full.strip()) &
+            self.nacres_code_mask(self.data_masse[self.CODE_NACRES_COL], code_nacres_full) &
             (self.data_masse[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
         )
         filtered = self.data_masse[mask]
@@ -235,12 +257,12 @@ class DataManager:
         """
         from difflib import SequenceMatcher
 
-        code = str(code_nacres).strip().upper()
+        code = clean_text(code_nacres).upper()
         df = self.data_masse
         if self.PRIX_UNITAIRE_COL not in df.columns:
             return None
 
-        mask = df[self.CODE_NACRES_COL].astype(str).str.strip().str.upper() == code
+        mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code)
         candidates = df[mask]
 
         if candidates.empty:
@@ -298,7 +320,7 @@ class DataManager:
             info["conditionnement"],
         )
 
-    def get_liquid_data(self, code_nacres):
+    def get_liquid_data(self, code_nacres, produit=None):
         """
         Cherche un consommable liquide par code NACRES.
         Retourne la Series de la ligne si trouvée, sinon None.
@@ -306,6 +328,9 @@ class DataManager:
         if self.data_liquides.empty:
             return None
         df = self.data_liquides
-        mask = df[self.CODE_NACRES_COL].astype(str).str.strip() == code_nacres.strip()
+        mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres)
+        produit_clean = clean_text(produit)
+        if produit_clean and "Produit" in df.columns:
+            mask &= df["Produit"].astype(str).str.strip() == produit_clean
         filtered = df[mask]
         return filtered.iloc[0] if not filtered.empty else None

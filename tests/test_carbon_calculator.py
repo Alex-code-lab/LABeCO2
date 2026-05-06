@@ -78,6 +78,15 @@ def _make_dm(
     dm.MASSE_CONDITIONNEMENT_COL  = 'Masse condionnement (g)'
     dm.MATERIAU_CONDITIONNEMENT_COL = 'Matériau conditionnement'
     dm.NOMBRE_PAR_COND_COL        = 'Nbr par conditionnement'
+    dm.MASSE_G3_COL               = 'Masse unitaire troisième materiaux (g)'
+    dm.MATERIAU3_COL              = 'Matériau troisième materiaux'
+
+    def _nacres_code_mask(series, code_nacres):
+        code = str(code_nacres or '').strip().upper()
+        prefix = code[:4]
+        clean = series.fillna('').astype(str).str.strip().str.upper()
+        return (clean == code) | (clean.str[:4] == prefix)
+    dm.nacres_code_mask.side_effect = _nacres_code_mask
 
     # Matériaux
     if material_map is not None:
