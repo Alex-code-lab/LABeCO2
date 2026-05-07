@@ -141,6 +141,10 @@ class MainWindow(QMainWindow):
         self.category_color_dot = None
         self.indicator_nacres = None
         self.indicator_conso = None
+        self.origine_label = None
+        self.origine_combo = None
+        self.origine_info_button = None
+        self.origine_row_widget = None
 
         self.setStyleSheet("""
             QPushButton {
@@ -473,6 +477,25 @@ class MainWindow(QMainWindow):
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
 
+        self.origine_label = QLabel("Provenance:")
+        self.origine_combo = QComboBox()
+        origins = self.data_manager.get_transport_origins()
+        self.origine_combo.addItems(origins)
+        self.origine_combo.setFixedWidth(200)
+        self.origine_info_button = QPushButton("Plus d'info")
+
+        origine_row = QHBoxLayout()
+        origine_row.setContentsMargins(0, 0, 0, 0)
+        origine_row.setSpacing(6)
+        origine_row.addWidget(self.origine_combo)
+        origine_row.addWidget(self.origine_info_button)
+        origine_row.addStretch()
+        self.origine_row_widget = QWidget()
+        self.origine_row_widget.setLayout(origine_row)
+
+        self.origine_label.setVisible(False)
+        self.origine_row_widget.setVisible(False)
+
         self.prix_unitaire_label = QLabel("Prix unitaire : —")
         self.prix_unitaire_label.setVisible(False)
         self.prix_info_button = QPushButton("Plus d'info")
@@ -570,6 +593,8 @@ class MainWindow(QMainWindow):
         existing_layout.addLayout(form_layout)
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
+        existing_layout.addWidget(self.origine_label)
+        existing_layout.addWidget(self.origine_row_widget)
         existing_layout.addLayout(prix_unitaire_layout)
         existing_layout.addWidget(self.masse_manquante_label)
         existing_layout.addWidget(self.input_label)
@@ -906,6 +931,8 @@ class MainWindow(QMainWindow):
         self.conso_filtered_combo.currentIndexChanged.connect(self.on_conso_filtered_changed)
         self.quantity_input.textChanged.connect(self._auto_fill_prix)
         self.prix_info_button.clicked.connect(self.show_prix_unitaire_info)
+        self.origine_info_button.clicked.connect(self.show_origine_info)
+        self.origine_combo.currentIndexChanged.connect(self._update_origine_info_button)
 
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         self.add_consumable_button.clicked.connect(self.open_data_mass_window_new)
@@ -1050,6 +1077,8 @@ class MainWindow(QMainWindow):
             self.conso_search_field,
             self.quantity_label,
             self.quantity_input,
+            self.origine_label,
+            self.origine_row_widget,
             self.prix_unitaire_label,
             self.prix_info_button,
             self.masse_manquante_label,
@@ -1260,7 +1289,8 @@ class MainWindow(QMainWindow):
                 "year": item.get("year", 0),
                 "electricity_type": item.get("electricity_type", ""),
                 "consommable": item.get("consommable", ""),
-                "code_nacres": item.get("code_nacres", "")
+                "code_nacres": item.get("code_nacres", ""),
+                "origine": item.get("origine", self.data_manager.TRANSPORT_DEFAULT),
             }
 
             # Optionnel : vérifier via un debug
@@ -1711,6 +1741,8 @@ class MainWindow(QMainWindow):
             self.update_manage_consumable_button_state()
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.origine_label.setVisible(False)
+            self.origine_row_widget.setVisible(False)
             self._current_prix_unitaire = None
             self._current_prix_unitaire_info_text = ""
             self.prix_unitaire_label.setToolTip("")
@@ -1790,6 +1822,9 @@ class MainWindow(QMainWindow):
 
         self.quantity_label.setVisible(True)
         self.quantity_input.setVisible(True)
+        has_mass = self._consumable_has_mass_data(selected)
+        self.origine_label.setVisible(has_mass)
+        self.origine_row_widget.setVisible(has_mass)
 
         self.update_unit()
         self._update_prix_unitaire()
@@ -1858,6 +1893,51 @@ class MainWindow(QMainWindow):
             self._current_prix_unitaire_info_text,
             self.prix_info_button,
             self.prix_info_button.rect(),
+            20000,
+        )
+
+    def _update_origine_info_button(self):
+        if self.origine_info_button is not None:
+            self.origine_info_button.setEnabled(self.origine_combo is not None and self.origine_combo.count() > 0)
+
+    def show_origine_info(self):
+        """Affiche les détails du facteur de transport pour la provenance sélectionnée."""
+        if self.origine_combo is None:
+            return
+        origine = self.origine_combo.currentText()
+        factor, uncert = self.data_manager.get_transport_factor(origine)
+
+        df = self.data_manager.data_transport
+        row = None
+        if not df.empty:
+            mask = df[self.data_manager.TRANSPORT_ORIGINE_COL] == origine
+            if mask.any():
+                row = df[mask].iloc[0]
+
+        lines = [f"Provenance : {origine}"]
+        if row is not None:
+            dist = int(row.get("Distance (km)", 0))
+            mode = row.get("Mode", "")
+            source = row.get("Source", "")
+            lines.append(f"Distance évaluée : {dist:,} km".replace(",", " "))
+            lines.append(f"Mode : {mode}")
+            lines.append(f"Facteur transport : {factor:.3f} kg CO₂e/kg")
+            lines.append(f"Incertitude : ±{int(uncert * 100)} %")
+            lines.append(f"Source : {source}")
+        else:
+            lines.append(f"Facteur transport : {factor:.3f} kg CO₂e/kg")
+            lines.append(f"Incertitude : ±{int(uncert * 100)} %")
+
+        if origine == self.data_manager.TRANSPORT_DEFAULT:
+            lines.append("")
+            lines.append("Valeur par défaut : moyenne entre USA (0,18) et Asie (0,35)")
+            lines.append("par fret maritime. S'applique si l'origine est inconnue.")
+
+        QToolTip.showText(
+            QCursor.pos(),
+            "\n".join(lines),
+            self.origine_info_button,
+            self.origine_info_button.rect(),
             20000,
         )
 
@@ -2019,6 +2099,26 @@ class MainWindow(QMainWindow):
                 self.quantity_input.setStyleSheet(
                     "border: 1.5px solid #fca5a5; border-radius: 3px;"
                 )
+
+    def _consumable_has_mass_data(self, selected):
+        """Retourne True si le consommable sélectionné a des données de masse (solide ou liquide)."""
+        import pandas as pd
+        if not selected:
+            return False
+        if selected.get("source") == "liquid":
+            return True
+        code_nacres = selected["code_nacres"]
+        consommable_name = selected["consommable"]
+        df = self.data_masse
+        mask = (
+            self._nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
+            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        )
+        row = df[mask]
+        if row.empty:
+            return False
+        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        return not (pd.isna(masse) or str(masse).strip() == "")
 
     def _update_masse_warning(self):
         """
@@ -2230,6 +2330,7 @@ class MainWindow(QMainWindow):
                     "unit": data.get("unit", ""),
                     "quantity": data.get("quantity", 0.0),
                     "consommable": data.get("consommable", ""),
+                    "origine": data.get("origine", self.data_manager.TRANSPORT_DEFAULT),
                     "electricity_type": data.get("electricity_type", ""),
                 })
             if not items_list:
@@ -2359,6 +2460,7 @@ class MainWindow(QMainWindow):
             'code_nacres': code_nacres,
             'consommable': consommable,
             'quantity': quantity,
+            'origine': self.origine_combo.currentText() if self.origine_combo and self.origine_combo.isVisible() else self.data_manager.TRANSPORT_DEFAULT,
         }
 
                 # --- Enrichissement des données massiques pour le bilan carbone ---
@@ -2406,6 +2508,7 @@ class MainWindow(QMainWindow):
             'consommable': consommable,
             'unit': self.current_unit,
             'quantity': quantity,
+            'origine': data_dict['origine'],
         }
 
         self.create_or_update_history_item(new_data)
@@ -2433,11 +2536,12 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Erreur', 'Aucune donnée disponible pour cet élément.')
             return
 
-        dialog = EditCalculationDialog(self, data=old_data, 
-                                    main_data=self.data, 
-                                    data_masse=self.data_masse, 
+        dialog = EditCalculationDialog(self, data=old_data,
+                                    main_data=self.data,
+                                    data_masse=self.data_masse,
                                     data_materials=self.data_materials,
-                                    data_liquides=self.data_liquides)
+                                    data_liquides=self.data_liquides,
+                                    data_manager=self.data_manager)
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
             # print("Debug - Nouveau self.modified_data :", modified_data)
@@ -2449,7 +2553,11 @@ class MainWindow(QMainWindow):
                 self._result_show_error(msg_price)
                 return
 
-            # On met à jour les champs
+            # Préserver les champs non édités dans le dialog (ex. origine)
+            if 'origine' not in modified_data:
+                modified_data['origine'] = old_data.get('origine', self.data_manager.TRANSPORT_DEFAULT)
+
+            # On met à jour les champs calculés
             modified_data['emissions_price'] = ep
             modified_data['emissions_price_error'] = ep_err
             modified_data['emission_mass'] = em
@@ -2457,7 +2565,7 @@ class MainWindow(QMainWindow):
             modified_data['total_mass'] = tm
 
             self.history_list.removeRow(current_row)
-            self.create_or_update_history_item(modified_data)
+            self.create_or_update_history_item(modified_data, insert_at=current_row)
             self.update_total_emissions()
             self.data_changed.emit()
 
@@ -2629,7 +2737,7 @@ class MainWindow(QMainWindow):
             lines.extend(mass_lines)
         return "\n".join(lines)
 
-    def create_or_update_history_item(self, data, item=None):
+    def create_or_update_history_item(self, data, item=None, insert_at=None):
         category    = data.get('category', '')
         subcategory = data.get('subcategory', '')
         name        = data.get('name', '')
@@ -2691,7 +2799,7 @@ class MainWindow(QMainWindow):
         eco2_masse = fmt(em, em_err) if em and em != 0.0 else ""
 
         # ── Insérer la ligne ─────────────────────────────────────────────
-        row = self.history_list.rowCount()
+        row = insert_at if insert_at is not None else self.history_list.rowCount()
         self.history_list.insertRow(row)
 
         tooltip = self._history_tooltip(data)
@@ -3096,6 +3204,24 @@ PTFE, PC, papier, carton, verre) ;
 <p>Formule : <i>quantité × masse unitaire (kg) × facteur matériau (kg CO₂e/kg)</i>,
 appliquée séparément au produit, à l'emballage et au conditionnement.</p>
 
+<p><b>Correction transport (méthode masse)</b></p>
+<p>
+Un facteur de transport s'ajoute à l'émission massique pour tenir compte du fret depuis
+le fabricant jusqu'au laboratoire. L'utilisateur sélectionne la provenance du consommable ;
+le facteur correspondant (kg CO₂e/kg de produit) est ajouté à l'émission calculée par la méthode masse.
+</p>
+<p>
+Formule : <i>émission totale = émission matériaux + masse_kg × facteur_transport</i>.
+L'incertitude du transport est propagée en quadrature avec celle des matériaux.
+</p>
+<p>
+Si la provenance est inconnue, la valeur par défaut <b>"Inconnue (défaut)"</b> est utilisée :
+<b>0,265 kg CO₂e/kg</b>, calculée comme la moyenne entre USA (0,18) et Asie (0,35) par fret maritime,
+pour une distance évaluée à 14 000 km. Incertitude : ±30 %.
+Ce choix assume que la majorité des consommables de laboratoire provient de zones lointaines
+et transite par voie maritime (le fret express aérien est exclu du défaut).
+</p>
+
 <p><b>Véhicules et déplacements</b></p>
 <p>
 Formule : <i>km/jour × nombre de jours × facteur (kg CO₂e/km)</i>.
@@ -3130,49 +3256,20 @@ Chaque facteur d'émission est associé à une incertitude relative (ex. : 0,10 
 
 <p><b>Ce qui n'est pas encore intégré dans le calcul</b></p>
 
-<p><i>1. Correction transport selon l'origine géographique</i></p>
-<p>
-Les facteurs matériaux (méthode masse) sont cradle-to-gate : le transport du fabricant au laboratoire
-n'est pas compté. Or cette contribution peut être significative selon l'origine du produit :
-</p>
-<table border="0" cellspacing="4" style="margin-left:16px;">
-  <tr><td><b>Origine</b></td><td><b>Distance évaluée</b></td><td><b>Mode</b></td><td><b>Facteur officiel (kg CO₂e/t.km)</b></td><td><b>Facteur final (kg CO₂e/kg)</b></td></tr>
-  <tr><td>France</td><td>500 km</td><td>Camion</td><td>0,086</td><td>0,043</td></tr>
-  <tr><td>Europe</td><td>1 500 km</td><td>Camion + ferroviaire</td><td>0,0798</td><td>0,12</td></tr>
-  <tr><td>USA</td><td>8 000 km</td><td>Maritime + camion</td><td>0,00554</td><td>0,18</td></tr>
-  <tr><td>Asie</td><td>20 000 km</td><td>Maritime + camion</td><td>0,00554</td><td>0,35</td></tr>
-  <tr><td>Afrique</td><td>10 000 km</td><td>Maritime + routier</td><td>0,00554</td><td>0,20</td></tr>
-  <tr><td>Europe (express avion)</td><td>1 500 km</td><td>Avion cargo</td><td>1,9</td><td>2,85</td></tr>
-  <tr><td>USA (express avion)</td><td>8 000 km</td><td>Avion cargo</td><td>1,9</td><td>15,2</td></tr>
-  <tr><td>Asie (express avion)</td><td>20 000 km</td><td>Avion cargo</td><td>1,9</td><td>38,0</td></tr>
-  <tr><td>Afrique (express avion)</td><td>10 000 km</td><td>Avion cargo</td><td>1,9</td><td>19,0</td></tr>
-</table>
-<p>
-Sources : ADEME Base Carbone® (routier, ferroviaire, aérien, maritime),
-<a href="https://www.carbone4.com/analyse-faq-fret">Carbone 4</a>,
-<a href="https://www.hellocarbo.com/blog/calculer/bilan-carbone-transport/">HelloCarbo</a>.
-Formule : kg CO₂e/kg = (distance_km × facteur_kg CO₂e/t.km) / 1 000.
-</p>
-<p>
-Pour des cuvettes PMMA (3,75 kg CO₂e/kg), cela représente +3 % (France) à +9 % (Asie par bateau).
-Le fret aérien depuis l'Asie (38 kg CO₂e/kg) dépasse le facteur de fabrication par un facteur ×10 —
-c'est le levier le plus puissant sur le poste transport.
-</p>
-
-<p><i>2. Étape de moulage et injection plastique</i></p>
+<p><i>1. Étape de moulage et injection plastique</i></p>
 <p>
 Les facteurs cradle-to-gate couvrent la résine plastique mais pas la mise en forme (moulage par injection,
 thermoformage). Cette étape ajoute typiquement <b>+0,3 à +0,5 kg CO₂e/kg</b> selon le mix électrique
 utilisé par le transformateur. Elle n'est pas encore intégrée dans la base de données matériaux.
 </p>
 
-<p><i>3. Empreinte carbone du numérique et de l'intelligence artificielle</i></p>
+<p><i>2. Empreinte carbone du numérique et de l'intelligence artificielle</i></p>
 <p>
 Internet, calculs distribués et modèles d'IA sont devenus omniprésents dans la recherche.
 Cette dimension n'est pas encore intégrée dans LABeCO₂ et constitue un axe de développement futur.
 </p>
 
-<p><i>4. Biomolécules et protéines purifiées</i></p>
+<p><i>3. Biomolécules et protéines purifiées</i></p>
 <p>
 Les données disponibles sur l'empreinte carbone des protéines et réactifs biologiques purifiés
 présentent des incertitudes extrêmement élevées (facteurs variant jusqu'à ×10 000 selon les sources).

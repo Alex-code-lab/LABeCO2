@@ -18,6 +18,7 @@ OUTPUT_DIR = Path(__file__).resolve().parents[1]
 
 data = {
     "Origine": [
+        "Inconnue (défaut)",
         "France",
         "Europe",
         "USA",
@@ -28,8 +29,9 @@ data = {
         "Asie (express avion)",
         "Afrique (express avion)",
     ],
-    "Distance (km)": [500, 1500, 8000, 20000, 10000, 1500, 8000, 20000, 10000],
+    "Distance (km)": [14000, 500, 1500, 8000, 20000, 10000, 1500, 8000, 20000, 10000],
     "Mode": [
+        "Maritime + camion",
         "Camion",
         "Camion + ferroviaire",
         "Maritime + camion",
@@ -40,19 +42,20 @@ data = {
         "Avion cargo",
         "Avion cargo",
     ],
-    "Facteur officiel (gCO₂e/t.km)": [
-        86.0, 79.8, 5.54, 5.54, 5.54,
-        1900.0, 1900.0, 1900.0, 1900.0,
+    "Facteur officiel (kg CO₂e/t.km)": [
+        0.00554, 0.086, 0.0798, 0.00554, 0.00554, 0.00554,
+        1.9, 1.9, 1.9, 1.9,
     ],
     "Facteur transport (kg CO₂e/kg)": [
-        0.043, 0.12, 0.18, 0.35, 0.20,
+        0.265, 0.043, 0.12, 0.18, 0.35, 0.20,
         2.85, 15.2, 38.0, 19.0,
     ],
     "Incertitude": [
-        0.15, 0.20, 0.20, 0.20, 0.20,
+        0.30, 0.15, 0.20, 0.20, 0.20, 0.20,
         0.15, 0.15, 0.15, 0.15,
     ],
     "Source": [
+        "Estimation LABeCO₂ — moyenne USA/Asie maritime (14 000 km)",
         "ADEME Base Carbone® - transport routier marchandises",
         "ADEME Base Carbone® - transport routier + ferroviaire",
         "ADEME Base Carbone® - transport maritime",

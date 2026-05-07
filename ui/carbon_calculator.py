@@ -139,21 +139,27 @@ class CarbonCalculator:
 
         # Cas spécial pour Achats + code NACRES : distinction liquides vs solides
         if category == 'Achats' and code_nacres != 'NA':
+            origine = data_dict.get('origine', self.dm.TRANSPORT_DEFAULT)
+            transport_factor, transport_uncert = self.dm.get_transport_factor(origine)
+
             # 1) On regarde si c'est un liquide
             liq_row = self.dm.get_liquid_data(code_nacres, consommable)
             if liq_row is not None:
-                # volume (mL) = quantity
                 e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity, consommable)
-                em     = e_liq
-                em_err = err_liq
+                transport_em = m_liq * transport_factor
+                transport_err = transport_em * transport_uncert
+                em     = e_liq + transport_em
+                em_err = (err_liq ** 2 + transport_err ** 2) ** 0.5
                 tm     = m_liq
             else:
-                # 2) Sinon, calcul classique pour consommables solides
+                # 2) Calcul classique pour consommables solides
                 e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
                     code_nacres, consommable, quantity
                 )
-                em     = e_mass
-                em_err = e_mass_err
+                transport_em = t_mass * transport_factor
+                transport_err = transport_em * transport_uncert
+                em     = e_mass + transport_em
+                em_err = (e_mass_err ** 2 + transport_err ** 2) ** 0.5
                 tm     = t_mass
                 if missing_mats:
                     noms = ", ".join(missing_mats)

@@ -32,20 +32,22 @@ class EditCalculationDialog(QDialog):
     """
 
     def __init__(self, parent=None, data=None, main_data=None, data_masse=None,
-                 data_materials=None, data_liquides=None):
+                 data_materials=None, data_liquides=None, data_manager=None):
         super().__init__(parent)
         self.setWindowTitle("Modifier le calcul")
-        
+
         # Données existantes et référentiels
         self.data = data or {}
         self.main_data = main_data
         self.data_masse = data_masse
         self.data_materials = data_materials
         self.data_liquides = data_liquides if data_liquides is not None else pd.DataFrame()
-        
+        self.data_manager = data_manager
+
         # Variables internes
         self.current_unit = None
         self.modified_data = None
+        self._origine_should_save = False  # True quand la provenance doit être incluse dans modified_data
 
         self.initUI()
         self.populate_fields(self.data)
@@ -109,6 +111,11 @@ class EditCalculationDialog(QDialog):
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
 
+        self.origine_label = QLabel("Provenance:")
+        self.origine_combo = QComboBox()
+        self.origine_label.setVisible(False)
+        self.origine_combo.setVisible(False)
+
         # Layout pour les catégories "normales"
         self.normal_form_layout = QFormLayout()
         # On ne met plus la catégorie ici (catégorie_label + combo) car on veut la garder toujours visible
@@ -120,6 +127,7 @@ class EditCalculationDialog(QDialog):
         self.normal_form_layout.addRow(self.days_label, self.days_field)
         self.normal_form_layout.addRow(self.nacres_filtered_label, self.nacres_filtered_combo)
         self.normal_form_layout.addRow(self.quantity_label, self.quantity_input)
+        self.normal_form_layout.addRow(self.origine_label, self.origine_combo)
 
         self.normal_widget = QWidget()
         self.normal_widget.setLayout(self.normal_form_layout)
@@ -168,9 +176,66 @@ class EditCalculationDialog(QDialog):
         self.year_combo.currentIndexChanged.connect(self.update_unit)
         self.year_combo.currentIndexChanged.connect(self.update_nacres_filtered_combo)
         self.nacres_filtered_combo.currentIndexChanged.connect(self.on_nacres_filtered_changed)
+        self.quantity_input.textChanged.connect(self._on_quantity_changed)
 
         self.validate_button.clicked.connect(self.on_validate)
         self.cancel_button.clicked.connect(self.reject)
+
+    def _data_has_mass(self, data):
+        """
+        Vérifie si le calcul stocké dans `data` dispose de données de masse,
+        en interrogeant directement code_nacres et consommable (sans dépendre
+        de l'état de la combo nacres_filtered).
+        """
+        code_nacres = data.get('code_nacres', '')
+        consommable = data.get('consommable', '')
+        if not code_nacres or code_nacres == 'NA':
+            return False
+        # Liquide
+        if not self.data_liquides.empty and self.data_manager is not None:
+            liq = self.data_manager.get_liquid_data(code_nacres, consommable)
+            if liq is not None:
+                return True
+        # Solide
+        selected = {'code_nacres': code_nacres, 'consommable': consommable, 'source': 'solid'}
+        return self._consumable_has_mass_data(selected)
+
+    def _consumable_has_mass_data(self, selected):
+        """Retourne True si le consommable sélectionné dispose de données de masse."""
+        if not selected:
+            return False
+        if selected.get("source") == "liquid":
+            return True
+        if self.data_masse is None or self.data_manager is None:
+            return False
+        code_nacres = selected.get("code_nacres", "")
+        consommable_name = selected.get("consommable", "")
+        df = self.data_masse
+        mask = (
+            self.data_manager.nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
+            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        )
+        row = df[mask]
+        if row.empty:
+            return False
+        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        return not (pd.isna(masse) or str(masse).strip() == "")
+
+    def _on_quantity_changed(self, text):
+        """Scale the euros amount proportionally when quantity changes."""
+        try:
+            base_q = float(getattr(self, '_base_quantity', 0) or 0)
+            base_v = float(getattr(self, '_base_value', 0) or 0)
+            if base_q <= 0 or base_v <= 0:
+                return
+            new_q = float(text.replace(',', '.'))
+            if new_q > 0:
+                new_v = base_v * (new_q / base_q)
+                self.input_field.blockSignals(True)
+                self.input_field.setText(f"{new_v:.4f}")
+                self.input_field.blockSignals(False)
+        except (ValueError, AttributeError):
+            pass
 
     def _populate_subcategory_combo(self, subcategories):
         self.subcategory_combo.clear()
@@ -348,18 +413,46 @@ class EditCalculationDialog(QDialog):
 
             # --- Cas Achats + Consommables => NACRES
             if category == 'Achats' and is_consumables_subcategory(data.get('subcategory', '')):
+                # Bloquer on_nacres_filtered_changed pendant le remplissage pour éviter
+                # qu'il réinitialise la combo provenance avant qu'on ait pu la régler
+                self.nacres_filtered_combo.blockSignals(True)
                 self.update_nacres_filtered_combo()
-                
                 code_nacres = data.get('code_nacres', '')
                 consommable = data.get('consommable', '')
                 if code_nacres and consommable:
                     self._select_consumable_item(code_nacres, consommable)
+                self.nacres_filtered_combo.blockSignals(False)
 
                 self.quantity_label.setVisible(True)
                 self.quantity_input.setVisible(True)
                 quantity = data.get('quantity', '')
+                # Stocker les valeurs de référence pour le scaling automatique
+                self._base_quantity = float(quantity or 0)
+                self._base_value = float(data.get('value', 0) or 0)
                 if quantity is not None:
+                    self.quantity_input.blockSignals(True)
                     self.quantity_input.setText(str(quantity))
+                    self.quantity_input.blockSignals(False)
+
+                # Provenance : visible uniquement si masse disponible.
+                # On utilise _data_has_mass (code_nacres/consommable issus de data, pas
+                # de l'état Qt des combos) pour être indépendant des signaux en cours.
+                has_mass = self._data_has_mass(data) if self.data_manager is not None else False
+                self._origine_should_save = has_mass
+                if has_mass:
+                    saved_origine = data.get('origine', self.data_manager.TRANSPORT_DEFAULT)
+                    # Remplir la combo si elle est vide (la chaîne de signaux ne l'a
+                    # peut-être pas encore remplie ou l'a réinitialisée)
+                    if self.origine_combo.count() == 0:
+                        self.origine_combo.addItems(self.data_manager.get_transport_origins())
+                    idx = self.origine_combo.findText(saved_origine)
+                    self.origine_combo.setCurrentIndex(idx if idx >= 0 else 0)
+                    self.origine_label.setVisible(True)
+                    self.origine_combo.setVisible(True)
+                else:
+                    self._origine_should_save = False
+                    self.origine_label.setVisible(False)
+                    self.origine_combo.setVisible(False)
             else:
                 # Autres cas : masquer NACRES/quantité
                 self.nacres_filtered_label.setVisible(False)
@@ -490,7 +583,7 @@ class EditCalculationDialog(QDialog):
                 if self.quantity_input.isVisible():
                     q_str = self.quantity_input.text().strip()
                     if not q_str:
-                        QMessageBox.warning(self, 'Erreur', 
+                        QMessageBox.warning(self, 'Erreur',
                                             "Le champ quantité est vide, veuillez saisir une quantité.")
                         return
                     try:
@@ -499,9 +592,17 @@ class EditCalculationDialog(QDialog):
                             raise ValueError
                         self.modified_data['quantity'] = quantity_val
                     except ValueError:
-                        QMessageBox.warning(self, 'Erreur', 
+                        QMessageBox.warning(self, 'Erreur',
                                             'Veuillez entrer une quantité positive.')
                         return
+
+                # Provenance — on utilise le flag d'état métier, pas isVisible()
+                # (isVisible() peut valoir False sur certains systèmes si la fenêtre
+                # n'a pas encore été rendue, ce qui ferait perdre la valeur choisie)
+                if self._origine_should_save and self.origine_combo.count() > 0:
+                    self.modified_data['origine'] = self.origine_combo.currentText()
+                elif self.data_manager is not None:
+                    self.modified_data['origine'] = self.data_manager.TRANSPORT_DEFAULT
 
             self.accept()
 
@@ -670,9 +771,21 @@ class EditCalculationDialog(QDialog):
         if not selected:
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.origine_label.setVisible(False)
+            self.origine_combo.setVisible(False)
+            self._origine_should_save = False
         else:
             self.quantity_label.setVisible(True)
             self.quantity_input.setVisible(True)
+
+            # Provenance : visible uniquement si masse disponible
+            has_mass = self._consumable_has_mass_data(selected)
+            self._origine_should_save = has_mass
+            if has_mass and self.data_manager is not None and self.origine_combo.count() == 0:
+                origins = self.data_manager.get_transport_origins()
+                self.origine_combo.addItems(origins)
+            self.origine_label.setVisible(has_mass)
+            self.origine_combo.setVisible(has_mass)
 
             code_prefix = normalize_nacres_prefix(selected["code_nacres"])
             if code_prefix:

@@ -61,6 +61,11 @@ class DataManager:
     DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
     DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
     DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
+    DATA_TRANSPORT_FILENAME = "data_transport_origins.hdf5"
+    TRANSPORT_ORIGINE_COL = "Origine"
+    TRANSPORT_FACTOR_COL = "Facteur transport (kg CO₂e/kg)"
+    TRANSPORT_UNCERT_COL = "Incertitude"
+    TRANSPORT_DEFAULT = "Inconnue (défaut)"
 
 
     def __init__(self, base_path, user_path=None):
@@ -100,6 +105,13 @@ class DataManager:
             self.data_liquides = pd.read_hdf(self.liq_path)
         else:
             self.data_liquides = pd.DataFrame()  # vide si absent
+
+        # Charger les facteurs de transport par origine géographique
+        transport_path = os.path.join(base_path, "data", "mass_factors", self.DATA_TRANSPORT_FILENAME)
+        if os.path.exists(transport_path):
+            self.data_transport = pd.read_hdf(transport_path)
+        else:
+            self.data_transport = pd.DataFrame()
 
         # Charger les prix du catalogue IJM (optionnel)
         self.data_prix_ijm = self._load_prix_ijm()
@@ -186,6 +198,28 @@ class DataManager:
         if prefix:
             mask |= clean_series.str[:4] == prefix
         return mask
+
+    def get_transport_origins(self):
+        """Retourne la liste ordonnée des origines géographiques disponibles."""
+        if self.data_transport.empty:
+            return [self.TRANSPORT_DEFAULT]
+        return self.data_transport[self.TRANSPORT_ORIGINE_COL].tolist()
+
+    def get_transport_factor(self, origine):
+        """
+        Retourne (facteur_kg_co2_par_kg, incertitude) pour une origine donnée.
+        Utilise la ligne 'Inconnue (défaut)' si l'origine est absente.
+        """
+        if self.data_transport.empty:
+            return (0.265, 0.30)
+        df = self.data_transport
+        mask = df[self.TRANSPORT_ORIGINE_COL] == origine
+        if not mask.any():
+            mask = df[self.TRANSPORT_ORIGINE_COL] == self.TRANSPORT_DEFAULT
+        if not mask.any():
+            return (0.265, 0.30)
+        row = df[mask].iloc[0]
+        return (float(row[self.TRANSPORT_FACTOR_COL]), float(row[self.TRANSPORT_UNCERT_COL]))
 
     def _load_prix_ijm(self):
         """
