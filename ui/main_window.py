@@ -194,7 +194,7 @@ class MainWindow(QMainWindow):
         # Label des sources et méthodologie
         self.sources_label = QLabel(
             "L'ensemble des sources sont à retrouver <a href=\"sources\">ici</a>. "
-            "La méthodologie de calcul est documentée <a href=\"methodo\">ici</a>."
+            "La méthodologie est présentée <a href=\"methodo\">ici</a>."
         )
         self.sources_label.setTextFormat(Qt.RichText)
         self.sources_label.setOpenExternalLinks(False)
@@ -3040,85 +3040,145 @@ class MainWindow(QMainWindow):
         text.setOpenExternalLinks(True)
         text.setWordWrap(True)
         text.setText("""
-<p><b>Périmètre général</b></p>
+<p><b>Contexte et objectif</b></p>
 <p>
-LABeCO₂ calcule l'empreinte carbone d'activités de recherche à l'échelle individuelle ou d'un projet expérimental.
+LABeCO₂ calcule l'empreinte carbone d'activités de recherche à l'échelle individuelle ou d'un projet
+expérimental, et non à l'échelle d'un laboratoire ou d'une institution.
+L'objectif n'est pas de produire une valeur absolue parfaitement exacte, mais une estimation cohérente,
+reproductible et comparable entre différentes manipulations, afin d'identifier les principaux postes
+d'émission et de réfléchir à des leviers de réduction.
+</p>
+<p>
 Le périmètre couvre les postes directement liés à la production scientifique : consommables, réactifs,
 déplacements professionnels, machines et équipements électriques.
-Les infrastructures mutualisées (bâtiments, climatisation, réseau) ne sont pas incluses dans ce périmètre.
+Les infrastructures mutualisées (bâtiments, climatisation, réseau informatique) et les coûts administratifs
+sont exclus — ce choix est assumé et documenté.
 </p>
 
-<p><b>Deux méthodes de calcul pour les consommables</b></p>
+<p><b>Méthode 1 : approche prix via les codes NACRES (modèle EEIO)</b></p>
 <p>
-Pour les achats de consommables identifiés par un code NACRES, l'application propose deux approches complémentaires :
+Les facteurs d'émission par code NACRES (kg CO₂e/€) sont issus de la base
+<a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">PER1p5 (Labos 1point5)</a>.
+Ils sont construits à partir de <b>modèles entrées-sorties étendus à l'environnement (EEIO)</b> :
+toute l'économie est représentée comme un réseau d'échanges entre secteurs industriels, auquel on associe
+les émissions réelles mesurées par euro produit.
 </p>
-<ul>
-  <li>
-    <b>Méthode prix</b> : le facteur d'émission (kg CO₂e/€) est issu de la base
-    <a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">PER1p5 (Labos 1point5)</a>,
-    qui associe chaque code NACRES à un facteur macro ou méso-économique.
-    L'émission est obtenue par : <i>dépense (€) × facteur (kg CO₂e/€)</i>.
-    Cette méthode couvre tous les consommables disposant d'un code NACRES, même sans données massiques.
-  </li>
-  <li>
-    <b>Méthode masse</b> : l'émission est calculée à partir des masses unitaires (produit, emballage,
-    conditionnement) et des facteurs d'émission par matériau (kg CO₂e/kg).
-    L'émission est obtenue par : <i>quantité × masse unitaire (kg) × facteur matériau (kg CO₂e/kg)</i>.
-    Cette méthode est plus précise mais nécessite des données massiques renseignées dans la base.
-  </li>
-</ul>
+<p>
+Le modèle remonte toute la chaîne de façon matricielle : quand tu achètes 1 € de consommable plastique,
+il calcule les émissions de la fabrication, du transport, de l'énergie, des services du distributeur,
+de l'emballage. <b>Le transport n'est donc pas ajouté comme un pourcentage fixe</b> : il est capturé
+indirectement via les achats intermédiaires du secteur. Cette approche systémique fonctionne bien à
+l'échelle d'un laboratoire entier, mais introduit des erreurs plus importantes à l'échelle d'une seule
+expérience, car le facteur NACRES est une <i>moyenne sectorielle</i> qui ne distingue pas un produit
+fabriqué en Allemagne d'un produit fabriqué en Chine.
+</p>
+<p>Formule : <i>dépense (€) × facteur NACRES (kg CO₂e/€)</i></p>
 
-<p><b>Périmètre des facteurs matériaux : cradle-to-gate</b></p>
+<p><b>Méthode 2 : approche physique bottom-up par les matériaux</b></p>
 <p>
-Les facteurs d'émission par matériau (kg CO₂e/kg) utilisés dans la méthode masse couvrent
-la production du matériau depuis l'extraction des matières premières jusqu'à la sortie d'usine
-(<i>cradle-to-gate</i>).
-<b>Le transport entre le fabricant et le laboratoire n'est pas inclus.</b>
-Pour des consommables produits en Europe, cette contribution est typiquement négligeable (quelques %).
-Pour des réactifs ou matériaux fabriqués en Asie, elle peut représenter 5 à 15 % supplémentaires
-selon le mode de transport.
+Pour les consommables dont on connaît la masse et le matériau, une approche physique est utilisée en
+complément. Les facteurs d'émission par matériau (kg CO₂e/kg) sont issus d'analyses de cycle de vie
+rigoureuses (normes ISO 14040/14044), vérifiées par des tiers indépendants.
 </p>
-<p>Sources des facteurs matériaux :
-<a href="https://base-empreinte.ademe.fr/">Base Empreinte® (ADEME)</a> pour la majorité des plastiques,
-papier, carton et verre ;
+<p>
+Ces facteurs couvrent l'extraction des matières premières et la fabrication jusqu'à la sortie d'usine
+(<b>cradle-to-gate</b>). Exemple : le PMMA des cuvettes de spectrophotométrie est à
+<b>3,75 kg CO₂e/kg</b> (PlasticsEurope EPD 2015, cradle-to-gate explicite).
+</p>
+<p>
+Sources : <a href="https://base-empreinte.ademe.fr/">Base Empreinte® ADEME</a> (PP, PE, PS, PET, PVC,
+PTFE, PC, papier, carton, verre) ;
 <a href="https://www.petrochemistry.eu/wp-content/uploads/2018/01/PMMA-Eco-profile-EPD-1-15-1.pdf">PlasticsEurope EPD 2015</a>
-pour le PMMA (explicitement cradle-to-gate) ;
+(PMMA) ;
 <a href="https://doi.org/10.1371/journal.pstr.0000080">Ragazzi 2023 (PLOS)</a>
-pour le nitrile et les solvants courants.
+(nitrile, solvants courants).
 </p>
+<p>Formule : <i>quantité × masse unitaire (kg) × facteur matériau (kg CO₂e/kg)</i>,
+appliquée séparément au produit, à l'emballage et au conditionnement.</p>
 
 <p><b>Véhicules et déplacements</b></p>
 <p>
-Les émissions des véhicules sont calculées par : <i>km/jour × nombre de jours × facteur (kg CO₂e/km)</i>.
-Les facteurs sont issus de la base
-<a href="https://apps.labos1point5.org/documentation/carbon/ges-emissions-factors">GES 1point5</a>.
+Formule : <i>km/jour × nombre de jours × facteur (kg CO₂e/km)</i>.
+Facteurs issus de la base <a href="https://apps.labos1point5.org/documentation/carbon/ges-emissions-factors">GES 1point5</a>.
 </p>
 
 <p><b>Machines et équipements électriques</b></p>
 <p>
-Les émissions sont calculées par : <i>consommation (kWh) × facteur électricité (kg CO₂e/kWh)</i>.
+La consommation correspond à la puissance de la machine (kW) multipliée par le temps d'utilisation (h).
+Formule complète : <i>puissance (kW) × temps d'utilisation (h) × facteur électricité (kg CO₂e/kWh)</i>.<br>
 Le facteur dépend du type d'électricité sélectionné (réseau France, mix européen, etc.)
 et est issu de la base GES 1point5.
 </p>
 
 <p><b>Propagation des incertitudes</b></p>
 <p>
-Les incertitudes sont propagées en quadrature (somme des carrés des incertitudes absolues, racine du total).
-Cette approche suppose l'indépendance des sources d'incertitude, ce qui constitue une hypothèse
-conservatrice dans la plupart des cas.
-L'incertitude associée à chaque facteur d'émission est exprimée en fraction relative du facteur
-(ex. : 0.10 = ±10 %).
+Les incertitudes sont propagées en quadrature : racine de la somme des carrés des incertitudes absolues.
+Cette approche suppose l'indépendance des sources d'incertitude.
+Chaque facteur d'émission est associé à une incertitude relative (ex. : 0,10 = ±10 %).
 </p>
 
 <p><b>Affichage des résultats</b></p>
-<p>
-Le récapitulatif affiche trois grandeurs :
-</p>
+<p>Le récapitulatif distingue trois grandeurs :</p>
 <ul>
-  <li><b>Toutes catégories (méthode prix) :</b> total de l'historique, toutes activités confondues, calculé par la méthode prix.</li>
-  <li><b>Consommables (méthode prix) :</b> sous-total des consommables ayant un calcul massique associé, par la méthode prix — permet la comparaison directe avec la ligne suivante.</li>
-  <li><b>Consommables (méthode masse) :</b> sous-total des mêmes consommables, calculé par la méthode masse.</li>
+  <li><b>Toutes catégories (méthode prix) :</b> total de l'historique, toutes activités, méthode prix.</li>
+  <li><b>Consommables (méthode prix) :</b> sous-total des consommables ayant aussi un calcul massique,
+  méthode prix — pour comparaison directe avec la ligne suivante.</li>
+  <li><b>Consommables (méthode masse) :</b> mêmes consommables, méthode physique bottom-up.</li>
 </ul>
+
+<hr>
+
+<p><b>Ce qui n'est pas encore intégré dans le calcul</b></p>
+
+<p><i>1. Correction transport selon l'origine géographique</i></p>
+<p>
+Les facteurs matériaux (méthode masse) sont cradle-to-gate : le transport du fabricant au laboratoire
+n'est pas compté. Or cette contribution peut être significative selon l'origine du produit :
+</p>
+<table border="0" cellspacing="4" style="margin-left:16px;">
+  <tr><td><b>Origine</b></td><td><b>Distance évaluée</b></td><td><b>Mode</b></td><td><b>Facteur officiel (kg CO₂e/t.km)</b></td><td><b>Facteur final (kg CO₂e/kg)</b></td></tr>
+  <tr><td>France</td><td>500 km</td><td>Camion</td><td>0,086</td><td>0,043</td></tr>
+  <tr><td>Europe</td><td>1 500 km</td><td>Camion + ferroviaire</td><td>0,0798</td><td>0,12</td></tr>
+  <tr><td>USA</td><td>8 000 km</td><td>Maritime + camion</td><td>0,00554</td><td>0,18</td></tr>
+  <tr><td>Asie</td><td>20 000 km</td><td>Maritime + camion</td><td>0,00554</td><td>0,35</td></tr>
+  <tr><td>Afrique</td><td>10 000 km</td><td>Maritime + routier</td><td>0,00554</td><td>0,20</td></tr>
+  <tr><td>Europe (express avion)</td><td>1 500 km</td><td>Avion cargo</td><td>1,9</td><td>2,85</td></tr>
+  <tr><td>USA (express avion)</td><td>8 000 km</td><td>Avion cargo</td><td>1,9</td><td>15,2</td></tr>
+  <tr><td>Asie (express avion)</td><td>20 000 km</td><td>Avion cargo</td><td>1,9</td><td>38,0</td></tr>
+  <tr><td>Afrique (express avion)</td><td>10 000 km</td><td>Avion cargo</td><td>1,9</td><td>19,0</td></tr>
+</table>
+<p>
+Sources : ADEME Base Carbone® (routier, ferroviaire, aérien, maritime),
+<a href="https://www.carbone4.com/analyse-faq-fret">Carbone 4</a>,
+<a href="https://www.hellocarbo.com/blog/calculer/bilan-carbone-transport/">HelloCarbo</a>.
+Formule : kg CO₂e/kg = (distance_km × facteur_kg CO₂e/t.km) / 1 000.
+</p>
+<p>
+Pour des cuvettes PMMA (3,75 kg CO₂e/kg), cela représente +3 % (France) à +9 % (Asie par bateau).
+Le fret aérien depuis l'Asie (38 kg CO₂e/kg) dépasse le facteur de fabrication par un facteur ×10 —
+c'est le levier le plus puissant sur le poste transport.
+</p>
+
+<p><i>2. Étape de moulage et injection plastique</i></p>
+<p>
+Les facteurs cradle-to-gate couvrent la résine plastique mais pas la mise en forme (moulage par injection,
+thermoformage). Cette étape ajoute typiquement <b>+0,3 à +0,5 kg CO₂e/kg</b> selon le mix électrique
+utilisé par le transformateur. Elle n'est pas encore intégrée dans la base de données matériaux.
+</p>
+
+<p><i>3. Empreinte carbone du numérique et de l'intelligence artificielle</i></p>
+<p>
+Internet, calculs distribués et modèles d'IA sont devenus omniprésents dans la recherche.
+Cette dimension n'est pas encore intégrée dans LABeCO₂ et constitue un axe de développement futur.
+</p>
+
+<p><i>4. Biomolécules et protéines purifiées</i></p>
+<p>
+Les données disponibles sur l'empreinte carbone des protéines et réactifs biologiques purifiés
+présentent des incertitudes extrêmement élevées (facteurs variant jusqu'à ×10 000 selon les sources).
+Une base de données dédiée, construite collectivement avec les équipes spécialisées, est nécessaire
+avant toute intégration fiable.
+</p>
         """)
         inner.addWidget(text)
         container.setLayout(inner)
@@ -3187,6 +3247,34 @@ Le récapitulatif affiche trois grandeurs :
             <li>
                 <b><a href="https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/safety-briefing-blogs/emea/reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment/safety-briefing_reducing-the-impact-of-disposable-glove-manufacturing-on-the-environment_en.ashx?rev=96e1cea169c54f0b995d5a4c1f2876d0">Ansell - Reducing the impact of disposable glove manufacturing on the environment</a></b><br>
                 Article d'Ansell discutant des mesures pour réduire l'impact environnemental de la fabrication des gants jetables.
+            </li>
+        </ul>
+
+        <p><b>Transport de marchandises :</b></p>
+        <ul>
+            <li>
+                <b><a href="https://prod-basecarbonesolo.ademe-dri.fr/documentation/UPLOAD_DOC_FR/routier.htm">ADEME Base Carbone® — Transport routier marchandises</a></b><br>
+                Facteurs d'émission pour le fret routier (camion), exprimés en kg CO₂e/t.km.
+            </li>
+            <li>
+                <b><a href="https://prod-basecarbonesolo.ademe-dri.fr/documentation/UPLOAD_DOC_FR/ferroviaire.htm">ADEME Base Carbone® — Transport ferroviaire marchandises</a></b><br>
+                Facteurs d'émission pour le fret ferroviaire, exprimés en kg CO₂e/t.km.
+            </li>
+            <li>
+                <b><a href="https://prod-basecarbonesolo.ademe-dri.fr/documentation/UPLOAD_DOC_FR/aerien2.htm">ADEME Base Carbone® — Transport aérien</a></b><br>
+                Facteurs d'émission pour le fret aérien cargo (1,9 kg CO₂e/t.km).
+            </li>
+            <li>
+                <b><a href="https://bilans-ges.ademe.fr/ressources/etapes-dun-bilan-ges">ADEME — Étapes d'un bilan GES</a></b><br>
+                Guide méthodologique ADEME pour la réalisation d'un bilan de gaz à effet de serre.
+            </li>
+            <li>
+                <b><a href="https://www.carbone4.com/analyse-faq-fret">Carbone 4 — FAQ Fret</a></b><br>
+                Analyse et questions fréquentes sur le calcul de l'empreinte carbone du fret.
+            </li>
+            <li>
+                <b><a href="https://www.hellocarbo.com/blog/calculer/bilan-carbone-transport/">HelloCarbo — Bilan carbone transport</a></b><br>
+                Synthèse des facteurs ADEME pour le transport de marchandises.
             </li>
         </ul>
 
