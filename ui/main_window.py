@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
+from shiboken6 import isValid
 
 from ui.data_manager import DataManager
 from ui.carbon_calculator import CarbonCalculator
@@ -190,13 +191,16 @@ class MainWindow(QMainWindow):
         )
         main_layout.addWidget(self.result_area)
 
-        # Label des sources
-        self.sources_label = QLabel("L&#39;ensemble des sources sont à retrouver <a href=\"#\">ici</a>.")
+        # Label des sources et méthodologie
+        self.sources_label = QLabel(
+            "L'ensemble des sources sont à retrouver <a href=\"sources\">ici</a>. "
+            "La méthodologie de calcul est documentée <a href=\"methodo\">ici</a>."
+        )
         self.sources_label.setTextFormat(Qt.RichText)
         self.sources_label.setOpenExternalLinks(False)
         self.sources_label.setTextInteractionFlags(Qt.TextBrowserInteraction | Qt.LinksAccessibleByMouse)
         self.sources_label.setAlignment(Qt.AlignCenter)
-        self.sources_label.linkActivated.connect(self.show_sources_popup)
+        self.sources_label.linkActivated.connect(self._on_footer_link)
         main_layout.addWidget(self.sources_label)
 
         scroll_area = QScrollArea()
@@ -2941,6 +2945,9 @@ class MainWindow(QMainWindow):
 
         # Récupère la fenêtre existante pour ce type de graphique (si elle existe déjà).
         window = getattr(self, window_attr, None)
+        if window is not None and not isValid(window):
+            setattr(self, window_attr, None)
+            window = None
 
         if window is None:  # Si la fenêtre n'existe pas encore :
             # Dictionnaire associant chaque type de graphique à sa classe correspondante.
@@ -2964,16 +2971,10 @@ class MainWindow(QMainWindow):
             # Crée une nouvelle instance de la fenêtre pour le type de graphique spécifié.
             window = window_class(self)
 
-            # Rafraîchit automatiquement le graphique dès que les données changent.
-            self.data_changed.connect(window.refresh_data)
-
-            # À la fermeture : déconnecte le signal et remet l'attribut à None.
-            def _on_finished(attr=window_attr, w=window):
-                try:
-                    self.data_changed.disconnect(w.refresh_data)
-                except RuntimeError:
-                    pass
-                setattr(self, attr, None)
+            # finished(int) transmet un code de fermeture : il ne doit pas remplacer window_attr.
+            def _on_finished(_result=None, attr=window_attr, w=window):
+                if getattr(self, attr, None) is w:
+                    setattr(self, attr, None)
 
             window.finished.connect(_on_finished)
 
@@ -3011,6 +3012,124 @@ class MainWindow(QMainWindow):
 
     def generate_coverage_category_chart(self):
         self.generate_chart('coverage_category')
+
+    def _on_footer_link(self, href):
+        if href == "methodo":
+            self.show_methodology_popup()
+        else:
+            self.show_sources_popup(href)
+
+    def show_methodology_popup(self):
+        """Affiche la fenêtre de documentation méthodologique."""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QScrollArea, QWidget
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Méthodologie de calcul")
+        dialog.setModal(True)
+        dialog.resize(620, 520)
+
+        outer = QVBoxLayout(dialog)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        inner = QVBoxLayout(container)
+
+        text = QLabel()
+        text.setTextFormat(Qt.RichText)
+        text.setOpenExternalLinks(True)
+        text.setWordWrap(True)
+        text.setText("""
+<p><b>Périmètre général</b></p>
+<p>
+LABeCO₂ calcule l'empreinte carbone d'activités de recherche à l'échelle individuelle ou d'un projet expérimental.
+Le périmètre couvre les postes directement liés à la production scientifique : consommables, réactifs,
+déplacements professionnels, machines et équipements électriques.
+Les infrastructures mutualisées (bâtiments, climatisation, réseau) ne sont pas incluses dans ce périmètre.
+</p>
+
+<p><b>Deux méthodes de calcul pour les consommables</b></p>
+<p>
+Pour les achats de consommables identifiés par un code NACRES, l'application propose deux approches complémentaires :
+</p>
+<ul>
+  <li>
+    <b>Méthode prix</b> : le facteur d'émission (kg CO₂e/€) est issu de la base
+    <a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">PER1p5 (Labos 1point5)</a>,
+    qui associe chaque code NACRES à un facteur macro ou méso-économique.
+    L'émission est obtenue par : <i>dépense (€) × facteur (kg CO₂e/€)</i>.
+    Cette méthode couvre tous les consommables disposant d'un code NACRES, même sans données massiques.
+  </li>
+  <li>
+    <b>Méthode masse</b> : l'émission est calculée à partir des masses unitaires (produit, emballage,
+    conditionnement) et des facteurs d'émission par matériau (kg CO₂e/kg).
+    L'émission est obtenue par : <i>quantité × masse unitaire (kg) × facteur matériau (kg CO₂e/kg)</i>.
+    Cette méthode est plus précise mais nécessite des données massiques renseignées dans la base.
+  </li>
+</ul>
+
+<p><b>Périmètre des facteurs matériaux : cradle-to-gate</b></p>
+<p>
+Les facteurs d'émission par matériau (kg CO₂e/kg) utilisés dans la méthode masse couvrent
+la production du matériau depuis l'extraction des matières premières jusqu'à la sortie d'usine
+(<i>cradle-to-gate</i>).
+<b>Le transport entre le fabricant et le laboratoire n'est pas inclus.</b>
+Pour des consommables produits en Europe, cette contribution est typiquement négligeable (quelques %).
+Pour des réactifs ou matériaux fabriqués en Asie, elle peut représenter 5 à 15 % supplémentaires
+selon le mode de transport.
+</p>
+<p>Sources des facteurs matériaux :
+<a href="https://base-empreinte.ademe.fr/">Base Empreinte® (ADEME)</a> pour la majorité des plastiques,
+papier, carton et verre ;
+<a href="https://www.petrochemistry.eu/wp-content/uploads/2018/01/PMMA-Eco-profile-EPD-1-15-1.pdf">PlasticsEurope EPD 2015</a>
+pour le PMMA (explicitement cradle-to-gate) ;
+<a href="https://doi.org/10.1371/journal.pstr.0000080">Ragazzi 2023 (PLOS)</a>
+pour le nitrile et les solvants courants.
+</p>
+
+<p><b>Véhicules et déplacements</b></p>
+<p>
+Les émissions des véhicules sont calculées par : <i>km/jour × nombre de jours × facteur (kg CO₂e/km)</i>.
+Les facteurs sont issus de la base
+<a href="https://apps.labos1point5.org/documentation/carbon/ges-emissions-factors">GES 1point5</a>.
+</p>
+
+<p><b>Machines et équipements électriques</b></p>
+<p>
+Les émissions sont calculées par : <i>consommation (kWh) × facteur électricité (kg CO₂e/kWh)</i>.
+Le facteur dépend du type d'électricité sélectionné (réseau France, mix européen, etc.)
+et est issu de la base GES 1point5.
+</p>
+
+<p><b>Propagation des incertitudes</b></p>
+<p>
+Les incertitudes sont propagées en quadrature (somme des carrés des incertitudes absolues, racine du total).
+Cette approche suppose l'indépendance des sources d'incertitude, ce qui constitue une hypothèse
+conservatrice dans la plupart des cas.
+L'incertitude associée à chaque facteur d'émission est exprimée en fraction relative du facteur
+(ex. : 0.10 = ±10 %).
+</p>
+
+<p><b>Affichage des résultats</b></p>
+<p>
+Le récapitulatif affiche trois grandeurs :
+</p>
+<ul>
+  <li><b>Toutes catégories (méthode prix) :</b> total de l'historique, toutes activités confondues, calculé par la méthode prix.</li>
+  <li><b>Consommables (méthode prix) :</b> sous-total des consommables ayant un calcul massique associé, par la méthode prix — permet la comparaison directe avec la ligne suivante.</li>
+  <li><b>Consommables (méthode masse) :</b> sous-total des mêmes consommables, calculé par la méthode masse.</li>
+</ul>
+        """)
+        inner.addWidget(text)
+        container.setLayout(inner)
+        scroll.setWidget(container)
+        outer.addWidget(scroll)
+
+        close_button = QPushButton("Fermer")
+        close_button.clicked.connect(dialog.close)
+        outer.addWidget(close_button)
+
+        dialog.exec()
 
     def show_sources_popup(self, _link_str):
         """
