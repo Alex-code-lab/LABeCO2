@@ -19,6 +19,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 # Exemple : si vous avez ce module de couleurs
 from utils.color_utils import generate_color_shades
+from ui.charts.history_utils import iter_history_data
 
 
 class NacresBarChartWindow(QDialog):
@@ -78,12 +79,7 @@ class NacresBarChartWindow(QDialog):
         # Récupération des données : 'emissions_price' et erreurs associées
         nacres_dict = {}
         nacres_errors = {}
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if not data:
-                continue
-
+        for data in iter_history_data(self.main_window.history_list):
             code_nacres = data.get('code_nacres', 'NA')
             category = data.get('category', '')
             quantity = data.get('quantity', 0)

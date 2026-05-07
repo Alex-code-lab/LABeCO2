@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt  # Constantes Qt, comme Qt.WA_DeleteOnClose
 from matplotlib.figure import Figure  # Représente une figure Matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas  # Intègre une figure Matplotlib dans une application Qt
 from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades  # Utilitaires personnalisés pour gérer les couleurs et catégories
+from ui.charts.history_utils import iter_history_data
 
 
 class BarChartWindow(QDialog):
@@ -95,14 +96,11 @@ class BarChartWindow(QDialog):
         errors = []  # Liste des erreurs associées
 
         # Parcourt l'historique des calculs dans la fenêtre principale
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)  # Récupère les données de l'élément
-            if data:
-                categories.append(data.get('category', ''))  # Ajoute la catégorie
-                subcategories.append(data.get('subcategory', ''))  # Ajoute la sous-catégorie
-                emissions.append(data.get('emissions_price', 0))  # Ajoute les émissions
-                errors.append(data.get('emissions_price_error', 0))  # Ajoute les erreurs
+        for data in iter_history_data(self.main_window.history_list):
+            categories.append(data.get('category', ''))  # Ajoute la catégorie
+            subcategories.append(data.get('subcategory', ''))  # Ajoute la sous-catégorie
+            emissions.append(data.get('emissions_price', 0))  # Ajoute les émissions
+            errors.append(data.get('emissions_price_error', 0))  # Ajoute les erreurs
 
         # Agrège les émissions par catégorie et sous-catégorie
         subcategory_emissions = {}

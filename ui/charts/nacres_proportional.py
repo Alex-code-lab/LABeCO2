@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from utils.color_utils import generate_color_shades
+from ui.charts.history_utils import iter_history_data
 
 
 class ProportionalBarChartNacresWindow(QDialog):
@@ -84,17 +85,14 @@ class ProportionalBarChartNacresWindow(QDialog):
         errors = []
 
         # Extraction des données depuis l'historique
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if data:
-                code_nacres = data.get('code_nacres', 'NA')
-                emission = data.get('emission_mass', 0)
-                error = data.get('emission_mass_error', 0)
-                if code_nacres != 'NA':  # On filtre les codes NACRES valides
-                    nacres_codes.append(code_nacres[:4])  # Garde les 4 premiers caractères
-                    emissions.append(emission)
-                    errors.append(error)
+        for data in iter_history_data(self.main_window.history_list):
+            code_nacres = data.get('code_nacres', 'NA')
+            emission = data.get('emission_mass', 0)
+            error = data.get('emission_mass_error', 0)
+            if code_nacres != 'NA':  # On filtre les codes NACRES valides
+                nacres_codes.append(code_nacres[:4])  # Garde les 4 premiers caractères
+                emissions.append(emission)
+                errors.append(error)
 
         # Agrégation des données par code NACRES
         aggregated_emissions = {}

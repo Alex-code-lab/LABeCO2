@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from ui.charts.history_utils import iter_history_data
 
 
 class CoverageWindow(QDialog):
@@ -88,13 +89,7 @@ class CoverageWindow(QDialog):
         proxy = 0.0
         uncovered = 0.0
 
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-
-            if not data:
-                continue
-
+        for data in iter_history_data(self.main_window.history_list):
             emission_mass = float(data.get("emission_mass", 0.0) or 0.0)
             emission_price = float(data.get("emissions_price", 0.0) or 0.0)
 

@@ -319,9 +319,9 @@ class MainWindow(QMainWindow):
         self.graph_buttons_container.setVisible(checked)
         if self.toggle_graph_buttons_button is not None:
             if checked:
-                self.toggle_graph_buttons_button.setText("Masquer les options graphiques")
+                self.toggle_graph_buttons_button.setText("▲ Masquer les options graphiques")
             else:
-                self.toggle_graph_buttons_button.setText("Afficher les options graphiques")
+                self.toggle_graph_buttons_button.setText("▼ Afficher les options graphiques")
 
     def initUICategorySelectors(self, main_layout):
         """
@@ -623,15 +623,17 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.history_list)
 
         self.delete_button = QPushButton('Supprimer le(s) calcul(s) sélectionné(s)')
+        self.delete_button.setEnabled(False)
         self.modify_button = QPushButton('Modifier le calcul sélectionné')
+        self.modify_button.setEnabled(False)
 
         calc_buttons_layout = QHBoxLayout()
         calc_buttons_layout.setSpacing(1)
         calc_buttons_layout.addWidget(self.delete_button)
         calc_buttons_layout.addWidget(self.modify_button)
 
-        self.export_button = QPushButton('Exporter les données')
-        self.import_button = QPushButton('Importer les données')
+        self.export_button = QPushButton('Exporter le bilan calculé')
+        self.import_button = QPushButton('Importer un bilan')
 
         export_import_layout = QHBoxLayout()
         export_import_layout.setSpacing(0)
@@ -650,20 +652,45 @@ class MainWindow(QMainWindow):
         main_layout.addSpacing(5)
 
     def initUIGraphButtons(self, main_layout):
-        graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
-        main_layout.addWidget(graph_summary_label)
-
-        self.toggle_graph_buttons_button = QPushButton("Afficher les options graphiques")
+        self.toggle_graph_buttons_button = QPushButton("▼ Afficher les options graphiques")
         self.toggle_graph_buttons_button.setCheckable(True)
         self.toggle_graph_buttons_button.setChecked(False)
         self.toggle_graph_buttons_button.setToolTip("Afficher ou masquer les boutons de graphiques.")
+        self.toggle_graph_buttons_button.setStyleSheet("""
+            QPushButton {
+                background-color: #eef7f2;
+                color: #14532d;
+                border: 1px solid #bbdfc8;
+                border-radius: 5px;
+                padding: 6px 10px;
+                font-weight: 600;
+                text-align: left;
+            }
+            QPushButton:hover { background-color: #e2f1e8; }
+            QPushButton:checked {
+                background-color: #e8f2fb;
+                border-color: #b6d4ec;
+                color: #17415f;
+            }
+        """)
         main_layout.addWidget(self.toggle_graph_buttons_button)
 
         self.graph_buttons_container = QWidget()
+        self.graph_buttons_container.setObjectName("graphButtonsContainer")
         graph_buttons_layout = QVBoxLayout()
-        graph_buttons_layout.setContentsMargins(0, 6, 0, 0)
-        graph_buttons_layout.setSpacing(4)
+        graph_buttons_layout.setContentsMargins(12, 10, 12, 10)
+        graph_buttons_layout.setSpacing(6)
         self.graph_buttons_container.setLayout(graph_buttons_layout)
+        self.graph_buttons_container.setStyleSheet(
+            "#graphButtonsContainer { background-color: #f4f9f6; border: 1px solid #d5eadc; "
+            "border-radius: 6px; }"
+            "#graphButtonsContainer QLabel { border: none; background: transparent; }"
+            "QPushButton { background-color: #ffffff; }"
+        )
+
+        graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
+        graph_summary_label.setStyleSheet("border: none; background: transparent;")
+        graph_buttons_layout.addWidget(graph_summary_label)
 
         _HEADER_FIRST = (
             "font-weight: 700; font-size: 13px; color: #374151;"
@@ -815,7 +842,11 @@ class MainWindow(QMainWindow):
 
         self.history_list.model().rowsInserted.connect(self._update_graph_buttons_state)
         self.history_list.model().rowsRemoved.connect(self._update_graph_buttons_state)
+        self.history_list.model().rowsInserted.connect(self._update_history_buttons_state)
+        self.history_list.model().rowsRemoved.connect(self._update_history_buttons_state)
+        self.history_list.selectionModel().selectionChanged.connect(self._update_history_buttons_state)
         self._update_graph_buttons_state()
+        self._update_history_buttons_state()
 
     # ------------------------------------------------------------------
     # Helpers d'affichage et de sélection
@@ -925,6 +956,58 @@ class MainWindow(QMainWindow):
             if mask.any():
                 return clean_text(self.data_liquides.loc[mask, self.data_manager.CODE_NACRES_COL].iloc[0])
         return ""
+
+    def _set_consumable_controls_visible(self, visible, clear_selection=False):
+        """
+        Affiche ou masque toute la zone spécifique aux consommables.
+
+        On garde ce nettoyage centralisé pour éviter de laisser visibles le prix
+        unitaire ou les avertissements de masse après un changement de catégorie.
+        """
+        for widget in (
+            self.conso_filtered_label,
+            self.conso_filtered_combo,
+            self.conso_search_label,
+            self.conso_search_field,
+            self.quantity_label,
+            self.quantity_input,
+            self.prix_unitaire_label,
+            self.prix_info_button,
+            self.masse_manquante_label,
+            self.consumable_actions_widget,
+            self.manage_consumables_button,
+            self.add_consumable_button,
+        ):
+            if widget is not None:
+                widget.setVisible(visible)
+
+        if visible:
+            self.update_manage_consumable_button_state()
+            return
+
+        if self.conso_filtered_combo is not None and clear_selection:
+            self.conso_filtered_combo.blockSignals(True)
+            self.conso_filtered_combo.clear()
+            self.conso_filtered_combo.addItem("non renseignée")
+            self.conso_filtered_combo.blockSignals(False)
+
+        if self.conso_search_field is not None and clear_selection:
+            self.conso_search_field.blockSignals(True)
+            self.conso_search_field.clear()
+            self.conso_search_field.blockSignals(False)
+        if self.quantity_input is not None and clear_selection:
+            self.quantity_input.blockSignals(True)
+            self.quantity_input.clear()
+            self.quantity_input.blockSignals(False)
+
+        self._current_prix_unitaire = None
+        self._current_prix_unitaire_info_text = ""
+        if self.prix_unitaire_label is not None:
+            self.prix_unitaire_label.setToolTip("")
+        if self.masse_manquante_label is not None:
+            self.masse_manquante_label.setText("")
+        if self.manage_consumables_button is not None:
+            self.manage_consumables_button.setEnabled(False)
     # ------------------------------------------------------------------
     # Fonctions pour gérer filtres & masques
     # ------------------------------------------------------------------
@@ -1242,19 +1325,7 @@ class MainWindow(QMainWindow):
             self.machine_group.setVisible(True)
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             # Masquer les contrôles liés aux consommables
-            self.manage_consumables_button.setVisible(False)
-            self.manage_consumables_button.setEnabled(False)
-            self.conso_filtered_label.setVisible(False)
-            self.conso_filtered_combo.setVisible(False)
-            self.conso_search_label.setVisible(False)
-            self.conso_search_field.setVisible(False)
-            self.quantity_label.setVisible(False)
-            self.quantity_input.setVisible(False)
-            self._current_prix_unitaire = None
-            self._current_prix_unitaire_info_text = ""
-            self.prix_unitaire_label.setToolTip("")
-            self.prix_unitaire_label.setVisible(False)
-            self.prix_info_button.setVisible(False)
+            self._set_consumable_controls_visible(False, clear_selection=True)
         else:
             # Afficher les éléments standards
             self.subcategory_label.setVisible(True)
@@ -1270,14 +1341,10 @@ class MainWindow(QMainWindow):
             # Masquer la section Machine
             self.machine_group.setVisible(False)
             self.machine_group.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-            # Afficher ou masquer le bouton "Gestion des Consommables" pour 'Achats'
+            # Le bloc consommable est affiché plus bas seulement pour Achats / Consommables.
             if category == 'Achats':
-                self.manage_consumables_button.setVisible(True)
-                self.update_manage_consumable_button_state()
                 self.subsub_name_label.setText('Code NACRES :')
             else:
-                self.manage_consumables_button.setVisible(False)
-                self.manage_consumables_button.setEnabled(False)
                 self.subsub_name_label.setText('Nom :')
             # Pour "Véhicules", afficher le champ "Nombre de jours"
             if category == 'Véhicules':
@@ -1305,7 +1372,12 @@ class MainWindow(QMainWindow):
     def update_manage_consumable_button_state(self):
         if not hasattr(self, "manage_consumables_button"):
             return
-        self.manage_consumables_button.setEnabled(self.has_selected_consumable())
+        can_manage = (
+            self.consumable_actions_widget is not None
+            and self.consumable_actions_widget.isVisible()
+            and self.has_selected_consumable()
+        )
+        self.manage_consumables_button.setEnabled(can_manage)
 
     def update_nacres_visibility(self):
         """
@@ -1320,20 +1392,17 @@ class MainWindow(QMainWindow):
 
         if category == 'Achats' and subcat and is_consumables_subcategory(subcat):
             # On affiche la zone NACRES
-            self.conso_filtered_label.setVisible(True)
-            self.conso_filtered_combo.setVisible(True)
-            self.conso_search_label.setVisible(True)
-            self.conso_search_field.setVisible(True)
+            self._set_consumable_controls_visible(True)
+            self.quantity_label.setVisible(False)
+            self.quantity_input.setVisible(False)
+            self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
+            self.masse_manquante_label.setVisible(False)
             # On met à jour la liste des consommables
             self.update_conso_filtered_combo()
         else:
-            # On masque la zone NACRES (et quantité)
-            self.conso_filtered_label.setVisible(False)
-            self.conso_filtered_combo.setVisible(False)
-            self.conso_search_label.setVisible(False)
-            self.conso_search_field.setVisible(False)
-            self.quantity_label.setVisible(False)
-            self.quantity_input.setVisible(False)
+            # On masque toute la zone consommables, y compris prix et masse.
+            self._set_consumable_controls_visible(False, clear_selection=True)
         self.update_manage_consumable_button_state()
 
     def update_subsubcategory_names(self):
@@ -1509,6 +1578,12 @@ class MainWindow(QMainWindow):
             self.conso_filtered_combo.blockSignals(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.prix_unitaire_label.setToolTip("")
+            self.prix_unitaire_label.setVisible(False)
+            self.prix_info_button.setVisible(False)
+            self.masse_manquante_label.setVisible(False)
+            self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
             self.update_manage_consumable_button_state()
             return
 
@@ -1768,6 +1843,13 @@ class MainWindow(QMainWindow):
         ):
             if btn is not None:
                 btn.setEnabled(has_data)
+
+    def _update_history_buttons_state(self, *_):
+        if self.history_list is None or self.delete_button is None or self.modify_button is None:
+            return
+        has_selection = bool(self.history_list.selectionModel().selectedRows())
+        self.delete_button.setEnabled(has_selection)
+        self.modify_button.setEnabled(has_selection)
 
     def _set_indicator(self, label, ok):
         if label is None:
@@ -2540,10 +2622,27 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un ou plusieurs calculs à supprimer.")
             return
 
+        count = len(selected_rows)
+        message = (
+            "Supprimer le calcul sélectionné ?"
+            if count == 1
+            else f"Supprimer les {count} calculs sélectionnés ?"
+        )
+        reply = QMessageBox.question(
+            self,
+            "Confirmer la suppression",
+            message,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
         for row in selected_rows:
             self.history_list.removeRow(row)
 
         self.update_total_emissions()
+        self._update_history_buttons_state()
         self.data_changed.emit()
 
     def export_data(self):

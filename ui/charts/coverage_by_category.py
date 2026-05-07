@@ -16,6 +16,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 from utils.color_utils import CATEGORY_ORDER
+from ui.charts.history_utils import iter_history_data
 
 
 class CoverageCategoryWindow(QDialog):
@@ -81,12 +82,7 @@ class CoverageCategoryWindow(QDialog):
             for cat in CATEGORY_ORDER
         }
 
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if not data:
-                continue
-
+        for data in iter_history_data(self.main_window.history_list):
             category = data.get("category", "")
             if category not in coverage:
                 continue

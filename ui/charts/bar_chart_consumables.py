@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from ui.charts.history_utils import iter_history_data
 
 class StackedBarConsumablesWindow(QDialog):
     """
@@ -115,12 +116,7 @@ class StackedBarConsumablesWindow(QDialog):
         self.nacres_data = {}
 
         # Parcourt l'historique pour récupérer les consommables
-        for i in range(parent.history_list.count()):
-            item = parent.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if not data:
-                continue
-
+        for data in iter_history_data(parent.history_list):
             category = data.get('category', '')
             subcat = data.get('subcategory', '')
             quantity = data.get('quantity', 0)

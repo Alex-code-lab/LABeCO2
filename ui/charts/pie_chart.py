@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades
+from ui.charts.history_utils import iter_history_data
 
 
 
@@ -125,13 +126,10 @@ class PieChartWindow(QDialog):
         emissions = []
 
         # Parcours de l'historique des calculs dans la fenêtre principale
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if data:
-                # On récupère la catégorie et les émissions associées
-                categories.append(data.get('category', ''))
-                emissions.append(data.get('emissions_price', 0))
+        for data in iter_history_data(self.main_window.history_list):
+            # On récupère la catégorie et les émissions associées
+            categories.append(data.get('category', ''))
+            emissions.append(data.get('emissions_price', 0))
 
         # Agrégation des émissions par catégorie
         category_emissions = {}

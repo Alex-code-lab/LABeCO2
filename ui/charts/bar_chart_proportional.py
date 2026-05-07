@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades
+from ui.charts.history_utils import iter_history_data
 
 
 class ProportionalBarChartWindow(QDialog):
@@ -90,18 +91,15 @@ class ProportionalBarChartWindow(QDialog):
         errors = []  # Liste des erreurs associées
 
         # Récupération des informations depuis l'historique
-        for i in range(self.main_window.history_list.count()):
-            item = self.main_window.history_list.item(i)
-            data = item.data(Qt.UserRole)
-            if data:
-                category = data.get('category', '')
-                subcategory = data.get('subcategory', '')
-                emission = data.get('emissions_price', 0)
-                error = data.get('emissions_price_error', 0)
-                categories.append(category)
-                subcategories.append(subcategory)
-                emissions.append(emission)
-                errors.append(error)
+        for data in iter_history_data(self.main_window.history_list):
+            category = data.get('category', '')
+            subcategory = data.get('subcategory', '')
+            emission = data.get('emissions_price', 0)
+            error = data.get('emissions_price_error', 0)
+            categories.append(category)
+            subcategories.append(subcategory)
+            emissions.append(emission)
+            errors.append(error)
 
         # Agrégation des émissions par catégorie et sous-catégorie
         subcategory_emissions = {}
