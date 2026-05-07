@@ -178,7 +178,7 @@ class DataManager:
         """
         code_clean = clean_text(code_nacres).upper()
         if not code_clean:
-            return series.astype(str).str.len() < 0
+            return pd.Series(False, index=series.index)
 
         clean_series = series.fillna("").astype(str).str.strip().str.upper()
         mask = clean_series == code_clean

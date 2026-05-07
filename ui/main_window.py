@@ -176,7 +176,18 @@ class MainWindow(QMainWindow):
         self.initUIGraphButtons(main_layout)
 
         # Label de résultat
-        self.result_area = QLabel("Total des émissions : 0.0000 kg CO₂e")
+        self.result_area = QLabel()
+        self.result_area.setWordWrap(True)
+        self.result_area.setTextFormat(Qt.RichText)
+        self.result_area.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._result_show_ok(
+            "<b>Toutes catégories (méthode prix) :</b> 0.0000 "
+            "<span style='color:#6b9e7a; font-size:11px'>± 0.0000</span> kg CO₂e<br>"
+            "<b>Consommables (méthode prix) :</b> 0.0000 "
+            "<span style='color:#6b9e7a; font-size:11px'>± 0.0000</span> kg CO₂e<br>"
+            "<b>Consommables (méthode masse) :</b> 0.0000 "
+            "<span style='color:#6b9e7a; font-size:11px'>± 0.0000</span> kg CO₂e"
+        )
         main_layout.addWidget(self.result_area)
 
         # Label des sources
@@ -271,10 +282,31 @@ class MainWindow(QMainWindow):
         self.header_label.setOpenExternalLinks(False)
         main_layout.addWidget(self.header_label)
 
-        self.add_calcul_button = QPushButton("Ajouter un calcul")
-        self.add_manip_button = QPushButton("Ajouter une manip type")
+        self.add_calcul_button = QPushButton("▼ Ajouter un calcul")
+        self.add_manip_button = QPushButton("▼ Ajouter une manip type")
+        self.add_calcul_button.setCheckable(True)
+        self.add_manip_button.setCheckable(True)
         self.add_calcul_button.setFixedHeight(40)
         self.add_manip_button.setFixedHeight(40)
+        collapsible_button_style = """
+            QPushButton {
+                background-color: #f5faf7;
+                color: #14532d;
+                border: 1px solid #cfe8d8;
+                border-radius: 5px;
+                padding: 7px 10px;
+                font-weight: 600;
+                text-align: left;
+            }
+            QPushButton:hover { background-color: #edf7f1; }
+            QPushButton:checked {
+                background-color: #e8f2fb;
+                border-color: #b6d4ec;
+                color: #17415f;
+            }
+        """
+        self.add_calcul_button.setStyleSheet(collapsible_button_style)
+        self.add_manip_button.setStyleSheet(collapsible_button_style)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.add_calcul_button)
@@ -322,6 +354,49 @@ class MainWindow(QMainWindow):
                 self.toggle_graph_buttons_button.setText("▲ Masquer les options graphiques")
             else:
                 self.toggle_graph_buttons_button.setText("▼ Afficher les options graphiques")
+
+    def _set_manip_type_controls_visible(self, visible):
+        self.manip_type_label.setVisible(visible)
+        self.manip_type_combo.setVisible(visible)
+        self.add_manip_type_button.setVisible(visible)
+        self.update_delete_manip_button()
+
+    def _set_button_checked_safely(self, button, checked):
+        button.blockSignals(True)
+        button.setChecked(checked)
+        button.blockSignals(False)
+
+    def _update_add_section_button_texts(self):
+        if self.add_calcul_button is not None:
+            if self.add_calcul_button.isChecked():
+                self.add_calcul_button.setText("▲ Masquer l'ajout d'un calcul")
+            else:
+                self.add_calcul_button.setText("▼ Ajouter un calcul")
+        if self.add_manip_button is not None:
+            if self.add_manip_button.isChecked():
+                self.add_manip_button.setText("▲ Masquer les manips type")
+            else:
+                self.add_manip_button.setText("▼ Ajouter une manip type")
+
+    def toggle_calcul_section(self, checked):
+        if checked:
+            self._set_button_checked_safely(self.add_manip_button, False)
+            self._set_manip_type_controls_visible(False)
+            self.show_calcul_section()
+        else:
+            self.existing_group.setVisible(False)
+            self.machine_group.setVisible(False)
+        self._update_add_section_button_texts()
+
+    def toggle_manip_type_section(self, checked):
+        if checked:
+            self._set_button_checked_safely(self.add_calcul_button, False)
+            self.existing_group.setVisible(False)
+            self.machine_group.setVisible(False)
+            self.show_manip_type_section()
+        else:
+            self._set_manip_type_controls_visible(False)
+        self._update_add_section_button_texts()
 
     def initUICategorySelectors(self, main_layout):
         """
@@ -789,7 +864,7 @@ class MainWindow(QMainWindow):
         """
         self.header_label.linkActivated.connect(self.toggle_text_display)
         self.toggle_graph_buttons_button.toggled.connect(self.toggle_graph_buttons_section)
-        self.add_calcul_button.clicked.connect(self.show_calcul_section)
+        self.add_calcul_button.toggled.connect(self.toggle_calcul_section)
 
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
@@ -811,7 +886,7 @@ class MainWindow(QMainWindow):
         self.export_button.clicked.connect(self.export_data)
         self.import_button.clicked.connect(self.import_data)
         self.create_user_manip_button.clicked.connect(self.define_user_manip_from_history)
-        self.add_manip_button.clicked.connect(self.show_manip_type_section)
+        self.add_manip_button.toggled.connect(self.toggle_manip_type_section)
 
         self.generate_pie_button.clicked.connect(self.generate_pie_chart)
         self.generate_bar_button.clicked.connect(self.generate_bar_chart)
@@ -1016,11 +1091,7 @@ class MainWindow(QMainWindow):
         # Ne pas retirer le widget du layout, simplement le masquer
         self.existing_group.setVisible(False)
         self.machine_group.setVisible(False)
-        
-        self.manip_type_label.setVisible(True)
-        self.manip_type_combo.setVisible(True)
-        self.add_manip_type_button.setVisible(True)
-        self.update_delete_manip_button()
+        self._set_manip_type_controls_visible(True)
 
     def show_calcul_section(self):
         """
@@ -1029,10 +1100,7 @@ class MainWindow(QMainWindow):
         """
         current_category = self.category_combo.currentText()
         # Masquer les contrôles des manip types
-        self.manip_type_label.setVisible(False)
-        self.manip_type_combo.setVisible(False)
-        self.add_manip_type_button.setVisible(False)
-        self.delete_manip_type_button.setVisible(False)
+        self._set_manip_type_controls_visible(False)
 
         if current_category == "Machine":
             # Pour Machine, on affiche la section Machine et on masque la zone standard
@@ -1044,8 +1112,8 @@ class MainWindow(QMainWindow):
             self.machine_group.setVisible(False)
         self.category_combo.setEnabled(True)
         self.subcategory_combo.setEnabled(True)
-        self.existing_group.setVisible(True)
-        self.existing_group.adjustSize()
+        if self.existing_group.isVisible():
+            self.existing_group.adjustSize()
         self._update_field_indicators()
 
     def calculate_emission_for_item(self, item_data: dict) -> dict:
@@ -1306,6 +1374,10 @@ class MainWindow(QMainWindow):
         Pour les autres catégories, on affiche les contrôles standards et on masque la section Machine.
         """
         category = self.category_combo.currentText()
+        calc_section_open = (
+            self.add_calcul_button is not None
+            and self.add_calcul_button.isChecked()
+        )
 
         if category == 'Machine':
             # Masquer les éléments standards
@@ -1322,7 +1394,7 @@ class MainWindow(QMainWindow):
             self.days_field.setVisible(False)
             self.calculate_button.setVisible(False)
             # Afficher la section Machine
-            self.machine_group.setVisible(True)
+            self.machine_group.setVisible(calc_section_open)
             self.machine_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             # Masquer les contrôles liés aux consommables
             self._set_consumable_controls_visible(False, clear_selection=True)
@@ -1360,6 +1432,8 @@ class MainWindow(QMainWindow):
             self._populate_subcategory_combo(subcats.astype(str))
             self.update_subsubcategory_names()
             self.update_nacres_visibility()
+        self.existing_group.setVisible(calc_section_open and category != 'Machine')
+        self.machine_group.setVisible(calc_section_open and category == 'Machine')
         self._update_category_color()
         self.update_manage_consumable_button_state()
         self._update_field_indicators()
@@ -1847,9 +1921,33 @@ class MainWindow(QMainWindow):
     def _update_history_buttons_state(self, *_):
         if self.history_list is None or self.delete_button is None or self.modify_button is None:
             return
+        has_rows = self.history_list.rowCount() > 0
         has_selection = bool(self.history_list.selectionModel().selectedRows())
         self.delete_button.setEnabled(has_selection)
         self.modify_button.setEnabled(has_selection)
+        if self.create_user_manip_button is not None:
+            self.create_user_manip_button.setEnabled(has_rows)
+
+    _STYLE_RESULT_OK = (
+        "QLabel { background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 6px;"
+        " padding: 8px 12px; font-size: 12px; color: #166534; font-weight: 500; }"
+    )
+    _STYLE_RESULT_ERR = (
+        "QLabel { background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px;"
+        " padding: 8px 12px; font-size: 12px; color: #991b1b; font-weight: 500; }"
+    )
+
+    def _result_show_ok(self, html):
+        if self.result_area is None:
+            return
+        self.result_area.setStyleSheet(self._STYLE_RESULT_OK)
+        self.result_area.setText(html)
+
+    def _result_show_error(self, text):
+        if self.result_area is None:
+            return
+        self.result_area.setStyleSheet(self._STYLE_RESULT_ERR)
+        self.result_area.setText(text)
 
     def _set_indicator(self, label, ok):
         if label is None:
@@ -2284,7 +2382,7 @@ class MainWindow(QMainWindow):
         # Appel unifié
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
         if msg:
-            self.result_area.setText(msg)
+            self._result_show_error(msg)
             return
 
         new_data = {
@@ -2344,7 +2442,7 @@ class MainWindow(QMainWindow):
             # et modified_data['days'] = days.
             ep, ep_err, em, em_err, tm, msg_price = self.carbon_calculator.compute_emission_data(modified_data)
             if msg_price:
-                self.result_area.setText(msg_price)
+                self._result_show_error(msg_price)
                 return
 
             # On met à jour les champs
@@ -2412,13 +2510,17 @@ class MainWindow(QMainWindow):
         mass_price_err = math.sqrt(total_mass_price_err_sq)
         mass_err = math.sqrt(total_mass_err_sq)
 
-        # Finalement, on met tout dans self.result_area
-        # => 3 lignes
-        self.result_area.setText(
-            f"1) Total des émissions (prix) [tous items] : {total_all_price:.4f} ± {all_price_err:.4f} kg CO₂e\n"
-            f"2) Émissions (prix) [items massiques] : {total_mass_price:.4f} ± {mass_price_err:.4f} kg CO₂e\n"
-            f"3) Émissions massiques : {total_mass:.4f} ± {mass_err:.4f} kg CO₂e"
-        )
+        def _fmt(label, val, err):
+            return (
+                f"<b>{label} :</b> {val:.4f} "
+                f"<span style='color:#6b9e7a; font-size:11px'>± {err:.4f}</span> kg CO₂e"
+            )
+
+        self._result_show_ok("<br>".join([
+            _fmt("Toutes catégories (méthode prix)", total_all_price, all_price_err),
+            _fmt("Consommables (méthode prix)", total_mass_price, mass_price_err),
+            _fmt("Consommables (méthode masse)", total_mass, mass_err),
+        ]))
 
     def _find_consumable_mass_row(self, code_nacres, consommable):
         if self.data_masse is None or self.data_masse.empty:
