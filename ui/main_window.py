@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
     QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
+    QToolButton, QStyle,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
@@ -49,6 +50,8 @@ from ui.edit_calculation_dialog import EditCalculationDialog
 from ui.charts.bar_chart_consumables import StackedBarConsumablesWindow
 from ui.charts.nacres_bar_chart import NacresBarChartWindow
 from ui.charts.pareto_chart import ParetoChartWindow
+from ui.charts.transport_chart import TransportChartWindow
+from ui.charts.transport_factor_chart import TransportFactorChartWindow
 from ui.charts.nacres_proportional import ProportionalBarChartNacresWindow
 from ui.charts.coverage_overview import CoverageWindow
 from ui.charts.coverage_by_category import CoverageCategoryWindow
@@ -110,6 +113,8 @@ class MainWindow(QMainWindow):
         self.stacked_bar_consumables_window = None
         self.nacres_bar_chart_window = None
         self.pareto_chart_window = None
+        self.transport_chart_window = None
+        self.transport_factor_chart_window = None
         self.coverage_chart_window = None
         self.coverage_category_chart_window = None
 
@@ -128,6 +133,7 @@ class MainWindow(QMainWindow):
         self.header_label = None
         self.input_label = None
         self.days_label = None
+        self.reset_search_button = None
         self.toggle_graph_buttons_button = None
         self.graph_buttons_container = None
 
@@ -439,6 +445,11 @@ class MainWindow(QMainWindow):
         self.search_label = QLabel('Recherche:')
         self.search_field = QLineEdit()
         self.search_field.setFixedWidth(200)
+        self.reset_search_button = QToolButton()
+        self.reset_search_button.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
+        self.reset_search_button.setToolTip("Réinitialiser les recherches")
+        self.reset_search_button.setAutoRaise(True)
+        self.reset_search_button.setFixedSize(28, 28)
 
         self.indicator_nacres = QLabel("✗")
         self.indicator_nacres.setFixedWidth(20)
@@ -449,6 +460,7 @@ class MainWindow(QMainWindow):
         nom_layout.addWidget(self.subsub_name_combo)
         nom_layout.addWidget(self.search_label)
         nom_layout.addWidget(self.search_field)
+        nom_layout.addWidget(self.reset_search_button)
 
         # NACRES / consommable
         self.conso_filtered_label = QLabel("Consommables:")
@@ -861,12 +873,30 @@ class MainWindow(QMainWindow):
             " groupée par code NACRES."
         )
 
+        self.generate_transport_button = QPushButton("Transport : matière et acheminement")
+        self.generate_transport_button.setToolTip(
+            "Barres empilées par provenance : décomposition des émissions masse"
+            " en part matière et part transport."
+        )
+        self.generate_transport_factor_button = QPushButton("Transport : émissions par provenance")
+        self.generate_transport_factor_button.setToolTip(
+            "Barres par provenance : émissions kg CO₂e dues uniquement au transport,"
+            " avec le facteur (kg CO₂e/kg) et le pourcentage du total masse affiché."
+        )
+
         row2 = QHBoxLayout()
         row2.setSpacing(4)
         row2.addWidget(self.generate_stacked_bar_consumables_button)
         row2.addWidget(self.generate_nacres_bar_button)
         row2.addWidget(self.generate_proportional_bar_button_mass)
         graph_buttons_layout.addLayout(row2)
+
+        row2b = QHBoxLayout()
+        row2b.setSpacing(4)
+        row2b.addWidget(self.generate_transport_button)
+        row2b.addWidget(self.generate_transport_factor_button)
+        row2b.addStretch()
+        graph_buttons_layout.addLayout(row2b)
 
         # ── Section 3 : Couverture ───────────────────────────────────────
         graph_buttons_layout.addWidget(_section_header("Couverture méthodologique"))
@@ -911,6 +941,7 @@ class MainWindow(QMainWindow):
             lambda text: self.update_conso_filtered_combo(filter_text=text)
         )
         self.search_field.textChanged.connect(self.on_search_text_changed)
+        self.reset_search_button.clicked.connect(self.reset_search_fields)
         self.subsub_name_combo.currentIndexChanged.connect(self.update_years)
         self.subsub_name_combo.currentIndexChanged.connect(self.on_subsub_name_changed)
 
@@ -932,6 +963,8 @@ class MainWindow(QMainWindow):
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
         self.generate_proportional_bar_button_mass.clicked.connect(self.generate_proportional_bar_chart_mass)     
         self.generate_pareto_button.clicked.connect(self.generate_pareto_chart)
+        self.generate_transport_button.clicked.connect(self.generate_transport_chart)
+        self.generate_transport_factor_button.clicked.connect(self.generate_transport_factor_chart)
         self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
         self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
 
@@ -1434,6 +1467,42 @@ class MainWindow(QMainWindow):
         self.update_conso_filtered_combo(filter_text=None)
         self.synchronize_after_search()
 
+    def reset_search_fields(self):
+        """
+        Vide les recherches NACRES/consommables et remet les sélections associées à l'état vide.
+        """
+        for field in (self.search_field, self.conso_search_field):
+            if field is not None:
+                field.blockSignals(True)
+                field.clear()
+                field.blockSignals(False)
+
+        self.update_subsubcategory_names()
+
+        self.conso_filtered_combo.blockSignals(True)
+        self.conso_filtered_combo.clear()
+        self.conso_filtered_combo.addItem("non renseignée")
+        self.conso_filtered_combo.blockSignals(False)
+
+        for widget in (
+            self.quantity_label,
+            self.quantity_input,
+            self.origine_label,
+            self.origine_row_widget,
+            self.prix_unitaire_label,
+            self.prix_info_button,
+            self.masse_manquante_label,
+        ):
+            if widget is not None:
+                widget.setVisible(False)
+
+        self._current_prix_unitaire = None
+        self._current_prix_unitaire_info_text = ""
+        self.prix_unitaire_label.setToolTip("")
+        self.masse_manquante_label.setText("")
+        self.update_manage_consumable_button_state()
+        self._update_field_indicators()
+
     def synchronize_after_search(self):
         """
         Synchronise les sélections après une opération de recherche.
@@ -1469,6 +1538,7 @@ class MainWindow(QMainWindow):
             self.subcategory_combo.setVisible(False)
             self.search_label.setVisible(False)
             self.search_field.setVisible(False)
+            self.reset_search_button.setVisible(False)
             self.subsub_name_label.setVisible(False)
             self.subsub_name_combo.setVisible(False)
             self.year_combo.setVisible(False)
@@ -1488,6 +1558,7 @@ class MainWindow(QMainWindow):
             self.subcategory_combo.setVisible(True)
             self.search_label.setVisible(True)
             self.search_field.setVisible(True)
+            self.reset_search_button.setVisible(True)
             self.subsub_name_label.setVisible(True)
             self.subsub_name_combo.setVisible(True)
             self.year_combo.setVisible(True)
@@ -1555,6 +1626,8 @@ class MainWindow(QMainWindow):
             self._set_consumable_controls_visible(True)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.origine_label.setVisible(False)
+            self.origine_row_widget.setVisible(False)
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
@@ -1762,6 +1835,8 @@ class MainWindow(QMainWindow):
             self.conso_filtered_combo.blockSignals(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.origine_label.setVisible(False)
+            self.origine_row_widget.setVisible(False)
             self.prix_unitaire_label.setToolTip("")
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
@@ -2128,6 +2203,8 @@ class MainWindow(QMainWindow):
             self.generate_nacres_bar_button,
             self.generate_proportional_bar_button_mass,
             self.generate_pareto_button,
+            self.generate_transport_button,
+            self.generate_transport_factor_button,
             self.generate_coverage_button,
             self.generate_coverage_category_button,
         ):
@@ -3199,6 +3276,8 @@ class MainWindow(QMainWindow):
                 'nacres_bar': NacresBarChartWindow,
                 'proportional_bar_mass': ProportionalBarChartNacresWindow,
                 'pareto': ParetoChartWindow,
+                'transport': TransportChartWindow,
+                'transport_factor': TransportFactorChartWindow,
                 'coverage': CoverageWindow,
                 'coverage_category': CoverageCategoryWindow
             }.get(chart_type)
@@ -3250,6 +3329,12 @@ class MainWindow(QMainWindow):
 
     def generate_pareto_chart(self):
         self.generate_chart('pareto')
+
+    def generate_transport_chart(self):
+        self.generate_chart('transport')
+
+    def generate_transport_factor_chart(self):
+        self.generate_chart('transport_factor')
 
     def generate_coverage_chart(self):
         self.generate_chart('coverage')
