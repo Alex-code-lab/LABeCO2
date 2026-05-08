@@ -1162,24 +1162,18 @@ class MainWindow(QMainWindow):
     def show_calcul_section(self):
         """
         Affiche la section d'ajout de calcul (pour Achats, Véhicules, etc.) et masque les contrôles des manip types.
-        Si la catégorie sélectionnée est "Machine", on masque la zone standard et on affiche la section Machine.
+        Si la catégorie sélectionnée est "Machine", on garde le sélecteur de catégorie visible
+        et on affiche la section Machine.
         """
         current_category = self.category_combo.currentText()
         # Masquer les contrôles des manip types
         self._set_manip_type_controls_visible(False)
 
-        if current_category == "Machine":
-            # Pour Machine, on affiche la section Machine et on masque la zone standard
-            self.existing_group.setVisible(False)
-            self.machine_group.setVisible(True)
-        else:
-            # Pour les autres, on affiche la zone standard et on masque la section Machine
-            self.existing_group.setVisible(True)
-            self.machine_group.setVisible(False)
+        self.existing_group.setVisible(True)
+        self.machine_group.setVisible(current_category == "Machine")
         self.category_combo.setEnabled(True)
         self.subcategory_combo.setEnabled(True)
-        if self.existing_group.isVisible():
-            self.existing_group.adjustSize()
+        self.existing_group.adjustSize()
         self._update_field_indicators()
 
     def calculate_emission_for_item(self, item_data: dict) -> dict:
@@ -1499,7 +1493,9 @@ class MainWindow(QMainWindow):
             self._populate_subcategory_combo(subcats.astype(str))
             self.update_subsubcategory_names()
             self.update_nacres_visibility()
-        self.existing_group.setVisible(calc_section_open and category != 'Machine')
+        # existing_group contient aussi le sélecteur de catégorie : il doit rester
+        # visible pour pouvoir quitter "Machine" et revenir vers Achats, Véhicules, etc.
+        self.existing_group.setVisible(calc_section_open)
         self.machine_group.setVisible(calc_section_open and category == 'Machine')
         self._update_category_color()
         self.update_manage_consumable_button_state()
