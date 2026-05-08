@@ -748,30 +748,40 @@ class EditCalculationDialog(QDialog):
             if subsub_name:
                 subsubcategory, name = self.split_subsub_name(subsub_name)
                 code_nacres_prefix = normalize_nacres_prefix(subsubcategory)
-                self._add_direct_nacres_item(code_nacres_prefix)
+                entries = []
                 filtered_entries = self.data_masse[
                     self.data_masse['Code NACRES'].astype(str).str.strip().str[:4].str.upper() == code_nacres_prefix
                 ]
 
                 if not filtered_entries.empty:
-                    entries = []
                     for _, row in filtered_entries.iterrows():
                         nom_objet_val = clean_text(row.get("Consommable", ""))
                         code_val = clean_text(row.get("Code NACRES", ""))
                         if nom_objet_val:
                             entries.append((nom_objet_val.casefold(), code_val, nom_objet_val, "solid"))
-                    for _, code, name, source in sorted(entries):
-                        self._add_consumable_item(code, name, source)
 
                 if self.data_liquides is not None and not self.data_liquides.empty:
-                    liquid_entries = []
                     for _, row in self.data_liquides.iterrows():
                         code_val = clean_text(row.get("Code NACRES", ""))
                         produit = clean_text(row.get("Produit", ""))
                         if produit and normalize_nacres_prefix(code_val) == code_nacres_prefix:
-                            liquid_entries.append((produit.casefold(), code_val, produit, "liquid"))
-                    for _, code, name, source in sorted(liquid_entries):
-                        self._add_consumable_item(code, name, source)
+                            entries.append((produit.casefold(), code_val, produit, "liquid"))
+
+                if not entries:
+                    self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)
+                    self.nacres_filtered_combo.blockSignals(False)
+                    self.nacres_filtered_label.setVisible(False)
+                    self.nacres_filtered_combo.setVisible(False)
+                    self.quantity_label.setVisible(False)
+                    self.quantity_input.setVisible(False)
+                    self.origine_label.setVisible(False)
+                    self.origine_combo.setVisible(False)
+                    self._origine_should_save = False
+                    return
+
+                self._add_direct_nacres_item(code_nacres_prefix)
+                for _, code, name, source in sorted(entries):
+                    self._add_consumable_item(code, name, source)
 
             if self.nacres_filtered_combo.count() == 0:
                 self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)

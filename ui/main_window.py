@@ -48,6 +48,7 @@ from ui.data_mass_window import DataMassWindow
 from ui.edit_calculation_dialog import EditCalculationDialog
 from ui.charts.bar_chart_consumables import StackedBarConsumablesWindow
 from ui.charts.nacres_bar_chart import NacresBarChartWindow
+from ui.charts.pareto_chart import ParetoChartWindow
 from ui.charts.nacres_proportional import ProportionalBarChartNacresWindow
 from ui.charts.coverage_overview import CoverageWindow
 from ui.charts.coverage_by_category import CoverageCategoryWindow
@@ -108,6 +109,7 @@ class MainWindow(QMainWindow):
         self.data_mass_window = None
         self.stacked_bar_consumables_window = None
         self.nacres_bar_chart_window = None
+        self.pareto_chart_window = None
         self.coverage_chart_window = None
         self.coverage_category_chart_window = None
 
@@ -826,12 +828,18 @@ class MainWindow(QMainWindow):
         self.generate_proportional_bar_button.setToolTip(
             "Barres proportionnelles : émissions par catégorie, pondérées par les dépenses monétaires."
         )
+        self.generate_pareto_button = QPushButton("Pareto")
+        self.generate_pareto_button.setToolTip(
+            "Diagramme de Pareto : postes classés par émissions décroissantes"
+            " avec courbe cumulée — identifie les 20 % de postes responsables de 80 % des émissions."
+        )
 
         row1 = QHBoxLayout()
         row1.setSpacing(4)
         row1.addWidget(self.generate_pie_button)
         row1.addWidget(self.generate_bar_button)
         row1.addWidget(self.generate_proportional_bar_button)
+        row1.addWidget(self.generate_pareto_button)
         graph_buttons_layout.addLayout(row1)
 
         # ── Section 2 : Consommables ─────────────────────────────────────
@@ -923,6 +931,7 @@ class MainWindow(QMainWindow):
         self.generate_stacked_bar_consumables_button.clicked.connect(self.generate_stacked_bar_consumables)
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
         self.generate_proportional_bar_button_mass.clicked.connect(self.generate_proportional_bar_chart_mass)     
+        self.generate_pareto_button.clicked.connect(self.generate_pareto_chart)
         self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
         self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
 
@@ -1736,7 +1745,46 @@ class MainWindow(QMainWindow):
             if produit and normalize_nacres_prefix(full_code) == code_nacres_4:
                 filtered_items.append((produit.casefold(), full_code, produit, "liquid"))
 
+        if not filtered_items:
+            self.conso_filtered_combo.blockSignals(True)
+            self.conso_filtered_combo.clear()
+            self.conso_filtered_combo.addItem("non renseignée")
+            self.conso_filtered_combo.blockSignals(False)
+            for widget in (
+                self.conso_filtered_label,
+                self.indicator_conso,
+                self.conso_filtered_combo,
+                self.conso_search_label,
+                self.conso_search_field,
+                self.quantity_label,
+                self.quantity_input,
+                self.origine_label,
+                self.origine_row_widget,
+                self.prix_unitaire_label,
+                self.prix_info_button,
+                self.masse_manquante_label,
+                self.consumable_actions_widget,
+            ):
+                if widget is not None:
+                    widget.setVisible(False)
+            self._current_prix_unitaire = None
+            self._current_prix_unitaire_info_text = ""
+            self.prix_unitaire_label.setToolTip("")
+            self.masse_manquante_label.setText("")
+            self.update_unit()
+            self.update_manage_consumable_button_state()
+            self._update_field_indicators()
+            return
 
+        for widget in (
+            self.conso_filtered_label,
+            self.conso_filtered_combo,
+            self.conso_search_label,
+            self.conso_search_field,
+            self.consumable_actions_widget,
+        ):
+            if widget is not None:
+                widget.setVisible(True)
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
         self._add_direct_nacres_combo_item(code_nacres_4)
@@ -2028,6 +2076,7 @@ class MainWindow(QMainWindow):
             self.generate_stacked_bar_consumables_button,
             self.generate_nacres_bar_button,
             self.generate_proportional_bar_button_mass,
+            self.generate_pareto_button,
             self.generate_coverage_button,
             self.generate_coverage_category_button,
         ):
@@ -3098,6 +3147,7 @@ class MainWindow(QMainWindow):
                 'stacked_bar_consumables': StackedBarConsumablesWindow,
                 'nacres_bar': NacresBarChartWindow,
                 'proportional_bar_mass': ProportionalBarChartNacresWindow,
+                'pareto': ParetoChartWindow,
                 'coverage': CoverageWindow,
                 'coverage_category': CoverageCategoryWindow
             }.get(chart_type)
@@ -3146,6 +3196,9 @@ class MainWindow(QMainWindow):
 
     def generate_proportional_bar_chart_mass(self):
         self.generate_chart('proportional_bar_mass')
+
+    def generate_pareto_chart(self):
+        self.generate_chart('pareto')
 
     def generate_coverage_chart(self):
         self.generate_chart('coverage')
