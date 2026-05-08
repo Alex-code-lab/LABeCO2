@@ -275,9 +275,26 @@ class EditCalculationDialog(QDialog):
         if tooltip:
             self.nacres_filtered_combo.setItemData(index, "\n".join(tooltip), Qt.ToolTipRole)
 
+    def _add_direct_nacres_item(self, code_nacres):
+        code = normalize_nacres_prefix(code_nacres)
+        if not code:
+            return
+        self.nacres_filtered_combo.addItem(
+            "Dépense directe sur ce code NACRES",
+            userData={"direct_nacres": True, "code_nacres": code},
+        )
+        index = self.nacres_filtered_combo.count() - 1
+        self.nacres_filtered_combo.setItemData(
+            index,
+            "Aucun consommable détaillé n'est requis : le calcul utilisera directement le facteur monétaire du code NACRES sélectionné.",
+            Qt.ToolTipRole,
+        )
+
     def _selected_consumable_data(self):
         data = self.nacres_filtered_combo.currentData()
         if isinstance(data, dict):
+            if data.get("direct_nacres"):
+                return None
             code = clean_text(data.get("code_nacres"))
             name = clean_text(data.get("consommable"))
             if code or name:
@@ -419,17 +436,18 @@ class EditCalculationDialog(QDialog):
                 self.update_nacres_filtered_combo()
                 code_nacres = data.get('code_nacres', '')
                 consommable = data.get('consommable', '')
-                if code_nacres and consommable:
+                if code_nacres and consommable and consommable != 'NA':
                     self._select_consumable_item(code_nacres, consommable)
                 self.nacres_filtered_combo.blockSignals(False)
 
-                self.quantity_label.setVisible(True)
-                self.quantity_input.setVisible(True)
+                selected_consumable = self._selected_consumable_data()
+                self.quantity_label.setVisible(selected_consumable is not None)
+                self.quantity_input.setVisible(selected_consumable is not None)
                 quantity = data.get('quantity', '')
                 # Stocker les valeurs de référence pour le scaling automatique
                 self._base_quantity = float(quantity or 0)
                 self._base_value = float(data.get('value', 0) or 0)
-                if quantity is not None:
+                if selected_consumable is not None and quantity is not None:
                     self.quantity_input.blockSignals(True)
                     self.quantity_input.setText(str(quantity))
                     self.quantity_input.blockSignals(False)
@@ -730,6 +748,7 @@ class EditCalculationDialog(QDialog):
             if subsub_name:
                 subsubcategory, name = self.split_subsub_name(subsub_name)
                 code_nacres_prefix = normalize_nacres_prefix(subsubcategory)
+                self._add_direct_nacres_item(code_nacres_prefix)
                 filtered_entries = self.data_masse[
                     self.data_masse['Code NACRES'].astype(str).str.strip().str[:4].str.upper() == code_nacres_prefix
                 ]
@@ -754,10 +773,12 @@ class EditCalculationDialog(QDialog):
                     for _, code, name, source in sorted(liquid_entries):
                         self._add_consumable_item(code, name, source)
 
-            # Toujours ajouter "Aucune correspondance"
-            self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)
+            if self.nacres_filtered_combo.count() == 0:
+                self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)
             self.nacres_filtered_combo.blockSignals(False)
-            self.nacres_filtered_combo.setCurrentText("Aucune correspondance")
+            self.nacres_filtered_combo.setCurrentIndex(0)
+            if self._selected_consumable_data() is None:
+                self.on_nacres_filtered_changed()
 
         else:
             self.nacres_filtered_label.setVisible(False)

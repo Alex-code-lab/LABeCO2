@@ -1004,11 +1004,35 @@ class MainWindow(QMainWindow):
         if tooltip:
             self.conso_filtered_combo.setItemData(index, "\n".join(tooltip), Qt.ToolTipRole)
 
+    def _add_direct_nacres_combo_item(self, code_nacres):
+        code = normalize_nacres_prefix(code_nacres)
+        if not code:
+            return
+        self.conso_filtered_combo.addItem(
+            "Dépense directe sur ce code NACRES",
+            userData={"direct_nacres": True, "code_nacres": code},
+        )
+        index = self.conso_filtered_combo.count() - 1
+        self.conso_filtered_combo.setItemData(
+            index,
+            "Aucun consommable détaillé n'est requis : le calcul utilisera directement le facteur monétaire du code NACRES sélectionné.",
+            Qt.ToolTipRole,
+        )
+
+    def _selected_nacres_prefix(self):
+        subsub_name = self.subsub_name_combo.currentText() if self.subsub_name_combo else ""
+        if not subsub_name or subsub_name == "non renseignée":
+            return ""
+        subsubcategory, _ = self.split_subsub_name(subsub_name)
+        return normalize_nacres_prefix(subsubcategory or subsub_name)
+
     def _selected_consumable_data(self):
         if self.conso_filtered_combo is None:
             return None
         data = self.conso_filtered_combo.currentData()
         if isinstance(data, dict):
+            if data.get("direct_nacres"):
+                return None
             name = clean_text(data.get("consommable"))
             code = clean_text(data.get("code_nacres"))
             if name or code:
@@ -1715,7 +1739,7 @@ class MainWindow(QMainWindow):
 
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
-        self.conso_filtered_combo.addItem("non renseignée")
+        self._add_direct_nacres_combo_item(code_nacres_4)
         for _, code, name, source in sorted(filtered_items):
             self._add_consumable_combo_item(code, name, source)
         self.conso_filtered_combo.blockSignals(False)
@@ -1725,7 +1749,12 @@ class MainWindow(QMainWindow):
         else:
             self.conso_filtered_combo.setCurrentIndex(0)
 
-        self.update_quantity_visibility()
+        if self._selected_consumable_data() is None:
+            self.on_conso_filtered_changed()
+        else:
+            self.update_quantity_visibility()
+            self.update_unit()
+            self._update_field_indicators()
         self.update_manage_consumable_button_state()
 
     def on_conso_filtered_changed(self):
@@ -1738,6 +1767,7 @@ class MainWindow(QMainWindow):
         """
         selected = self._selected_consumable_data()
         if not selected:
+            has_nacres_code = bool(self._selected_nacres_prefix())
             self.update_manage_consumable_button_state()
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
@@ -1749,15 +1779,17 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
-            # Forcer subsub_name => "non renseignée"
-            self.subsub_name_combo.blockSignals(True)
-            idx_nr = self.subsub_name_combo.findText("non renseignée")
-            if idx_nr != -1:
-                self.subsub_name_combo.setCurrentIndex(idx_nr)
-            else:
-                self.subsub_name_combo.setCurrentIndex(0)
-            self.subsub_name_combo.blockSignals(False)
+            if not has_nacres_code:
+                # Aucune sélection exploitable : on revient à l'état vide.
+                self.subsub_name_combo.blockSignals(True)
+                idx_nr = self.subsub_name_combo.findText("non renseignée")
+                if idx_nr != -1:
+                    self.subsub_name_combo.setCurrentIndex(idx_nr)
+                else:
+                    self.subsub_name_combo.setCurrentIndex(0)
+                self.subsub_name_combo.blockSignals(False)
             self.update_unit()
+            self._update_field_indicators()
             return
 
         # Récupérer codeNACRES_4
@@ -2070,7 +2102,7 @@ class MainWindow(QMainWindow):
             and self.conso_filtered_combo.isVisible()
         )
         if conso_visible:
-            conso_ok = self._selected_consumable_data() is not None
+            conso_ok = self._selected_consumable_data() is not None or bool(self._selected_nacres_prefix())
             self._set_indicator(self.indicator_conso, conso_ok)
             self.indicator_conso.setVisible(True)
         else:

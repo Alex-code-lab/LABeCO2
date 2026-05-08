@@ -82,12 +82,11 @@ class NacresBarChartWindow(QDialog):
         for data in iter_history_data(self.main_window.history_list):
             code_nacres = data.get('code_nacres', 'NA')
             category = data.get('category', '')
-            quantity = data.get('quantity', 0)
             emissions_price = data.get('emissions_price', 0.0)
             emissions_error = data.get('emissions_price_error', 0.0)
 
             # On filtre les données valides
-            if code_nacres != 'NA' and category == 'Achats' and quantity > 0:
+            if code_nacres != 'NA' and category == 'Achats':
                 code_nacres_short = code_nacres[:4]  # Garde uniquement les 4 premiers caractères
                 if code_nacres_short not in nacres_dict:
                     nacres_dict[code_nacres_short] = 0.0
@@ -101,7 +100,7 @@ class NacresBarChartWindow(QDialog):
 
         if not nacres_dict:
             ax = self.figure.add_subplot(111)
-            ax.text(0.5, 0.5, "Aucune donnée NACRES correspondante (Achats + quantity>0).", 
+            ax.text(0.5, 0.5, "Aucune donnée NACRES correspondante dans les achats.",
                     ha='center', va='center', transform=ax.transAxes)
             self.canvas.draw()
             return
