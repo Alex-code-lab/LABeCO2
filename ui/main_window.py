@@ -1035,6 +1035,29 @@ class MainWindow(QMainWindow):
         subsubcategory, _ = self.split_subsub_name(subsub_name)
         return normalize_nacres_prefix(subsubcategory or subsub_name)
 
+    def _current_subsub_data(self):
+        if self.subsub_name_combo is None:
+            return {}
+        data = self.subsub_name_combo.currentData()
+        return data if isinstance(data, dict) else {}
+
+    def _sync_subcategory_from_subsub_selection(self):
+        data = self._current_subsub_data()
+        target_subcategory = clean_text(data.get("subcategory"))
+        if not target_subcategory or target_subcategory == self._current_subcategory():
+            return False
+
+        self.subcategory_combo.blockSignals(True)
+        changed = self._select_subcategory(target_subcategory)
+        self.subcategory_combo.blockSignals(False)
+
+        if changed:
+            if self.category_combo.currentText() == "Achats":
+                self.subsub_name_label.setText("Code NACRES :")
+            else:
+                self.subsub_name_label.setText("Nom :")
+        return changed
+
     def _selected_consumable_data(self):
         if self.conso_filtered_combo is None:
             return None
@@ -1553,36 +1576,46 @@ class MainWindow(QMainWindow):
         subcategory = self._current_subcategory()
         search_text = self.search_field.text().lower()
 
+        global_achats_search = category == 'Achats' and bool(search_text)
         mask = (self.data['category'] == category)
-        if subcategory:
+        if subcategory and not global_achats_search:
             mask &= (self.data['subcategory'] == subcategory)
 
         filtered_data = self.data[mask]
 
-        # Construction "subsubcategory - name"
-        subsub_names = (
-            filtered_data['subsubcategory'].fillna('')
-            + ' - '
-            + filtered_data['name'].fillna('')
-        ).str.strip(' - ')
-
-        # On rend unique
-        subsub_names_unique = subsub_names.unique()
-
-        # Appliquer la recherche
-        if search_text:
-            subsub_names_filtered = [s for s in subsub_names_unique if search_text in s.lower()]
-        else:
-            subsub_names_filtered = list(subsub_names_unique)
-
-        subsub_names_filtered.insert(0, "non renseignée")
+        entries = []
+        seen = set()
+        for _, row in filtered_data.iterrows():
+            subsubcategory = clean_text(row.get('subsubcategory', ''))
+            name = clean_text(row.get('name', ''))
+            display = clean_text(f"{subsubcategory} - {name}").strip(" - ")
+            if not display:
+                continue
+            haystack = display.casefold()
+            if search_text and search_text.casefold() not in haystack:
+                continue
+            item_data = {
+                "category": clean_text(row.get('category', '')),
+                "subcategory": clean_text(row.get('subcategory', '')),
+                "subsubcategory": subsubcategory,
+                "name": name,
+            }
+            key = (
+                item_data["category"],
+                item_data["subcategory"],
+                item_data["subsubcategory"],
+                item_data["name"],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append((display.casefold(), display, item_data))
 
         self.subsub_name_combo.blockSignals(True)
         self.subsub_name_combo.clear()
-        nr = subsub_names_filtered.pop(0)
-        subsub_names_filtered = sorted(subsub_names_filtered)
-        subsub_names_filtered.insert(0, nr)
-        self.subsub_name_combo.addItems(subsub_names_filtered)
+        self.subsub_name_combo.addItem("non renseignée")
+        for _, display, item_data in sorted(entries):
+            self.subsub_name_combo.addItem(display, userData=item_data)
         self.subsub_name_combo.blockSignals(False)
 
         self.update_years()
@@ -1597,7 +1630,14 @@ class MainWindow(QMainWindow):
         category = self.category_combo.currentText()
         subcategory = self._current_subcategory()
         subsub_name = self.subsub_name_combo.currentText()
-        subsubcategory, name = self.split_subsub_name(subsub_name)
+        item_data = self._current_subsub_data()
+        if item_data:
+            category = item_data.get("category", category)
+            subcategory = item_data.get("subcategory", subcategory)
+            subsubcategory = item_data.get("subsubcategory", "")
+            name = item_data.get("name", "")
+        else:
+            subsubcategory, name = self.split_subsub_name(subsub_name)
 
         mask = (
             (self.data['category'] == category) &
@@ -1624,7 +1664,14 @@ class MainWindow(QMainWindow):
         subcategory = self._current_subcategory()
         subsub_name = self.subsub_name_combo.currentText()
         year = self.year_combo.currentText()
-        subsubcategory, name = self.split_subsub_name(subsub_name)
+        item_data = self._current_subsub_data()
+        if item_data:
+            category = item_data.get("category", category)
+            subcategory = item_data.get("subcategory", subcategory)
+            subsubcategory = item_data.get("subsubcategory", "")
+            name = item_data.get("name", "")
+        else:
+            subsubcategory, name = self.split_subsub_name(subsub_name)
 
         mask = (
             (self.data['category'] == category) &
@@ -1722,6 +1769,14 @@ class MainWindow(QMainWindow):
             self._current_prix_unitaire = None
             self._current_prix_unitaire_info_text = ""
             self.update_manage_consumable_button_state()
+            return
+
+        self._sync_subcategory_from_subsub_selection()
+        if self.category_combo.currentText() != 'Achats' or not is_consumables_subcategory(self._current_subcategory()):
+            self._set_consumable_controls_visible(False, clear_selection=True)
+            self.update_unit()
+            self.update_manage_consumable_button_state()
+            self._update_field_indicators()
             return
 
         # Récupère les 4 premiers caractères comme code NACRES approximatif
