@@ -51,7 +51,10 @@ from ui.charts.bar_chart_consumables import StackedBarConsumablesWindow
 from ui.charts.nacres_bar_chart import NacresBarChartWindow
 from ui.charts.pareto_chart import ParetoChartWindow
 from ui.charts.transport_chart import TransportChartWindow
+from ui.charts.transport_consumable_chart import TransportConsumableChartWindow
 from ui.charts.transport_factor_chart import TransportFactorChartWindow
+from ui.charts.transport_scenario_chart import TransportScenarioChartWindow
+from ui.charts.transport_top_chart import TransportTopChartWindow
 from ui.charts.nacres_proportional import ProportionalBarChartNacresWindow
 from ui.charts.coverage_overview import CoverageWindow
 from ui.charts.coverage_by_category import CoverageCategoryWindow
@@ -114,7 +117,10 @@ class MainWindow(QMainWindow):
         self.nacres_bar_chart_window = None
         self.pareto_chart_window = None
         self.transport_chart_window = None
+        self.transport_consumable_chart_window = None
         self.transport_factor_chart_window = None
+        self.transport_scenario_chart_window = None
+        self.transport_top_chart_window = None
         self.coverage_chart_window = None
         self.coverage_category_chart_window = None
 
@@ -873,32 +879,57 @@ class MainWindow(QMainWindow):
             " groupée par code NACRES."
         )
 
-        self.generate_transport_button = QPushButton("Transport : matière et acheminement")
-        self.generate_transport_button.setToolTip(
-            "Barres empilées par provenance : décomposition des émissions masse"
-            " en part matière et part transport."
-        )
-        self.generate_transport_factor_button = QPushButton("Transport : émissions par provenance")
-        self.generate_transport_factor_button.setToolTip(
-            "Barres par provenance : émissions kg CO₂e dues uniquement au transport,"
-            " avec le facteur (kg CO₂e/kg) et le pourcentage du total masse affiché."
-        )
-
         row2 = QHBoxLayout()
         row2.setSpacing(4)
         row2.addWidget(self.generate_stacked_bar_consumables_button)
         row2.addWidget(self.generate_nacres_bar_button)
         row2.addWidget(self.generate_proportional_bar_button_mass)
+        row2.addStretch()
         graph_buttons_layout.addLayout(row2)
 
-        row2b = QHBoxLayout()
-        row2b.setSpacing(4)
-        row2b.addWidget(self.generate_transport_button)
-        row2b.addWidget(self.generate_transport_factor_button)
-        row2b.addStretch()
-        graph_buttons_layout.addLayout(row2b)
+        # ── Section 3 : Transport des consommables ──────────────────────
+        graph_buttons_layout.addWidget(_section_header("Transport des consommables"))
 
-        # ── Section 3 : Couverture ───────────────────────────────────────
+        self.generate_transport_consumable_button = QPushButton("Par consommable")
+        self.generate_transport_consumable_button.setToolTip(
+            "Barres empilées par consommable : part matière et part transport,"
+            " avec une couleur de transport par provenance."
+        )
+        self.generate_transport_top_button = QPushButton("Top transport")
+        self.generate_transport_top_button.setToolTip(
+            "Classement des consommables qui pèsent le plus dans les émissions de transport."
+        )
+        self.generate_transport_button = QPushButton("Par provenance (matière + transport)")
+        self.generate_transport_button.setToolTip(
+            "Barres empilées par provenance : décomposition des émissions masse"
+            " en part matière et part transport."
+        )
+        self.generate_transport_factor_button = QPushButton("Par provenance (transport seul)")
+        self.generate_transport_factor_button.setToolTip(
+            "Barres par provenance : émissions kg CO₂e dues uniquement au transport,"
+            " avec le facteur (kg CO₂e/kg) et le pourcentage du total masse affiché."
+        )
+        self.generate_transport_scenario_button = QPushButton("Scénario Europe")
+        self.generate_transport_scenario_button.setToolTip(
+            "Compare les émissions transport actuelles à un scénario où les provenances hors France/Europe"
+            " sont remplacées par une provenance Europe."
+        )
+
+        row3_transport = QHBoxLayout()
+        row3_transport.setSpacing(4)
+        row3_transport.addWidget(self.generate_transport_consumable_button)
+        row3_transport.addWidget(self.generate_transport_top_button)
+        row3_transport.addWidget(self.generate_transport_button)
+        graph_buttons_layout.addLayout(row3_transport)
+
+        row3_transport_b = QHBoxLayout()
+        row3_transport_b.setSpacing(4)
+        row3_transport_b.addWidget(self.generate_transport_factor_button)
+        row3_transport_b.addStretch()
+        row3_transport_b.addWidget(self.generate_transport_scenario_button)
+        graph_buttons_layout.addLayout(row3_transport_b)
+
+        # ── Section 4 : Couverture ───────────────────────────────────────
         graph_buttons_layout.addWidget(_section_header("Couverture méthodologique"))
 
         self.generate_coverage_button = QPushButton("Couverture globale")
@@ -963,8 +994,11 @@ class MainWindow(QMainWindow):
         self.generate_nacres_bar_button.clicked.connect(self.generate_nacres_bar_chart)
         self.generate_proportional_bar_button_mass.clicked.connect(self.generate_proportional_bar_chart_mass)     
         self.generate_pareto_button.clicked.connect(self.generate_pareto_chart)
+        self.generate_transport_consumable_button.clicked.connect(self.generate_transport_consumable_chart)
+        self.generate_transport_top_button.clicked.connect(self.generate_transport_top_chart)
         self.generate_transport_button.clicked.connect(self.generate_transport_chart)
         self.generate_transport_factor_button.clicked.connect(self.generate_transport_factor_chart)
+        self.generate_transport_scenario_button.clicked.connect(self.generate_transport_scenario_chart)
         self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
         self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
 
@@ -2203,8 +2237,11 @@ class MainWindow(QMainWindow):
             self.generate_nacres_bar_button,
             self.generate_proportional_bar_button_mass,
             self.generate_pareto_button,
+            self.generate_transport_consumable_button,
+            self.generate_transport_top_button,
             self.generate_transport_button,
             self.generate_transport_factor_button,
+            self.generate_transport_scenario_button,
             self.generate_coverage_button,
             self.generate_coverage_category_button,
         ):
@@ -3277,7 +3314,10 @@ class MainWindow(QMainWindow):
                 'proportional_bar_mass': ProportionalBarChartNacresWindow,
                 'pareto': ParetoChartWindow,
                 'transport': TransportChartWindow,
+                'transport_consumable': TransportConsumableChartWindow,
                 'transport_factor': TransportFactorChartWindow,
+                'transport_scenario': TransportScenarioChartWindow,
+                'transport_top': TransportTopChartWindow,
                 'coverage': CoverageWindow,
                 'coverage_category': CoverageCategoryWindow
             }.get(chart_type)
@@ -3333,8 +3373,17 @@ class MainWindow(QMainWindow):
     def generate_transport_chart(self):
         self.generate_chart('transport')
 
+    def generate_transport_consumable_chart(self):
+        self.generate_chart('transport_consumable')
+
     def generate_transport_factor_chart(self):
         self.generate_chart('transport_factor')
+
+    def generate_transport_top_chart(self):
+        self.generate_chart('transport_top')
+
+    def generate_transport_scenario_chart(self):
+        self.generate_chart('transport_scenario')
 
     def generate_coverage_chart(self):
         self.generate_chart('coverage')

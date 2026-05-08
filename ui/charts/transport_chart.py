@@ -18,11 +18,18 @@ from PySide6.QtCore import Qt, Signal
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from ui.charts.history_utils import iter_history_data
-
-_COLOR_MATERIAL  = '#73c2fb'   # bleu : émissions matière
-_COLOR_TRANSPORT = '#f59e0b'   # ambre : émissions transport
-_COLOR_ERR       = '#374151'   # gris foncé pour les barres d'erreur
+from ui.charts.transport_utils import (
+    COLOR_ERR,
+    COLOR_MATERIAL,
+    COLOR_TRANSPORT,
+    add_transport_summary,
+    apply_transport_tight_layout,
+    iter_transport_records,
+    origin_color,
+    set_vertical_text_room,
+    short_origin_label,
+    summarize_transport,
+)
 
 
 class TransportChartWindow(QDialog):
@@ -73,40 +80,12 @@ class TransportChartWindow(QDialog):
     def refresh_data(self):
         self.figure.clear()
 
-        dm = self.main_window.data_manager
+        records = list(iter_transport_records(
+            self.main_window.history_list,
+            self.main_window.data_manager,
+        ))
 
-        # Accumulation par provenance
-        # Pour chaque item avec masse : recalcule la part transport
-        mat_by_origin   = {}   # émissions matière (kg CO₂e)
-        trans_by_origin = {}   # émissions transport (kg CO₂e)
-        err_by_origin   = {}   # variance cumulée pour les barres d'erreur
-
-        for data in iter_history_data(self.main_window.history_list):
-            em    = float(data.get('emission_mass', 0.0) or 0.0)
-            tm    = float(data.get('total_mass',    0.0) or 0.0)
-            em_err = float(data.get('emission_mass_error', 0.0) or 0.0)
-
-            if em <= 0 or tm <= 0:
-                continue  # pas de calcul masse pour cet item
-
-            origine = data.get('origine', dm.TRANSPORT_DEFAULT) or dm.TRANSPORT_DEFAULT
-            transport_factor, transport_uncert = dm.get_transport_factor(origine)
-
-            trans_em  = tm * transport_factor
-            trans_err = trans_em * transport_uncert
-            mat_em    = max(em - trans_em, 0.0)
-            mat_err   = max(em_err - trans_err, 0.0)  # approximation conservative
-
-            if origine not in mat_by_origin:
-                mat_by_origin[origine]   = 0.0
-                trans_by_origin[origine] = 0.0
-                err_by_origin[origine]   = 0.0
-
-            mat_by_origin[origine]   += mat_em
-            trans_by_origin[origine] += trans_em
-            err_by_origin[origine]   += (em_err ** 2)
-
-        if not mat_by_origin:
+        if not records:
             ax = self.figure.add_subplot(111)
             ax.text(
                 0.5, 0.5,
@@ -116,9 +95,18 @@ class TransportChartWindow(QDialog):
             self.canvas.draw()
             return
 
-        # Convertir variances en écarts-types
-        for k in err_by_origin:
-            err_by_origin[k] = err_by_origin[k] ** 0.5
+        mat_by_origin = {}
+        trans_by_origin = {}
+        err_by_origin = {}
+
+        for record in records:
+            origin = record["origin"]
+            mat_by_origin[origin] = mat_by_origin.get(origin, 0.0) + record["material_emissions"]
+            trans_by_origin[origin] = trans_by_origin.get(origin, 0.0) + record["transport_emissions"]
+            err_by_origin[origin] = err_by_origin.get(origin, 0.0) + record["emission_error"] ** 2
+
+        for origin in err_by_origin:
+            err_by_origin[origin] = err_by_origin[origin] ** 0.5
 
         # Trier par émissions totales décroissantes
         origins = sorted(
@@ -127,10 +115,10 @@ class TransportChartWindow(QDialog):
             reverse=True
         )
 
-        self._plot(origins, mat_by_origin, trans_by_origin, err_by_origin)
+        self._plot(origins, mat_by_origin, trans_by_origin, err_by_origin, summarize_transport(records))
 
     # ------------------------------------------------------------------
-    def _plot(self, origins, mat_dict, trans_dict, err_dict):
+    def _plot(self, origins, mat_dict, trans_dict, err_dict, summary):
         n = len(origins)
         x = np.arange(n)
         bar_w = 0.55
@@ -139,56 +127,76 @@ class TransportChartWindow(QDialog):
         trans_vals = np.array([trans_dict[o] for o in origins])
         totals     = mat_vals + trans_vals
         errs       = np.array([err_dict[o]   for o in origins])
+        origin_colors = [origin_color(o) for o in origins]
 
         ax = self.figure.add_subplot(111)
 
         bars_mat   = ax.bar(x, mat_vals,   bar_w,
-                            color=_COLOR_MATERIAL,  edgecolor='white', label='Matière')
+                            color=COLOR_MATERIAL,  edgecolor=origin_colors,
+                            linewidth=1.2, label='Matière')
         bars_trans = ax.bar(x, trans_vals, bar_w,
                             bottom=mat_vals,
-                            color=_COLOR_TRANSPORT, edgecolor='white', label='Transport')
+                            color=COLOR_TRANSPORT, edgecolor=origin_colors,
+                            linewidth=1.2, label='Transport')
 
         # Barres d'erreur sur le total
         ax.errorbar(x, totals, yerr=errs,
-                    fmt='none', ecolor=_COLOR_ERR, capsize=5, capthick=1, lw=0.8, zorder=5)
+                    fmt='none', ecolor=COLOR_ERR, capsize=5, capthick=1, lw=0.8, zorder=5)
+
+        peak = set_vertical_text_room(ax, totals, errs, room_ratio=0.42)
 
         # Pourcentage transport au-dessus de chaque barre
         for i, (tot, tr) in enumerate(zip(totals, trans_vals)):
             if tot > 0:
                 pct = tr / tot * 100
-                ax.text(x[i], tot + errs[i] + tot * 0.015,
+                ax.text(x[i], tot + errs[i] + peak * 0.035,
                         f"{pct:.0f}%\ntransport",
-                        ha='center', va='bottom', fontsize=7, color=_COLOR_ERR)
+                        ha='center', va='bottom', fontsize=7, color=COLOR_ERR,
+                        clip_on=True)
 
         # Valeurs numériques à l'intérieur des barres (si assez hautes)
         for i, (mv, tv) in enumerate(zip(mat_vals, trans_vals)):
             if mv > totals.max() * 0.06:
                 ax.text(x[i], mv / 2,
-                        f"{mv:.1f}", ha='center', va='center', fontsize=7, color='white')
+                        f"{mv:.1f}", ha='center', va='center', fontsize=7,
+                        color='white', clip_on=True)
             if tv > totals.max() * 0.06:
                 ax.text(x[i], mv + tv / 2,
-                        f"{tv:.1f}", ha='center', va='center', fontsize=7, color='white')
+                        f"{tv:.1f}", ha='center', va='center', fontsize=7,
+                        color='white', clip_on=True)
 
         # Étiquettes axe X : nom provenance sur deux lignes si nécessaire
-        short_origins = [o.replace(' (', '\n(') for o in origins]
+        short_origins = [short_origin_label(o) for o in origins]
         ax.set_xticks(x)
         ax.set_xticklabels(short_origins, fontsize=8)
+        for tick, origin in zip(ax.get_xticklabels(), origins):
+            tick.set_color(origin_color(origin))
+            tick.set_fontweight('bold')
 
         ax.set_ylabel("Émissions (kg CO₂e)", fontsize=9)
         ax.set_title(
-            "Émissions par provenance : part matière et part transport",
-            fontsize=11
+            "Par provenance : matière et transport",
+            fontsize=11,
+            pad=14,
         )
         ax.set_xlim(-0.5, n - 0.5)
+        ax.tick_params(axis='x', pad=6)
 
         legend_elements = [
-            Patch(facecolor=_COLOR_MATERIAL,  label='Émissions matière'),
-            Patch(facecolor=_COLOR_TRANSPORT, label='Émissions transport'),
+            Patch(facecolor=COLOR_MATERIAL, label='Émissions matière'),
+            Patch(facecolor=COLOR_TRANSPORT, label='Émissions transport'),
         ]
+        legend_elements.extend(
+            Patch(facecolor=origin_color(origin), label=origin)
+            for origin in origins
+        )
         ax.legend(handles=legend_elements, fontsize=8,
-                  framealpha=0.9, edgecolor='#cbd5e1')
+                  framealpha=0.9, edgecolor='#cbd5e1',
+                  loc='center right', bbox_to_anchor=(0.985, 0.46),
+                  bbox_transform=self.figure.transFigure)
 
-        self.figure.tight_layout()
+        add_transport_summary(self.figure, summary)
+        apply_transport_tight_layout(self.figure, rect=(0, 0, 0.76, 0.86))
         self.canvas.draw()
 
     # ------------------------------------------------------------------
