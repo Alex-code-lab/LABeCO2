@@ -5,7 +5,6 @@
 # Distribué sous licence : GNU GPL v3 (non commercial)
 # windows/graphiques/graph_3_proportional_bar_chart.py
 import numpy as np
-import matplotlib.patches
 from adjustText import adjust_text
 from PySide6.QtWidgets import (
     QMessageBox, QVBoxLayout, QDialog, QFileDialog, QToolBar, QStyle,

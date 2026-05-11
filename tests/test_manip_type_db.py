@@ -38,5 +38,30 @@ class TestManipsTypeDB(unittest.TestCase):
                 db.close()
 
 
+class TestManipsTypeDBInit(unittest.TestCase):
+    def test_absolute_path_used_as_is(self):
+        """Un chemin absolu passé au constructeur ne doit pas être réencapsulé par resource_path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            abs_path = os.path.join(tmpdir, "test.sqlite")
+            db = ManipsTypeDB(db_path=abs_path)
+            try:
+                self.assertEqual(db.db_path, abs_path)
+            finally:
+                db.close()
+
+    def test_normalize_source_user_legacy(self):
+        """SOURCE_USER_LEGACY doit être normalisé vers SOURCE_USER."""
+        self.assertEqual(
+            ManipsTypeDB.normalize_source(ManipsTypeDB.SOURCE_USER_LEGACY),
+            ManipsTypeDB.SOURCE_USER,
+        )
+
+    def test_source_filter_values_user_includes_legacy(self):
+        """Le filtre SOURCE_USER doit inclure la valeur legacy pour la rétrocompatibilité."""
+        values = ManipsTypeDB.source_filter_values(ManipsTypeDB.SOURCE_USER)
+        self.assertIn(ManipsTypeDB.SOURCE_USER, values)
+        self.assertIn(ManipsTypeDB.SOURCE_USER_LEGACY, values)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -13,3 +13,5 @@ private/
 .DS_Store
 *.xlsx
 *.hdf5.backup
+tools/
+docs/test_carbon_calculator_annote.py

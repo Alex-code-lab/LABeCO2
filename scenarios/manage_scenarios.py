@@ -6,7 +6,7 @@
 # scenarios/manage_scenarios.py
 import sys
 import os
-from manip_type_db import ManipsTypeDB
+from scenarios.manip_type_db import ManipsTypeDB
 
 def main():
     # On suppose que le fichier .sqlite est dans un dossier particulier :

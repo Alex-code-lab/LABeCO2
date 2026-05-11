@@ -37,7 +37,7 @@ class ManipsTypeDB:
         Initialise la connexion SQLite et crée les tables si elles n'existent pas.
         :param db_path: Chemin du fichier de base de données SQLite.
         """
-        self.db_path = resource_path(db_path)
+        self.db_path = db_path if os.path.isabs(db_path) else resource_path(db_path)
         # Connexion à la base (créée si inexistante)
         self.conn = sqlite3.connect(self.db_path)
         # Pour récupérer les lignes sous forme de dictionnaires (clé = nom de colonne)
