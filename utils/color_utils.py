@@ -10,6 +10,7 @@ import matplotlib.colors
 # Constantes de couleurs
 CATEGORY_COLORS = {
     'Véhicules': '#2e8b57',          # Sea Green
+    'Transports': '#E07B00',         # Amber Orange
     'Achats': '#07bc52',             # Green
     'Machine': '#20B2AA',            # Light Sea Green
     'Activités agricoles': '#4682B4',# Steel Blue
@@ -18,6 +19,7 @@ CATEGORY_COLORS = {
 
 CATEGORY_ORDER = [
     'Véhicules',
+    'Transports',
     'Achats',
     'Machine',
     'Activités agricoles',

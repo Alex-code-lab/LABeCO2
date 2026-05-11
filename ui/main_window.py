@@ -2259,8 +2259,8 @@ class MainWindow(QMainWindow):
             self.create_user_manip_button.setEnabled(has_rows)
 
     _STYLE_RESULT_OK = (
-        "QLabel { background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 6px;"
-        " padding: 8px 12px; font-size: 12px; color: #166534; font-weight: 500; }"
+        "QLabel { background-color: #eef4fb; border: 1px solid #93c5e8; border-radius: 6px;"
+        " padding: 8px 12px; font-size: 12px; color: #17415f; font-weight: 500; }"
     )
     _STYLE_RESULT_ERR = (
         "QLabel { background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px;"
