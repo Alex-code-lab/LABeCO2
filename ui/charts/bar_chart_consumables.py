@@ -128,11 +128,12 @@ class StackedBarConsumablesWindow(QDialog):
             emission_mass = float(data.get('emission_mass', 0.0) or 0.0)
             emission_mass_error = float(data.get('emission_mass_error', 0.0) or 0.0)
 
-            # Critère : Achats -> Consommables, quantity>0, code_nacres != 'NA'
+            _invalid = {'na', 'nan', 'none', ''}
+            # Critère : Achats -> Consommables, quantity>0, code_nacres valide
             if (category == 'Achats'
                 and 'Consommables' in subcat
                 and quantity > 0
-                and code_nacres != 'NA'):
+                and str(code_nacres or '').strip().lower() not in _invalid):
                 
                 if code_nacres not in self.nacres_data:
                     self.nacres_data[code_nacres] = {

@@ -84,13 +84,17 @@ class ProportionalBarChartNacresWindow(QDialog):
         emissions = []
         errors = []
 
-        # Extraction des données depuis l'historique
+        _INVALID = {'na', 'nan', 'none', ''}
+
+        # Extraction des données depuis l'historique (Achats uniquement)
         for data in iter_history_data(self.main_window.history_list):
-            code_nacres = data.get('code_nacres', 'NA')
+            if data.get('category', '') != 'Achats':
+                continue
+            code_nacres = str(data.get('code_nacres', '') or '').strip()
             emission = data.get('emission_mass', 0)
             error = data.get('emission_mass_error', 0)
-            if code_nacres != 'NA':  # On filtre les codes NACRES valides
-                nacres_codes.append(code_nacres[:4])  # Garde les 4 premiers caractères
+            if code_nacres.lower() not in _INVALID:
+                nacres_codes.append(code_nacres[:4])
                 emissions.append(emission)
                 errors.append(error)
 

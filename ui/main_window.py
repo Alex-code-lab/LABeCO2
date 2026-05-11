@@ -59,6 +59,7 @@ from ui.charts.nacres_proportional import ProportionalBarChartNacresWindow
 from ui.charts.coverage_overview import CoverageWindow
 from ui.charts.coverage_by_category import CoverageCategoryWindow
 from ui.user_manip_dialog import UserManipDialog
+from ui.charts.history_utils import iter_history_data
 
 
 
@@ -142,6 +143,7 @@ class MainWindow(QMainWindow):
         self.reset_search_button = None
         self.toggle_graph_buttons_button = None
         self.graph_buttons_container = None
+        self.summary_pdf_button = None
 
         # NACRES
         self.conso_filtered_label = None
@@ -812,9 +814,29 @@ class MainWindow(QMainWindow):
             "QPushButton { background-color: #ffffff; }"
         )
 
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+
         graph_summary_label = QLabel("<b>Génération de résumés graphiques :</b>")
         graph_summary_label.setStyleSheet("border: none; background: transparent;")
-        graph_buttons_layout.addWidget(graph_summary_label)
+        header_row.addWidget(graph_summary_label)
+
+        header_row.addStretch()
+
+        self.summary_pdf_button = QPushButton("📄 Résumé PDF total")
+        self.summary_pdf_button.setToolTip(
+            "Génère un PDF complet : résumé des émissions, tableau de l'historique et tous les graphiques."
+        )
+        self.summary_pdf_button.setStyleSheet(
+            "QPushButton { background-color: #1d4ed8; color: white; border: none;"
+            " border-radius: 4px; padding: 4px 12px; font-weight: 600; }"
+            "QPushButton:hover { background-color: #1e40af; }"
+            "QPushButton:pressed { background-color: #1e3a8a; }"
+            "QPushButton:disabled { background-color: #93c5fd; color: #e0e7ff; }"
+        )
+        header_row.addWidget(self.summary_pdf_button)
+
+        graph_buttons_layout.addLayout(header_row)
 
         _HEADER_FIRST = (
             "font-weight: 700; font-size: 13px; color: #374151;"
@@ -1001,6 +1023,7 @@ class MainWindow(QMainWindow):
         self.generate_transport_scenario_button.clicked.connect(self.generate_transport_scenario_chart)
         self.generate_coverage_button.clicked.connect(self.generate_coverage_chart)
         self.generate_coverage_category_button.clicked.connect(self.generate_coverage_category_chart)
+        self.summary_pdf_button.clicked.connect(self.generate_pdf_summary)
 
         self.history_list.cellDoubleClicked.connect(lambda r, c: self.modify_selected_calculation())
         self.add_machine_button.clicked.connect(self.add_machine)
@@ -2244,6 +2267,7 @@ class MainWindow(QMainWindow):
             self.generate_transport_scenario_button,
             self.generate_coverage_button,
             self.generate_coverage_category_button,
+            self.summary_pdf_button,
         ):
             if btn is not None:
                 btn.setEnabled(has_data)
@@ -3009,19 +3033,24 @@ class MainWindow(QMainWindow):
                 return f"{val:.4f} ± {err:.4f}"
             return f"{val:.4f}"
 
+        _SENTINEL = {'NA', 'nan', 'none', 'None', ''}
+
+        def _valid(val):
+            return bool(val) and str(val) not in _SENTINEL
+
         # ── Colonne "Élément" ────────────────────────────────────────────
         if category == 'Machine':
             elec = data.get('electricity_type', '')
-            element = f"{subcategory} : {elec}" if elec else subcategory
+            element = f"{subcategory} : {elec}" if elec and str(elec) not in _SENTINEL else subcategory
         elif category == 'Véhicules':
-            parts = [p for p in (subcategory, code_nacres, name) if p and p != 'NA']
+            parts = [p for p in (subcategory, code_nacres, name) if _valid(p)]
             element = " : ".join(parts)
         elif is_consumable_item:
             element = f"{subcategory_display} : {consommable}"
         else:
-            parts = [p for p in (subcategory_display[:20], code_nacres, name) if p and p != 'NA']
+            parts = [p for p in (subcategory_display[:20], code_nacres, name) if _valid(p)]
             element = " : ".join(parts)
-            if consommable and consommable != 'NA':
+            if _valid(consommable):
                 element += f" ({consommable})"
 
         # ── Colonne "Valeur" ─────────────────────────────────────────────
@@ -3170,13 +3199,15 @@ class MainWindow(QMainWindow):
         ext = ext.lower()
         try:
             if ext == '.csv':
-                df = pd.read_csv(file_name, sep=';')
+                # keep_default_na=False : empêche pandas de convertir 'NA' en NaN
+                # (sinon astype(str) produit la chaîne 'nan')
+                df = pd.read_csv(file_name, sep=';', keep_default_na=False)
             elif ext == '.xlsx':
                 df = pd.read_excel(file_name)
             elif ext == '.h5':
                 df = pd.read_hdf(file_name, key='history')
             else:
-                df = pd.read_csv(file_name, sep=';')
+                df = pd.read_csv(file_name, sep=';', keep_default_na=False)
         except Exception as e:
             QMessageBox.warning(self, "Erreur Import", f"Impossible de lire le fichier : {e}")
             return
@@ -3189,6 +3220,23 @@ class MainWindow(QMainWindow):
                     "code_nacres", "consommable", "unit"]:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip()
+        # Normaliser les résidus 'nan' (exports antérieurs où un NaN pandas a été sérialisé)
+        for col in ["code_nacres", "consommable"]:
+            if col in df.columns:
+                df[col] = df[col].replace({'nan': 'NA', 'none': 'NA', 'None': 'NA', '': 'NA'})
+        for col in ["name", "subsubcategory"]:
+            if col in df.columns:
+                df[col] = df[col].replace({'nan': '', 'none': '', 'None': ''})
+
+        # Pour les Achats : si code_nacres est absent/NA/nan mais subsubcategory est renseigné,
+        # utiliser les 4 premiers caractères de subsubcategory comme code NACRES.
+        if all(c in df.columns for c in ('category', 'code_nacres', 'subsubcategory')):
+            missing_code = (
+                (df['category'] == 'Achats') &
+                (df['code_nacres'].str.upper().isin(['NA', 'NAN', ''])) &
+                (~df['subsubcategory'].str.upper().isin(['', 'NAN', 'NA']))
+            )
+            df.loc[missing_code, 'code_nacres'] = df.loc[missing_code, 'subsubcategory'].str[:4]
 
         count_imported = 0
         for _, row in df.iterrows():
@@ -3348,6 +3396,140 @@ class MainWindow(QMainWindow):
         window.show()
         window.raise_()  # Amène la fenêtre au premier plan.
         window.activateWindow()  # Active la fenêtre pour qu'elle soit prête à recevoir des interactions.
+
+    def generate_pdf_summary(self):
+        """Génère un PDF complet : page de résumé, tableau historique, puis tous les graphiques."""
+        import datetime
+        from matplotlib.backends.backend_pdf import PdfPages
+        from matplotlib.figure import Figure
+        from PySide6.QtWidgets import QFileDialog, QProgressDialog
+        from PySide6.QtCore import Qt
+
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "Enregistrer le résumé PDF", "bilan_carbone.pdf",
+            "Fichiers PDF (*.pdf)"
+        )
+        if not file_name:
+            return
+        if not file_name.lower().endswith('.pdf'):
+            file_name += '.pdf'
+
+        progress = QProgressDialog("Génération du PDF…", None, 0, 0, self)
+        progress.setWindowTitle("Résumé PDF")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+        QApplication.processEvents()
+
+        try:
+            with PdfPages(file_name) as pdf:
+
+                # ── Page 1 : résumé texte ─────────────────────────────────
+                fig = Figure(figsize=(8.27, 11.69))
+                ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+                ax.axis('off')
+
+                now = datetime.datetime.now().strftime("%d/%m/%Y")
+                result_text = self.result_area.text() if self.result_area else ""
+                # nettoyer les balises HTML basiques pour le PDF
+                import re
+                html_lines = re.split(r'<br\s*/?>', result_text, flags=re.IGNORECASE)
+                clean_lines = [
+                    re.sub(r'<[^>]+>', '', l).replace('&nbsp;', ' ').strip()
+                    for l in html_lines
+                ]
+                clean = '\n'.join(l for l in clean_lines if l)
+
+                ax.text(0.5, 0.95, "Bilan Carbone LABeCO₂",
+                        ha='center', va='top', fontsize=20, fontweight='bold',
+                        transform=ax.transAxes)
+                ax.text(0.5, 0.88, f"Généré le {now}",
+                        ha='center', va='top', fontsize=11, color='#555555',
+                        transform=ax.transAxes)
+                ax.plot([0.1, 0.9], [0.84, 0.84], color='#cccccc', linewidth=0.8,
+                        transform=ax.transAxes)
+                ax.text(0.5, 0.80, clean,
+                        ha='center', va='top', fontsize=12,
+                        transform=ax.transAxes, linespacing=2.0)
+                pdf.savefig(fig, bbox_inches='tight')
+
+                # ── Page 2 : tableau historique ───────────────────────────
+                def _pdf_str(val):
+                    s = str(val or '').strip()
+                    return '' if s.lower() in ('nan', 'none', 'na') else s
+
+                rows = []
+                for data in iter_history_data(self.history_list):
+                    cat  = _pdf_str(data.get('category', ''))
+                    name = _pdf_str(data.get('name', ''))
+                    sub  = _pdf_str(data.get('subcategory', ''))
+                    elem = name or sub or cat
+                    ep   = float(data.get('emissions_price', 0) or 0)
+                    em   = float(data.get('emission_mass', 0) or 0)
+                    rows.append([cat, elem[:40], f"{ep:.3f}", f"{em:.3f}"])
+
+                if rows:
+                    fig2 = Figure(figsize=(11.69, 8.27))
+                    ax2 = fig2.add_axes([0.03, 0.1, 0.94, 0.82])
+                    ax2.axis('off')
+                    ax2.set_title("Historique des calculs", fontsize=14,
+                                  fontweight='bold', pad=12)
+                    col_labels = ["Catégorie", "Élément", "eCO₂ prix (kg)", "eCO₂ masse (kg)"]
+                    col_widths = [0.14, 0.52, 0.17, 0.17]
+                    tbl = ax2.table(
+                        cellText=rows,
+                        colLabels=col_labels,
+                        colWidths=col_widths,
+                        loc='center',
+                        cellLoc='left',
+                    )
+                    tbl.auto_set_font_size(False)
+                    tbl.set_fontsize(8)
+                    tbl.scale(1, 1.4)
+                    for (r, c), cell in tbl.get_celld().items():
+                        if r == 0:
+                            cell.set_facecolor('#1d4ed8')
+                            cell.set_text_props(color='white', fontweight='bold')
+                        elif r % 2 == 0:
+                            cell.set_facecolor('#f0f7ff')
+                        cell.set_edgecolor('#dddddd')
+                    pdf.savefig(fig2, bbox_inches='tight')
+
+                # ── Pages graphiques ──────────────────────────────────────
+                chart_classes = [
+                    ('pie',                 PieChartWindow),
+                    ('proportional_bar',    ProportionalBarChartWindow),
+                    ('bar',                 BarChartWindow),
+                    ('pareto',              ParetoChartWindow),
+                    ('nacres_bar',          NacresBarChartWindow),
+                    ('proportional_bar_mass', ProportionalBarChartNacresWindow),
+                    ('transport',           TransportChartWindow),
+                    ('transport_consumable', TransportConsumableChartWindow),
+                    ('transport_factor',    TransportFactorChartWindow),
+                    ('transport_top',       TransportTopChartWindow),
+                    ('coverage',            CoverageWindow),
+                    ('coverage_category',   CoverageCategoryWindow),
+                ]
+                for _key, cls in chart_classes:
+                    try:
+                        win = cls(self)
+                        QApplication.processEvents()
+                        if hasattr(win, 'figure') and win.figure is not None:
+                            pdf.savefig(win.figure, bbox_inches='tight')
+                        win.close()
+                        win.deleteLater()
+                        QApplication.processEvents()
+                    except Exception:
+                        pass
+
+        except Exception as e:
+            QMessageBox.warning(self, "Erreur PDF", f"Impossible de générer le PDF :\n{e}")
+            return
+        finally:
+            progress.close()
+
+        QMessageBox.information(self, "PDF généré",
+                                f"Résumé enregistré dans :\n{file_name}")
 
     def generate_pie_chart(self):
         self.generate_chart('pie')

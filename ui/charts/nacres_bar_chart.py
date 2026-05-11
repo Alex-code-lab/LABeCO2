@@ -85,8 +85,9 @@ class NacresBarChartWindow(QDialog):
             emissions_price = data.get('emissions_price', 0.0)
             emissions_error = data.get('emissions_price_error', 0.0)
 
-            # On filtre les données valides
-            if code_nacres != 'NA' and category == 'Achats':
+            # On filtre les données valides (Achats uniquement, code NACRES non vide/nan)
+            _invalid = {'na', 'nan', 'none', ''}
+            if category == 'Achats' and str(code_nacres or '').strip().lower() not in _invalid:
                 code_nacres_short = code_nacres[:4]  # Garde uniquement les 4 premiers caractères
                 if code_nacres_short not in nacres_dict:
                     nacres_dict[code_nacres_short] = 0.0

@@ -36,7 +36,7 @@ def save(widget, filename):
 
 def load_exemple(window):
     """Injecte exemple.csv dans l'historique sans passer par le dialogue fichier."""
-    df = pd.read_csv(EXEMPLE_CSV, sep=';')
+    df = pd.read_csv(EXEMPLE_CSV, sep=';', keep_default_na=False)
     for col in ["value", "quantity", "days", "emissions_price", "emission_mass", "total_mass"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -44,6 +44,12 @@ def load_exemple(window):
                 "code_nacres", "consommable", "unit"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
+    for col in ["code_nacres", "consommable"]:
+        if col in df.columns:
+            df[col] = df[col].replace({'nan': 'NA', 'none': 'NA', 'None': 'NA', '': 'NA'})
+    for col in ["name", "subsubcategory"]:
+        if col in df.columns:
+            df[col] = df[col].replace({'nan': '', 'none': '', 'None': ''})
     for _, row in df.iterrows():
         window.create_or_update_history_item(row.to_dict())
     window.update_total_emissions()
