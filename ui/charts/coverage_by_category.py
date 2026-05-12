@@ -112,7 +112,11 @@ class CoverageCategoryWindow(QDialog):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
-        categories = [cat for cat in CATEGORY_ORDER if cat in self.coverage]
+        categories = [
+            cat for cat in CATEGORY_ORDER
+            if cat in self.coverage
+            and (self.coverage[cat]["mass"] + self.coverage[cat]["price"] + self.coverage[cat]["none"]) > 0
+        ]
 
         mass_vals = [self.coverage[cat]["mass"] for cat in categories]
         price_vals = [self.coverage[cat]["price"] for cat in categories]

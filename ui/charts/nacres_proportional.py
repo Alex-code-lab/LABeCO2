@@ -129,10 +129,17 @@ class ProportionalBarChartNacresWindow(QDialog):
         # Ajout d'un subplot
         bar_ax = self.figure.add_subplot(111)
 
-        # Récupère les codes NACRES ayant des données
-        nacres_labels = list(self.aggregated_emissions.keys())
-        values = list(self.aggregated_emissions.values())
-        errors = list(self.aggregated_errors.values())
+        # Récupère uniquement les codes NACRES avec une émission masse > 0
+        filtered = {k: v for k, v in self.aggregated_emissions.items() if v > 0}
+        nacres_labels = list(filtered.keys())
+        values = list(filtered.values())
+        errors = [self.aggregated_errors[k] for k in nacres_labels]
+
+        if not nacres_labels:
+            bar_ax.text(0.5, 0.5, "Aucune donnée masse disponible",
+                        ha='center', va='center', transform=bar_ax.transAxes, fontsize=13, color='gray')
+            self.canvas.draw()
+            return
 
         # Positions sur l'axe x
         x_indices = np.arange(len(nacres_labels))

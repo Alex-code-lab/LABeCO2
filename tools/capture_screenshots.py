@@ -50,6 +50,13 @@ def load_exemple(window):
     for col in ["name", "subsubcategory"]:
         if col in df.columns:
             df[col] = df[col].replace({'nan': '', 'none': '', 'None': ''})
+    if all(c in df.columns for c in ('category', 'code_nacres', 'subsubcategory')):
+        missing_code = (
+            (df['category'] == 'Achats') &
+            (df['code_nacres'].str.upper().isin(['NA', 'NAN', ''])) &
+            (~df['subsubcategory'].str.upper().isin(['', 'NAN', 'NA']))
+        )
+        df.loc[missing_code, 'code_nacres'] = df.loc[missing_code, 'subsubcategory'].str[:4]
     for _, row in df.iterrows():
         window.create_or_update_history_item(row.to_dict())
     window.update_total_emissions()
@@ -61,16 +68,20 @@ def load_exemple(window):
 # (chart_type, nom_fichier, délai_ms avant capture — matplotlib est lent)
 # ─────────────────────────────────────────────────────────────────────────────
 CHARTS = [
-    ("pie",                    "09_graphique_camembert.png",          1200),
-    ("bar",                    "10_graphique_barres_prix_masse.png",   1200),
-    ("proportional_bar",       "11_graphique_barres_prop.png",         1200),
-    ("stacked_bar_consumables","12_graphique_barres_empilees.png",     1200),
-    ("nacres_bar",             "13_graphique_nacres.png",              1200),
-    ("proportional_bar_mass",  "14_graphique_nacres_prop.png",         1200),
-    ("pareto",                 "15_graphique_pareto.png",              1200),
-    ("transport",              "16_graphique_transport.png",           1200),
-    ("coverage",               "17_graphique_couverture.png",          1200),
-    ("coverage_category",      "18_graphique_couverture_cat.png",      1200),
+    ("pie",                    "10_graphique_camembert.png",              1200),
+    ("bar",                    "11_graphique_barres_prix_masse.png",      1200),
+    ("proportional_bar",       "12_graphique_barres_prop.png",            1200),
+    ("stacked_bar_consumables","13_graphique_barres_empilees.png",        1200),
+    ("nacres_bar",             "14_graphique_nacres.png",                 1200),
+    ("proportional_bar_mass",  "15_graphique_nacres_prop.png",            1200),
+    ("pareto",                 "16_graphique_pareto.png",                 1200),
+    ("transport",              "17_graphique_transport.png",              1200),
+    ("transport_consumable",   "18_graphique_transport_consommable.png",  1200),
+    ("transport_top",          "19_graphique_transport_top.png",          1200),
+    ("transport_factor",       "20_graphique_transport_facteur.png",      1200),
+    ("transport_scenario",     "21_graphique_transport_scenario.png",     1200),
+    ("coverage",               "22_graphique_couverture.png",             1200),
+    ("coverage_category",      "23_graphique_couverture_cat.png",         1200),
 ]
 
 
@@ -112,8 +123,12 @@ def run(window):
         QTimer.singleShot(400, step8_capture_graph)
 
     def step8_capture_graph():
+        scroll_area = window.centralWidget()
+        sb = scroll_area.verticalScrollBar()
+        sb.setValue(sb.maximum())
         save(window, "04_options_graphiques.png")
         window.toggle_graph_buttons_button.setChecked(False)
+        sb.setValue(0)
         QTimer.singleShot(300, step9_sources)
 
     # ── Étape 9 : popup Sources ───────────────────────────────────────────────
@@ -155,6 +170,18 @@ def run(window):
     # ── Étape 13 : fenêtre principale avec données (vue d'ensemble) ──────────
     def step13_fenetre_avec_donnees():
         save(window, "08_fenetre_avec_donnees.png")
+        QTimer.singleShot(300, step14_open_machine)
+
+    # ── Étape 14-15 : formulaire "Ajouter une machine" ───────────────────────
+    def step14_open_machine():
+        window.add_calcul_button.setChecked(True)
+        window.category_combo.setCurrentText("Machine")
+        QTimer.singleShot(400, step15_capture_machine)
+
+    def step15_capture_machine():
+        save(window, "09_ajout_machine.png")
+        window.add_calcul_button.setChecked(False)
+        window.category_combo.setCurrentText("Achats")
         QTimer.singleShot(300, lambda: step_chart(0))
 
     # ── Étapes graphiques : on itère sur la liste CHARTS ─────────────────────
@@ -204,7 +231,7 @@ def main():
             app.setStyleSheet(f.read())
 
     window = MainWindow()
-    window.showMaximized()
+    window.show()
 
     run(window)
 

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction  # Actions pour la barre d'outils
 from PySide6.QtCore import Qt  # Constantes Qt, comme Qt.WA_DeleteOnClose
+import matplotlib.colors
 from matplotlib.figure import Figure  # Représente une figure Matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas  # Intègre une figure Matplotlib dans une application Qt
 from utils.color_utils import CATEGORY_COLORS, CATEGORY_ORDER, generate_color_shades  # Utilitaires personnalisés pour gérer les couleurs et catégories
