@@ -13,6 +13,7 @@ a = Analysis(
         # --- Base de données masse / consommables ---
         ('data\\mass_factors\\data_eCO2_masse_consommable.hdf5',   'data\\mass_factors'),
         ('data\\mass_factors\\data_eCO2_liquides_consommable.hdf5', 'data\\mass_factors'),
+        ('data\\mass_factors\\data_transport_origins.hdf5',         'data\\mass_factors'),
         ('data\\mass_factors\\empreinte_carbone_materiaux.h5',      'data\\mass_factors'),
         ('data\\mass_factors\\empreinte_carbone_solvants.h5',       'data\\mass_factors'),
         ('data\\mass_factors\\materiaux_labo.h5',                   'data\\mass_factors'),

@@ -1,30 +1,83 @@
 # -*- mode: python ; coding: utf-8 -*-
-block_cipher = None
+# LABeCO2 — macOS app spec
+# Compilé avec : pyinstaller LABeCO2_Mac.spec
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
+        # --- Base de données GES1point5 ---
+        ('data/ges1point5/data_base_GES1point5.hdf5',  'data/ges1point5'),
+
+        # --- Base de données masse / consommables ---
+        ('data/mass_factors/data_eCO2_masse_consommable.hdf5',   'data/mass_factors'),
+        ('data/mass_factors/data_eCO2_liquides_consommable.hdf5', 'data/mass_factors'),
+        ('data/mass_factors/data_transport_origins.hdf5',         'data/mass_factors'),
+        ('data/mass_factors/empreinte_carbone_materiaux.h5',      'data/mass_factors'),
+        ('data/mass_factors/empreinte_carbone_solvants.h5',       'data/mass_factors'),
+        ('data/mass_factors/materiaux_labo.h5',                   'data/mass_factors'),
+        ('data/mass_factors/nacres_2022.h5',                      'data/mass_factors'),
+
+        # --- Base SQLite types de manips ---
         ('scenarios/manips_type.sqlite', 'scenarios'),
-        ('data/ges1point5/data_base_GES1point5.hdf5', 'data/ges1point5'),
-        ('data/mass_factors/data_eCO2_masse_consommable.hdf5', 'data/mass_factors'),
-        ('data/mass_factors/empreinte_carbone_materiaux.h5', 'data/mass_factors'),
-        ('styles/styles.qss', 'styles'),
-        ('assets/icon.icns', 'assets'),
-        ('assets/Logo.png', 'assets'),
+
+        # --- Interface ---
+        ('styles/styles.qss',  'styles'),
+        ('assets/Logo.png',    'assets'),
+        ('assets/icon.icns',   'assets'),
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        # PyTables / HDF5
+        'tables',
+        'tables.flavor',
+        'tables.leaf',
+        'tables.array',
+        'tables.carray',
+        'tables.earray',
+        'tables.vlarray',
+        'tables.group',
+        'tables.table',
+        'tables.indexes',
+        'tables.nodes.filenode',
+        'numexpr',
+        'numexpr.necompiler',
+        'blosc2',
+        # NumPy 2.x
+        'numpy.core',
+        'numpy.core.multiarray',
+        'numpy.core.numeric',
+        'numpy.core.umath',
+        'numpy._core',
+        'numpy._core.multiarray',
+        'numpy._core.numeric',
+        'numpy._core.umath',
+        # Pandas
+        'pandas._libs.tslibs.timedeltas',
+        'pandas._libs.tslibs.nattype',
+        'pandas._libs.tslibs.np_datetime',
+        'pandas._libs.tslibs.timestamps',
+        # Matplotlib backend Qt
+        'matplotlib.backends.backend_qtagg',
+        'matplotlib.backends.backend_qt5agg',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'tkinter',
+        'PyQt5',
+        'PyQt6',
+        'wx',
+        'IPython',
+        'jupyter',
+        'notebook',
+    ],
     noarchive=False,
     optimize=0,
-    cipher=block_cipher,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -39,25 +92,28 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,                # GUI → pas de console
+    console=False,
     disable_windowed_traceback=False,
-    argv_emulation=False,         # Utile surtout pour .app signées
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
     icon='assets/icon.icns',
 )
+
 app = BUNDLE(
     exe,
     name='LABeCO2.app',
     icon='assets/icon.icns',
-    bundle_identifier='com.labeco2.LABeCO2'
+    bundle_identifier='com.labeco2.LABeCO2',
 )
 
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='LABeCO2_app'            # nom différent du binaire
+    name='LABeCO2_app',
 )
