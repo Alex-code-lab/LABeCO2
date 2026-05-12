@@ -137,12 +137,16 @@ class ParetoChartWindow(QDialog):
         self.figure.clear()
 
         aggregated = {}
+        aggregated_err_sq = {}
         for data in iter_history_data(self.main_window.history_list):
             label = self._build_label(data)
             ep = float(data.get('emissions_price', 0.0) or 0.0)
+            err = float(data.get('emissions_price_error', 0.0) or 0.0)
             aggregated[label] = aggregated.get(label, 0.0) + ep
+            aggregated_err_sq[label] = aggregated_err_sq.get(label, 0.0) + err ** 2
 
         aggregated = {k: v for k, v in aggregated.items() if v > 0}
+        aggregated_errors = {k: np.sqrt(aggregated_err_sq[k]) for k in aggregated}
 
         if not aggregated:
             ax = self.figure.add_subplot(111)
@@ -151,13 +155,14 @@ class ParetoChartWindow(QDialog):
             self.canvas.draw()
             return
 
-        self._plot(aggregated)
+        self._plot(aggregated, aggregated_errors)
 
     # ------------------------------------------------------------------
-    def _plot(self, aggregated):
+    def _plot(self, aggregated, aggregated_errors):
         sorted_items = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)
         labels = [it[0] for it in sorted_items]
         values = np.array([it[1] for it in sorted_items])
+        errors = np.array([aggregated_errors.get(lbl, 0.0) for lbl in labels])
 
         total = values.sum()
         cumulative_pct = np.cumsum(values) / total * 100
@@ -173,11 +178,16 @@ class ParetoChartWindow(QDialog):
 
         # ── Barres ──────────────────────────────────────────────────────
         bars = ax1.barh(y_pos, values, color=colors, edgecolor='white', height=0.6)
+        ax1.errorbar(
+            values, y_pos,
+            xerr=errors,
+            fmt='none', ecolor='#374151', capsize=3, capthick=0.7, lw=0.7,
+        )
 
-        for bar, val in zip(bars, values):
+        for bar, val, err in zip(bars, values, errors):
             if val > 0:
                 ax1.text(
-                    bar.get_width() + total * 0.005,
+                    bar.get_width() + err + total * 0.015,
                     bar.get_y() + bar.get_height() / 2,
                     f"{val:.1f}",
                     va='center', ha='left', fontsize=7, color='#374151'

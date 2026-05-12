@@ -234,8 +234,8 @@ class PieChartWindow(QDialog):
         # Couleur de fond du graphique
         pie_ax.set_facecolor('black')
 
-        # Ajustement des marges
-        self.figure.tight_layout()
+        # Ajustement des marges (rect réserve de l'espace pour suptitle)
+        self.figure.tight_layout(rect=[0, 0, 1, 0.93])
 
         # Mise à jour de l'affichage sur le canvas
         self.canvas.draw()

@@ -89,6 +89,7 @@ class TransportTopChartWindow(QDialog):
 
         y = np.arange(len(records))
         values = np.array([record["transport_emissions"] for record in records])
+        errors = np.array([record.get("transport_error", 0.0) for record in records])
         max_val = max(float(values.max()), 1.0)
         transport_total = max(summary["transport_total"], 1e-12)
 
@@ -98,15 +99,20 @@ class TransportTopChartWindow(QDialog):
             color=[origin_color(record["origin"]) for record in records],
             edgecolor='white',
         )
+        ax.errorbar(
+            values, y,
+            xerr=errors,
+            fmt='none', ecolor=COLOR_ERR, capsize=4, capthick=0.8, lw=0.8,
+        )
 
         ax.set_yticks(y)
         ax.set_yticklabels([record["label"] for record in records], fontsize=8)
         ax.invert_yaxis()
 
-        for bar, record, value in zip(bars, records, values):
+        for bar, record, value, err in zip(bars, records, values, errors):
             pct = value / transport_total * 100.0
             ax.text(
-                value + max_val * 0.012,
+                value + err + max_val * 0.02,
                 bar.get_y() + bar.get_height() / 2,
                 f"{value:.1f} kg ({pct:.0f} %)",
                 va='center',
