@@ -270,11 +270,19 @@ class CarbonCalculator:
 
         # Colonnes de la table liquid
         dens = float(row.get("Densité (g/mL)", 0.0) or 0.0)
+        conc = float(row.get("Concentration (mg/mL)", 0.0) or 0.0)
         factor = float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0) or 0.0)
         uncert_pct = float(row.get("Incertitude (%)", 0.0) or 0.0) / 100.0
 
         # volume (mL) → masse (kg)
-        mass_kg = dens * volume_ml / 1000.0
+        # Si densité disponible : masse = volume × densité / 1000
+        # Sinon si concentration (mg/mL) : masse = volume × concentration (mg) / 1 000 000
+        if dens > 0:
+            mass_kg = dens * volume_ml / 1000.0
+        elif conc > 0:
+            mass_kg = volume_ml * conc / 1_000_000.0
+        else:
+            mass_kg = 0.0
 
         # émission + incertitude
         emission = mass_kg * factor

@@ -36,6 +36,7 @@ from ui.display_utils import (
     format_subcategory_label,
     is_consumables_subcategory,
     normalize_nacres_prefix,
+    normalize_search,
     safe_float,
 )
 
@@ -1704,7 +1705,7 @@ class MainWindow(QMainWindow):
         """
         category = self.category_combo.currentText()
         subcategory = self._current_subcategory()
-        search_text = self.search_field.text().lower()
+        search_text = normalize_search(self.search_field.text())
 
         global_achats_search = category == 'Achats' and bool(search_text)
         mask = (self.data['category'] == category)
@@ -1721,8 +1722,8 @@ class MainWindow(QMainWindow):
             display = clean_text(f"{subsubcategory} - {name}").strip(" - ")
             if not display:
                 continue
-            haystack = display.casefold()
-            if search_text and search_text.casefold() not in haystack:
+            haystack = normalize_search(display)
+            if search_text and search_text not in haystack:
                 continue
             item_data = {
                 "category": clean_text(row.get('category', '')),
@@ -1850,20 +1851,20 @@ class MainWindow(QMainWindow):
 
         if not isinstance(filter_text, str):
             filter_text = self.conso_search_field.text() if self.conso_search_field else ""
-        filter_text = filter_text.casefold()
+        filter_text = normalize_search(filter_text)
 
         entries = []
         for _, row in self.data_masse.iterrows():
             full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
             consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            haystack = f"{full_code} {consommable}".casefold()
+            haystack = normalize_search(f"{full_code} {consommable}")
             if consommable and (not filter_text or filter_text in haystack):
                 entries.append((consommable.casefold(), full_code, consommable, "solid"))
 
         for _, row in self.data_liquides.iterrows():
             code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
             produit = clean_text(row.get("Produit", ""))
-            haystack = f"{code} {produit}".casefold()
+            haystack = normalize_search(f"{code} {produit}")
             if produit and (not filter_text or filter_text in haystack):
                 entries.append((produit.casefold(), code, produit, "liquid"))
 
@@ -2083,6 +2084,7 @@ class MainWindow(QMainWindow):
                 self.subsub_name_combo.setCurrentIndex(self.subsub_name_combo.count() - 1)
             self.subsub_name_combo.blockSignals(False)
 
+        self._update_quantity_label(selected)
         self.quantity_label.setVisible(True)
         self.quantity_input.setVisible(True)
         has_mass = self._consumable_has_mass_data(selected)
@@ -2470,6 +2472,23 @@ class MainWindow(QMainWindow):
         self.input_field.setText(f"{prix_total:.2f}")
         self.input_field.blockSignals(False)
 
+    def _update_quantity_label(self, selected):
+        """Met à jour le texte du label Quantité selon le type de consommable."""
+        source = selected.get("source", "solid") if selected else "solid"
+        if source == "liquid":
+            row = self.data_manager.get_liquid_data(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            unit = "mL"
+            if row is not None:
+                u = str(row.get("Unité", "") or "").strip()
+                if u and u.lower() != "ml":
+                    unit = "mL"
+            self.quantity_label.setText(f"Quantité ({unit}) :")
+        else:
+            self.quantity_label.setText("Quantité (unités) :")
+
     def update_quantity_visibility(self):
         """
         Met à jour la visibilité de la barre "Quantité" en fonction de la catégorie sélectionnée et du consommable.
@@ -2480,15 +2499,15 @@ class MainWindow(QMainWindow):
         category = self.category_combo.currentText()
 
         if category != 'Achats':
-            # Pour toutes les catégories sauf 'Achats', masquer la barre "Quantité"
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
         else:
-            # Pour la catégorie 'Achats', déterminer la visibilité basée sur le consommable
-            if self._selected_consumable_data() is None:
+            selected = self._selected_consumable_data()
+            if selected is None:
                 self.quantity_label.setVisible(False)
                 self.quantity_input.setVisible(False)
             else:
+                self._update_quantity_label(selected)
                 self.quantity_label.setVisible(True)
                 self.quantity_input.setVisible(True)
 

@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Helpers d'affichage UI indépendants des libellés exacts de la base."""
 
+import unicodedata
+
+
+def normalize_search(text):
+    """Casefold + suppression des accents pour une recherche insensible aux diacritiques."""
+    return unicodedata.normalize('NFD', str(text).casefold()).encode('ascii', 'ignore').decode('ascii')
+
 
 def clean_text(value):
     """Retourne une chaîne propre pour une valeur potentiellement vide/NaN."""
