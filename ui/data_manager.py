@@ -354,6 +354,53 @@ class DataManager:
             info["conditionnement"],
         )
 
+    def get_liquid_prix_unitaire_info(self, code_nacres, produit_name=""):
+        """
+        Retourne les métadonnées de prix pour un consommable liquide (data_liquides).
+        Cherche par code NACRES puis fuzzy match sur Produit.
+        Retourne None si aucun prix disponible.
+        """
+        from difflib import SequenceMatcher
+        if self.data_liquides.empty:
+            return None
+        df = self.data_liquides
+        if self.PRIX_UNITAIRE_COL not in df.columns:
+            return None
+        mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres)
+        candidates = df[mask]
+        if candidates.empty:
+            return None
+        has_price = (
+            candidates[self.PRIX_UNITAIRE_COL].notna() &
+            (candidates[self.PRIX_UNITAIRE_COL].astype(str).str.strip() != "")
+        )
+        price_cands = candidates[has_price]
+        if price_cands.empty:
+            return None
+        if len(price_cands) == 1 or not produit_name:
+            row = price_cands.iloc[0]
+        else:
+            name_lower = produit_name.lower()
+            best_score, best_row = -1.0, price_cands.iloc[0]
+            for _, r in price_cands.iterrows():
+                score = SequenceMatcher(None, name_lower, str(r.get("Produit", "")).lower()).ratio()
+                if score > best_score:
+                    best_score, best_row = score, r
+            row = best_row
+        raw_price = row.get(self.PRIX_UNITAIRE_COL, None)
+        prix_unitaire = None if pd.isna(raw_price) else float(raw_price)
+        return {
+            "prix_unitaire": prix_unitaire,
+            "consommable": self._clean_cell(row.get("Produit", "")),
+            "designation": self._clean_cell(row.get(self.DESIGNATION_IJM_COL, "")) or self._clean_cell(row.get("Produit", "")),
+            "conditionnement": self._clean_cell(row.get(self.CONDT_IJM_COL, "")),
+            "nb_unites": self._clean_cell(row.get(self.NB_UNITES_IJM_COL, "")),
+            "prix_ht": self._clean_cell(row.get(self.PRIX_HT_COL, "")),
+            "code_ijm": self._clean_cell(row.get(self.CODE_IJM_COL, "")),
+            "marque": self._clean_cell(row.get(self.MARQUE_IJM_COL, "")),
+            "score_match": self._clean_cell(row.get(self.SCORE_MATCH_COL, "")),
+        }
+
     def get_liquid_data(self, code_nacres, produit=None):
         """
         Cherche un consommable liquide par code NACRES.

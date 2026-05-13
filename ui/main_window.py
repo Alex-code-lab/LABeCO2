@@ -2155,12 +2155,17 @@ class MainWindow(QMainWindow):
         code_nacres_full = selected["code_nacres"]
         consommable_name = selected["consommable"]
 
-        # Récupérer le Code NOM (4-5 chars IJM) depuis data_masse
-        code_nom = self.data_manager.get_code_nom(code_nacres_full.strip(), consommable_name.strip())
-        if code_nom is None:
-            code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
-
-        prix_info = self.data_manager.get_prix_unitaire_info(code_nom, consommable_name)
+        # Pour les liquides : lookup direct dans data_liquides
+        if selected.get("source") == "liquid":
+            prix_info = self.data_manager.get_liquid_prix_unitaire_info(
+                code_nacres_full.strip(), consommable_name.strip()
+            )
+        else:
+            # Récupérer le Code NOM (4-5 chars IJM) depuis data_masse
+            code_nom = self.data_manager.get_code_nom(code_nacres_full.strip(), consommable_name.strip())
+            if code_nom is None:
+                code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
+            prix_info = self.data_manager.get_prix_unitaire_info(code_nom, consommable_name)
         if prix_info and prix_info.get("prix_unitaire") is not None:
             prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
