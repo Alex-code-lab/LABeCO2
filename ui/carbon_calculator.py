@@ -141,11 +141,19 @@ class CarbonCalculator:
         if category == 'Achats' and code_nacres != 'NA':
             origine = data_dict.get('origine', self.dm.TRANSPORT_DEFAULT)
             transport_factor, transport_uncert = self.dm.get_transport_factor(origine)
+            custom_fe = float(data_dict.get('custom_fe', 0.0) or 0.0)
 
             # 1) On regarde si c'est un liquide
             liq_row = self.dm.get_liquid_data(code_nacres, consommable)
             if liq_row is not None:
                 e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity, consommable)
+                # Facteur personnalisé (kg eCO₂/L) si aucun facteur en base
+                if e_liq == 0.0 and custom_fe > 0.0:
+                    e_liq = (quantity / 1000.0) * custom_fe
+                    err_liq = 0.0
+                    # Masse pour transport : densité si dispo, sinon 1 g/mL
+                    dens = float(liq_row.get("Densité (g/mL)", 0.0) or 0.0)
+                    m_liq = (dens if dens > 0 else 1.0) * quantity / 1000.0
                 transport_em = m_liq * transport_factor
                 transport_err = transport_em * transport_uncert
                 em     = e_liq + transport_em
@@ -156,6 +164,14 @@ class CarbonCalculator:
                 e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
                     code_nacres, consommable, quantity
                 )
+                # Facteur personnalisé (kg eCO₂/kg) pour produits vrac sans matériau défini
+                if e_mass == 0.0 and custom_fe > 0.0:
+                    masse_unitaire_g = float(data_dict.get('masse_unitaire', 0.0) or 0.0)
+                    if masse_unitaire_g > 0.0:
+                        mass_kg = quantity * masse_unitaire_g / 1000.0
+                        e_mass = mass_kg * custom_fe
+                        t_mass = mass_kg
+                        e_mass_err = 0.0
                 transport_em = t_mass * transport_factor
                 transport_err = transport_em * transport_uncert
                 em     = e_mass + transport_em

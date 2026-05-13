@@ -155,6 +155,9 @@ class MainWindow(QMainWindow):
         self.prix_info_button = None
         self._current_prix_unitaire_info_text = ""
         self._current_prix_unitaire = None   # float ou None
+        self._current_masse_unitaire_g = None  # float > 0 si vrac solide, None sinon
+        self.fe_massique_label = None
+        self.fe_massique_input = None
         self.category_color_dot = None
         self.indicator_nacres = None
         self.indicator_conso = None
@@ -261,13 +264,13 @@ class MainWindow(QMainWindow):
             doit contribuer à la <span style="font-weight:bold; color:#1fa543;">réduction des émissions</span> 
             de gaz à effet de serre. Les activités scientifiques, souvent 
             <span style="font-weight:bold; color:#1fa543;">consommatrices de ressources</span>, 
-            représentent un levier d’action significatif pour atteindre cet objectif.
+            représentent un levier d'action significatif pour atteindre cet objectif.
         </p>
         <p>
             Cette application vise à <span style="font-weight:bold; color:#1fa543;">calculer le bilan carbone</span> 
             (<span style="font-weight:bold; color:#2196F3;">eCO₂</span>) des activités de laboratoire pour 
             <span style="font-weight:bold; color:#1fa543;">sensibiliser</span> à leur empreinte écologique 
-            et identifier les postes les plus énergivores afin d’
+            et identifier les postes les plus énergivores afin d'
             <span style="font-weight:bold; color:#1fa543;">optimiser</span> les pratiques et ainsi 
             <span style="font-weight:bold; color:#1fa543;">réfléchir</span> à des solutions durables 
             pour diminuer son empreinte.
@@ -283,7 +286,7 @@ class MainWindow(QMainWindow):
             <span style="font-weight:bold; color:#1fa543;">responsabilité collective</span>. 
             Le secteur scientifique peut, et doit, devenir un acteur exemplaire dans la lutte contre le 
             <span style="font-weight:bold; color:#1fa543;">changement climatique</span>, 
-            tout en maintenant l’excellence et l’innovation au cœur de ses priorités.
+            tout en maintenant l'excellence et l'innovation au cœur de ses priorités.
         </p>
         <p>
             <a href="#" style="color:#1fa543; text-decoration:none;">Voir moins</a>
@@ -500,6 +503,12 @@ class MainWindow(QMainWindow):
         self.quantity_label.setVisible(False)
         self.quantity_input.setVisible(False)
 
+        self.fe_massique_label = QLabel("Facteur d'émission :")
+        self.fe_massique_input = QLineEdit()
+        self.fe_massique_input.setPlaceholderText("ex: 12.5 (optionnel)")
+        self.fe_massique_label.setVisible(False)
+        self.fe_massique_input.setVisible(False)
+
         self.origine_label = QLabel("Provenance:")
         self.origine_combo = QComboBox()
         origins = self.data_manager.get_transport_origins()
@@ -616,6 +625,8 @@ class MainWindow(QMainWindow):
         existing_layout.addLayout(form_layout)
         existing_layout.addWidget(self.quantity_label)
         existing_layout.addWidget(self.quantity_input)
+        existing_layout.addWidget(self.fe_massique_label)
+        existing_layout.addWidget(self.fe_massique_input)
         existing_layout.addWidget(self.origine_label)
         existing_layout.addWidget(self.origine_row_widget)
         existing_layout.addLayout(prix_unitaire_layout)
@@ -1224,6 +1235,8 @@ class MainWindow(QMainWindow):
             self.conso_search_field,
             self.quantity_label,
             self.quantity_input,
+            self.fe_massique_label,
+            self.fe_massique_input,
             self.origine_label,
             self.origine_row_widget,
             self.prix_unitaire_label,
@@ -1254,6 +1267,10 @@ class MainWindow(QMainWindow):
             self.quantity_input.blockSignals(True)
             self.quantity_input.clear()
             self.quantity_input.blockSignals(False)
+        if self.fe_massique_input is not None and clear_selection:
+            self.fe_massique_input.blockSignals(True)
+            self.fe_massique_input.clear()
+            self.fe_massique_input.blockSignals(False)
 
         self._current_prix_unitaire = None
         self._current_prix_unitaire_info_text = ""
@@ -1363,7 +1380,7 @@ class MainWindow(QMainWindow):
         # Si la fonction 'calculate_emission' fait plus de choses, on peut les reproduire ici.
 
         # 4) Appeler compute_emission_data
-        #    => on s’appuie sur la structure existante, 
+        #    => on s'appuie sur la structure existante, 
         #    => item_data doit déjà contenir tout (category, subcategory, subsub, value, days, quantity, etc.)
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
 
@@ -1545,6 +1562,8 @@ class MainWindow(QMainWindow):
         for widget in (
             self.quantity_label,
             self.quantity_input,
+            self.fe_massique_label,
+            self.fe_massique_input,
             self.origine_label,
             self.origine_row_widget,
             self.prix_unitaire_label,
@@ -1684,6 +1703,8 @@ class MainWindow(QMainWindow):
             self._set_consumable_controls_visible(True)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.fe_massique_label.setVisible(False)
+            self.fe_massique_input.setVisible(False)
             self.origine_label.setVisible(False)
             self.origine_row_widget.setVisible(False)
             self.prix_unitaire_label.setVisible(False)
@@ -1893,6 +1914,8 @@ class MainWindow(QMainWindow):
             self.conso_filtered_combo.blockSignals(False)
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.fe_massique_label.setVisible(False)
+            self.fe_massique_input.setVisible(False)
             self.origine_label.setVisible(False)
             self.origine_row_widget.setVisible(False)
             self.prix_unitaire_label.setToolTip("")
@@ -1942,6 +1965,8 @@ class MainWindow(QMainWindow):
                 self.conso_search_field,
                 self.quantity_label,
                 self.quantity_input,
+                self.fe_massique_label,
+                self.fe_massique_input,
                 self.origine_label,
                 self.origine_row_widget,
                 self.prix_unitaire_label,
@@ -2003,6 +2028,8 @@ class MainWindow(QMainWindow):
             self.update_manage_consumable_button_state()
             self.quantity_label.setVisible(False)
             self.quantity_input.setVisible(False)
+            self.fe_massique_label.setVisible(False)
+            self.fe_massique_input.setVisible(False)
             self.origine_label.setVisible(False)
             self.origine_row_widget.setVisible(False)
             self._current_prix_unitaire = None
@@ -2455,8 +2482,9 @@ class MainWindow(QMainWindow):
 
     def _auto_fill_prix(self):
         """
-        Remplit automatiquement le champ prix (input_field) en multipliant
-        la quantité saisie par le prix unitaire du catalogue IJM.
+        Remplit automatiquement le champ prix (input_field).
+        - Solides : quantité (unités) × prix unitaire IJM
+        - Liquides : (volume_mL / volume_flacon_mL) × prix flacon IJM
         """
         if self._current_prix_unitaire is None:
             return
@@ -2467,13 +2495,63 @@ class MainWindow(QMainWindow):
             qty = float(qty_str)
         except ValueError:
             return
-        prix_total = qty * self._current_prix_unitaire
+
+        selected = self._selected_consumable_data()
+        if selected and selected.get("source") == "liquid":
+            row = self.data_manager.get_liquid_data(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            if row is None:
+                return
+            vol_flacon = row.get("Volume flacon (mL)", None)
+            if not vol_flacon or float(vol_flacon or 0) <= 0:
+                return
+            prix_total = (qty / float(vol_flacon)) * self._current_prix_unitaire
+        elif self._current_masse_unitaire_g and self._current_masse_unitaire_g > 0:
+            # Solide vendu en vrac : qty est en grammes
+            prix_total = (qty / self._current_masse_unitaire_g) * self._current_prix_unitaire
+        else:
+            prix_total = qty * self._current_prix_unitaire
+
         self.input_field.blockSignals(True)
         self.input_field.setText(f"{prix_total:.2f}")
         self.input_field.blockSignals(False)
 
+    def _get_masse_unitaire_g(self, selected):
+        """Retourne la masse unitaire (g) pour mode vrac, ou 0 si discret/non défini.
+
+        Mode vrac = masse renseignée ET matériau non défini (produit en vrac, poudre...).
+        Si matériau défini = objet discret dont la masse sert au calcul CO₂ interne.
+        """
+        if not selected or selected.get("source") == "liquid":
+            return 0.0
+        code = selected.get("code_nacres", "")
+        name = selected.get("consommable", "")
+        df_row = self.data_masse[
+            self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code) &
+            (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == name.strip())
+        ]
+        if df_row.empty:
+            return 0.0
+        row = df_row.iloc[0]
+        materiau = str(row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
+        if materiau:
+            return 0.0  # Objet discret avec matériau connu — pas de mode vrac
+        return safe_float(row.get(self.data_manager.MASSE_G_COL, 0.0))
+
+    def _liquid_has_co2_factor(self, selected):
+        """Retourne True si le consommable liquide a un facteur CO₂ défini dans la base."""
+        row = self.data_manager.get_liquid_data(
+            selected.get("code_nacres", ""),
+            selected.get("consommable", ""),
+        )
+        if row is None:
+            return False
+        return float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0) or 0.0) > 0
+
     def _update_quantity_label(self, selected):
-        """Met à jour le texte du label Quantité selon le type de consommable."""
+        """Met à jour le texte du label Quantité et le champ FE selon le type de consommable."""
         source = selected.get("source", "solid") if selected else "solid"
         if source == "liquid":
             row = self.data_manager.get_liquid_data(
@@ -2485,9 +2563,25 @@ class MainWindow(QMainWindow):
                 u = str(row.get("Unité", "") or "").strip()
                 if u and u.lower() != "ml":
                     unit = "mL"
+            self._current_masse_unitaire_g = None
             self.quantity_label.setText(f"Quantité ({unit}) :")
+            has_factor = self._liquid_has_co2_factor(selected)
+            self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/L) :")
+            self.fe_massique_label.setVisible(not has_factor)
+            self.fe_massique_input.setVisible(not has_factor)
         else:
-            self.quantity_label.setText("Quantité (unités) :")
+            masse_g = self._get_masse_unitaire_g(selected)
+            if masse_g > 0:
+                self._current_masse_unitaire_g = masse_g
+                self.quantity_label.setText("Quantité (g) :")
+                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/kg) :")
+                self.fe_massique_label.setVisible(True)
+                self.fe_massique_input.setVisible(True)
+            else:
+                self._current_masse_unitaire_g = None
+                self.quantity_label.setText("Quantité (unités) :")
+                self.fe_massique_label.setVisible(False)
+                self.fe_massique_input.setVisible(False)
 
     def update_quantity_visibility(self):
         """
@@ -2722,7 +2816,7 @@ class MainWindow(QMainWindow):
                 return
 
         # !! IMPORTANT !!
-        # On NE MULTIPLIE PAS PAR `days` ICI si c’est un Véhicule.
+        # On NE MULTIPLIE PAS PAR `days` ICI si c'est un Véhicule.
         # On envoie 'val' = "km/jour" et 'days' séparément, 
         # afin que carbon_calculator fasse total_value = val * days.
         #
@@ -2734,9 +2828,18 @@ class MainWindow(QMainWindow):
         if self.quantity_label.isVisible() and self.quantity_input.isVisible():
             try:
                 quantity_str = self.quantity_input.text().strip().replace(',', '.')
-                quantity = float(quantity_str) if quantity_str else 0.0
+                quantity_raw = float(quantity_str) if quantity_str else 0.0
             except ValueError:
-                quantity = 0.0
+                quantity_raw = 0.0
+            # Solide en vrac : convertir grammes → unités fractionnaires pour le calculateur
+            if self._current_masse_unitaire_g and self._current_masse_unitaire_g > 0:
+                quantity = quantity_raw / self._current_masse_unitaire_g
+            else:
+                quantity = quantity_raw
+
+        custom_fe = 0.0
+        if self.fe_massique_input is not None and self.fe_massique_input.isVisible():
+            custom_fe = safe_float(self.fe_massique_input.text().strip().replace(',', '.'))
 
         data_dict = {
             'category': category,
@@ -2744,12 +2847,13 @@ class MainWindow(QMainWindow):
             'subsubcategory': subsubcategory,
             'name': category_nacres,
             'year': year,
-            'value': val,   # c’est km/jour pour Véhicules, euros pour Achats, etc.
+            'value': val,   # c'est km/jour pour Véhicules, euros pour Achats, etc.
             'days': days,
             'code_nacres': code_nacres,
             'consommable': consommable,
             'quantity': quantity,
             'origine': self.origine_combo.currentText() if self.origine_combo and self.origine_combo.isVisible() else self.data_manager.TRANSPORT_DEFAULT,
+            'custom_fe': custom_fe,
         }
 
                 # --- Enrichissement des données massiques pour le bilan carbone ---
@@ -2765,7 +2869,7 @@ class MainWindow(QMainWindow):
                 # Masse et matériau du produit
                 data_dict['masse_unitaire'] = safe_float(row.get(self.data_manager.MASSE_G_COL, 0.0))
                 data_dict['materiau_conso']   = row.get(self.data_manager.MATERIAU_COL, "")
-                # Masse et matériau de l’emballage
+                # Masse et matériau de l'emballage
                 data_dict['masse_emballage']  = safe_float(row.get(self.data_manager.MASSE_EMBALLAGE_COL, 0.0))
                 data_dict['materiau_emballage'] = row.get(self.data_manager.MATERIAU_EMBALLAGE_COL, "")
                 # Masse et matériau du conditionnement
@@ -2805,6 +2909,8 @@ class MainWindow(QMainWindow):
         self.input_field.clear()
         if self.quantity_input is not None:
             self.quantity_input.clear()
+        if self.fe_massique_input is not None:
+            self.fe_massique_input.clear()
         self.data_changed.emit()
 
     def modify_selected_calculation(self):
