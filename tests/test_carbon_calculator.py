@@ -303,6 +303,35 @@ class TestMassBasedEmissions(unittest.TestCase):
         self.assertFalse(math.isnan(masse),    "masse ne doit pas être NaN")
         self.assertEqual(missing, [])
 
+    def test_chaine_vide_dans_masse_traitee_comme_zero(self):
+        """Régression UI : une masse vide '' ne doit pas faire planter float('')."""
+        df = pd.DataFrame([{
+            'Code NACRES': 'AA01',
+            'Consommable': 'Agar catalogue',
+            'Masse unitaire (g)': '',
+            'Matériau consommable': 'Plastique',
+            'Masse unitaire deuxieme materiaux (g)': '',
+            'Matériau deuxieme materiaux': '',
+            'Masse unitaire troisième materiaux (g)': '',
+            'Matériau troisième materiaux': '',
+            'Masse emballage unitaire (g)': '',
+            'Matériau emballage': '',
+            'Masse condionnement (g)': '',
+            'Matériau conditionnement': '',
+            'Nbr par conditionnement': '',
+        }])
+        dm = _make_dm(
+            data_masse=df,
+            material_map={'Plastique': (2.0, 0.1)}
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, unc, missing = calc._calculate_mass_based_emissions_old(
+            'AA01', 'Agar catalogue', quantity=5
+        )
+        self.assertEqual(emission, 0.0)
+        self.assertEqual(masse, 0.0)
+        self.assertEqual(missing, [])
+
     def test_code_nacres_na_retourne_zero(self):
         """Code NACRES 'NA' → résultat nul sans erreur."""
         dm = _make_dm()
@@ -353,6 +382,22 @@ class TestLiquidEmissions(unittest.TestCase):
         emission, masse, err = calc._calculate_liquid_emissions('ZZ99', volume_ml=100)
         self.assertEqual(emission, 0.0)
         self.assertEqual(masse, 0.0)
+
+    def test_entree_non_volumique_existante_utilise_grammes(self):
+        """Une ancienne entrée non volumique en base liquides peut encore être calculée en grammes."""
+        liquid_row = pd.Series({
+            'Code NACRES': 'NA73',
+            'Produit': 'AGAR AGAR TECHNICAL',
+            'Unité': 'g',
+            'Facteur CO₂ (kg CO₂e/kg)': 12.0,
+            'Incertitude (%)': '',
+        })
+        dm = _make_dm(liquid_row=liquid_row)
+        calc = CarbonCalculator(dm)
+        emission, masse, err = calc._calculate_liquid_emissions('NA73', volume_ml=5000)
+        self.assertAlmostEqual(masse, 5.0)
+        self.assertAlmostEqual(emission, 60.0)
+        self.assertEqual(err, 0.0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

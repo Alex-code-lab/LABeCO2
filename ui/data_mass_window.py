@@ -70,11 +70,9 @@ class DataMassWindow(QMainWindow):
             "Prix du conditionnement",
             "date d'ajout",
             "Source/Signature",
+            "Source catalogue IJM",
             "Lien / Note / Remarque",
-            "prix_ht_ijm",
             "condt_ijm",
-            "nb_unites_ijm",
-            "prix_unitaire_ijm",
             "designation_ijm",
             "code_ijm",
             "marque_ijm",
@@ -99,7 +97,16 @@ class DataMassWindow(QMainWindow):
             "Matériau emballage",
             "Masse emballage (g)",
             "Source/Signature",
-            "Note"
+            "date d'ajout",
+            "Note",
+            "Prix du conditionnement",
+            "Nbr par conditionnement",
+            "Source catalogue IJM",
+            "condt_ijm",
+            "designation_ijm",
+            "code_ijm",
+            "marque_ijm",
+            "score_match",
         ]
 
         # Fichier pour les consommables liquides (modifiable → user_path)
@@ -151,11 +158,9 @@ class DataMassWindow(QMainWindow):
                 "Prix du conditionnement": "",
                 "date d'ajout": "",
                 "Source/Signature": "Alexandre Souchaud",
+                "Source catalogue IJM": "",
                 "Lien / Note / Remarque": "",
-                "prix_ht_ijm": "",
                 "condt_ijm": "",
-                "nb_unites_ijm": "",
-                "prix_unitaire_ijm": "",
                 "designation_ijm": "",
                 "code_ijm": "",
                 "marque_ijm": "",
@@ -670,13 +675,7 @@ class DataMassWindow(QMainWindow):
     def compute_manual_price_fields(self, nbr_cond):
         price_text = self.price_input.text().strip().replace(',', '.')
         if not price_text:
-            return {
-                "Prix du conditionnement": "",
-                "prix_ht_ijm": "",
-                "condt_ijm": "",
-                "nb_unites_ijm": "",
-                "prix_unitaire_ijm": "",
-            }
+            return {"Prix du conditionnement": ""}
 
         try:
             price = float(price_text)
@@ -686,19 +685,11 @@ class DataMassWindow(QMainWindow):
             raise ValueError("Le prix doit être positif.")
 
         if self.price_mode_combo.currentText() == "Prix par unité":
-            prix_unitaire = price
             prix_conditionnement = price * nbr_cond
         else:
             prix_conditionnement = price
-            prix_unitaire = price / nbr_cond
 
-        return {
-            "Prix du conditionnement": prix_conditionnement,
-            "prix_ht_ijm": prix_conditionnement,
-            "condt_ijm": "1" if nbr_cond == 1 else f"1x{nbr_cond}",
-            "nb_unites_ijm": nbr_cond,
-            "prix_unitaire_ijm": prix_unitaire,
-        }
+        return {"Prix du conditionnement": prix_conditionnement}
 
     def update_price_preview(self):
         if self.is_liquid:
@@ -846,6 +837,7 @@ class DataMassWindow(QMainWindow):
                 "Matériau emballage": mat_emb_liq,
                 "Masse emballage (g)": masse_emb_liq or None,
                 "Source/Signature": source,
+                "date d'ajout": date.today().isoformat(),
                 "Note": lien_note
             }
         else:
@@ -879,12 +871,6 @@ class DataMassWindow(QMainWindow):
 
             if price_fields:
                 nouvel_objet.update(price_fields)
-                nouvel_objet.update({
-                    "designation_ijm": nom,
-                    "code_ijm": reference,
-                    "marque_ijm": marque,
-                    "score_match": "saisie utilisateur",
-                })
 
         if is_liq:
             self.save_liquid(nouvel_objet)
@@ -949,15 +935,14 @@ class DataMassWindow(QMainWindow):
             if col not in df_liq.columns:
                 df_liq[col] = ""
 
-        new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
-
         # Mise à jour de la ligne existante si mode enrichissement
         if getattr(self, '_prefill_liq_produit', None):
             mask = df_liq["Produit"].astype(str).str.strip() == self._prefill_liq_produit
             if mask.any():
                 idx = df_liq[mask].index[0]
-                for col in self.columns_liquids:
-                    val = new_line[col].iloc[0] if col in new_line.columns else ""
+                for col, val in obj_dict.items():
+                    if col not in df_liq.columns:
+                        df_liq[col] = ""
                     df_liq.at[idx, col] = val
                 self._prefill_liq_produit = None
                 df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
@@ -966,6 +951,7 @@ class DataMassWindow(QMainWindow):
                     self.afficher_donnees()
                 return
 
+        new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
         df_liq = pd.concat([df_liq, new_line], ignore_index=True)
         df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
         self.data_liquids = df_liq

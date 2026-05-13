@@ -47,7 +47,11 @@ class DataManager:
     MATERIAU_NAME_COL = "Materiau"
     EQUIV_CO2_COL = "Equivalent CO₂ (kg eCO₂/kg)"
 
-    # Colonnes prix catalogue IJM (dans data_masse)
+    # Colonnes prix consommables. "Prix du conditionnement" est la source de
+    # vérité; les anciennes colonnes *_ijm restent lues en fallback pour les
+    # bases non migrées.
+    PRIX_CONDITIONNEMENT_COL = "Prix du conditionnement"
+    SOURCE_CATALOGUE_IJM_COL = "Source catalogue IJM"
     PRIX_UNITAIRE_COL = "prix_unitaire_ijm"
     PRIX_HT_COL       = "prix_ht_ijm"
     CONDT_IJM_COL     = "condt_ijm"
@@ -262,26 +266,65 @@ class DataManager:
         """Retourne une chaîne propre pour une cellule pandas possiblement vide."""
         if pd.isna(value):
             return ""
-        return str(value).strip()
+        text = str(value).strip()
+        return "" if text.lower() in ("", "nan", "none", "n/a") else text
+
+    @staticmethod
+    def _to_float_or_none(value):
+        if pd.isna(value):
+            return None
+        text = str(value).strip().replace(",", ".")
+        if text.lower() in ("", "nan", "none", "n/a"):
+            return None
+        try:
+            return float(text)
+        except (TypeError, ValueError):
+            return None
+
+    def _row_price_conditionnement(self, row):
+        """Prix HT du conditionnement, avec fallback legacy prix_ht_ijm."""
+        price = self._to_float_or_none(row.get(self.PRIX_CONDITIONNEMENT_COL, None))
+        if price is None:
+            price = self._to_float_or_none(row.get(self.PRIX_HT_COL, None))
+        return price
+
+    def _row_nb_conditionnement(self, row):
+        """Nombre d'unités par conditionnement, avec fallback legacy nb_unites_ijm."""
+        nb = self._to_float_or_none(row.get(self.NOMBRE_PAR_COND_COL, None))
+        if nb is None:
+            nb = self._to_float_or_none(row.get(self.NB_UNITES_IJM_COL, None))
+        return nb
+
+    def _row_prix_unitaire(self, row):
+        price = self._row_price_conditionnement(row)
+        nb = self._row_nb_conditionnement(row)
+        if price is not None and nb and nb > 0:
+            return price / nb
+        return self._to_float_or_none(row.get(self.PRIX_UNITAIRE_COL, None))
+
+    def _row_has_price(self, row):
+        return self._row_prix_unitaire(row) is not None
 
     def _prix_info_from_row(self, row):
-        """Construit les métadonnées du produit IJM associé à une ligne data_masse."""
+        """Construit les métadonnées de prix d'une ligne consommable."""
         def get(col_name):
             return self._clean_cell(row.get(col_name, ""))
 
-        raw_price = row.get(self.PRIX_UNITAIRE_COL, None)
-        prix_unitaire = None if pd.isna(raw_price) else float(raw_price)
+        prix_conditionnement = self._row_price_conditionnement(row)
+        nb_unites = self._row_nb_conditionnement(row)
+        prix_unitaire = self._row_prix_unitaire(row)
 
         return {
             "prix_unitaire": prix_unitaire,
             "consommable": get(self.CONSOMMABLE_COL),
             "designation": get(self.DESIGNATION_IJM_COL) or get(self.CONSOMMABLE_COL),
             "conditionnement": get(self.CONDT_IJM_COL),
-            "nb_unites": get(self.NB_UNITES_IJM_COL),
-            "prix_ht": get(self.PRIX_HT_COL),
+            "nb_unites": "" if nb_unites is None else nb_unites,
+            "prix_ht": "" if prix_conditionnement is None else prix_conditionnement,
             "code_ijm": get(self.CODE_IJM_COL),
             "marque": get(self.MARQUE_IJM_COL),
             "score_match": get(self.SCORE_MATCH_COL),
+            "source_catalogue": get(self.SOURCE_CATALOGUE_IJM_COL),
         }
 
     def _find_prix_unitaire_row(self, code_nacres, consommable_name=""):
@@ -293,7 +336,7 @@ class DataManager:
 
         code = clean_text(code_nacres).upper()
         df = self.data_masse
-        if self.PRIX_UNITAIRE_COL not in df.columns:
+        if self.PRIX_CONDITIONNEMENT_COL not in df.columns and self.PRIX_UNITAIRE_COL not in df.columns:
             return None
 
         mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code)
@@ -302,11 +345,18 @@ class DataManager:
         if candidates.empty:
             return None
 
+        if consommable_name:
+            exact = candidates[
+                candidates[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip()
+            ]
+            if not exact.empty:
+                for _, row in exact.iterrows():
+                    if self._row_has_price(row):
+                        return row
+                return None
+
         # Garder seulement les lignes avec un prix
-        has_price = (
-            candidates[self.PRIX_UNITAIRE_COL].notna() &
-            (candidates[self.PRIX_UNITAIRE_COL].astype(str).str.strip() != "")
-        )
+        has_price = candidates.apply(self._row_has_price, axis=1)
         price_cands = candidates[has_price]
         if price_cands.empty:
             return None
@@ -364,16 +414,26 @@ class DataManager:
         if self.data_liquides.empty:
             return None
         df = self.data_liquides
-        if self.PRIX_UNITAIRE_COL not in df.columns:
+        if self.PRIX_CONDITIONNEMENT_COL not in df.columns and self.PRIX_UNITAIRE_COL not in df.columns:
             return None
         mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres)
         candidates = df[mask]
         if candidates.empty:
             return None
-        has_price = (
-            candidates[self.PRIX_UNITAIRE_COL].notna() &
-            (candidates[self.PRIX_UNITAIRE_COL].astype(str).str.strip() != "")
-        )
+
+        if produit_name:
+            exact = candidates[
+                candidates["Produit"].astype(str).str.strip() == produit_name.strip()
+            ]
+            if not exact.empty:
+                for _, row in exact.iterrows():
+                    if self._row_has_price(row):
+                        candidates = exact
+                        break
+                else:
+                    return None
+
+        has_price = candidates.apply(self._row_has_price, axis=1)
         price_cands = candidates[has_price]
         if price_cands.empty:
             return None
@@ -387,18 +447,20 @@ class DataManager:
                 if score > best_score:
                     best_score, best_row = score, r
             row = best_row
-        raw_price = row.get(self.PRIX_UNITAIRE_COL, None)
-        prix_unitaire = None if pd.isna(raw_price) else float(raw_price)
+        prix_conditionnement = self._row_price_conditionnement(row)
+        nb_unites = self._row_nb_conditionnement(row)
+        prix_unitaire = self._row_prix_unitaire(row)
         return {
             "prix_unitaire": prix_unitaire,
             "consommable": self._clean_cell(row.get("Produit", "")),
             "designation": self._clean_cell(row.get(self.DESIGNATION_IJM_COL, "")) or self._clean_cell(row.get("Produit", "")),
             "conditionnement": self._clean_cell(row.get(self.CONDT_IJM_COL, "")),
-            "nb_unites": self._clean_cell(row.get(self.NB_UNITES_IJM_COL, "")),
-            "prix_ht": self._clean_cell(row.get(self.PRIX_HT_COL, "")),
+            "nb_unites": "" if nb_unites is None else nb_unites,
+            "prix_ht": "" if prix_conditionnement is None else prix_conditionnement,
             "code_ijm": self._clean_cell(row.get(self.CODE_IJM_COL, "")),
             "marque": self._clean_cell(row.get(self.MARQUE_IJM_COL, "")),
             "score_match": self._clean_cell(row.get(self.SCORE_MATCH_COL, "")),
+            "source_catalogue": self._clean_cell(row.get(self.SOURCE_CATALOGUE_IJM_COL, "")),
         }
 
     def get_liquid_data(self, code_nacres, produit=None):

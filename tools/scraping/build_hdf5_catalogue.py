@@ -28,9 +28,7 @@ NUMERIC_COLS = [
     "Masse emballage unitaire (g)",
     "Masse condionnement (g)",
     "Nbr par conditionnement",
-    "prix_ht_ijm",
-    "nb_unites_ijm",
-    "prix_unitaire_ijm",
+    "Prix du conditionnement",
 ]
 
 
@@ -74,7 +72,7 @@ def build():
 
     print(f"\n{len(df)} produits enregistrés dans : {HDF5_PATH}")
     avec_masse  = df["Masse unitaire (g)"].notna().sum()
-    avec_prix   = df["prix_unitaire_ijm"].notna().sum()
+    avec_prix   = df["Prix du conditionnement"].notna().sum()
     print(f"  Avec données masse  : {avec_masse}")
     print(f"  Avec prix IJM       : {avec_prix}")
     print(f"  Colonnes            : {list(df.columns)}")

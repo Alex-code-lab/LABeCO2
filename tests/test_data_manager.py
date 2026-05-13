@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 
 # Neutraliser PySide6 et tables/HDF5
-for _mod in ['PySide6', 'PySide6.QtWidgets', 'PySide6.QtCore', 'tables', 'tables.flavor']:
+for _mod in ['PySide6', 'PySide6.QtWidgets', 'PySide6.QtCore', 'PySide6.QtGui', 'tables', 'tables.flavor']:
     sys.modules.setdefault(_mod, MagicMock())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -27,7 +27,17 @@ def _make_dm():
     dm.MATERIAU_NAME_COL = DataManager.MATERIAU_NAME_COL
     dm.EQUIV_CO2_COL     = DataManager.EQUIV_CO2_COL
     dm.UNCERTAINTY_COL   = DataManager.UNCERTAINTY_COL
+    dm.NOMBRE_PAR_COND_COL = DataManager.NOMBRE_PAR_COND_COL
+    dm.PRIX_CONDITIONNEMENT_COL = DataManager.PRIX_CONDITIONNEMENT_COL
+    dm.SOURCE_CATALOGUE_IJM_COL = DataManager.SOURCE_CATALOGUE_IJM_COL
     dm.PRIX_UNITAIRE_COL = DataManager.PRIX_UNITAIRE_COL
+    dm.PRIX_HT_COL       = DataManager.PRIX_HT_COL
+    dm.CONDT_IJM_COL     = DataManager.CONDT_IJM_COL
+    dm.NB_UNITES_IJM_COL = DataManager.NB_UNITES_IJM_COL
+    dm.DESIGNATION_IJM_COL = DataManager.DESIGNATION_IJM_COL
+    dm.CODE_IJM_COL      = DataManager.CODE_IJM_COL
+    dm.MARQUE_IJM_COL    = DataManager.MARQUE_IJM_COL
+    dm.SCORE_MATCH_COL   = DataManager.SCORE_MATCH_COL
     return dm
 
 
@@ -164,6 +174,53 @@ class TestGetMaterialDataExtra(unittest.TestCase):
         co2, unc = dm.get_material_data("Inconnu")
         self.assertIsNone(co2)
         self.assertIsNone(unc)
+
+
+class TestPrixUnitaireCanonique(unittest.TestCase):
+
+    def test_prix_unitaire_calcule_depuis_prix_conditionnement(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([{
+            "Code NACRES": "NB11",
+            "Consommable": "Tube IJM",
+            "Prix du conditionnement": 70.0,
+            "Nbr par conditionnement": 500,
+            "Source catalogue IJM": "Catalogue IJM 2025",
+            "condt_ijm": "1x500",
+            "designation_ijm": "Tube IJM",
+            "code_ijm": "P001",
+            "marque_ijm": "MARQUE",
+            "score_match": "",
+        }])
+
+        info = dm.get_prix_unitaire_info("NB11", "Tube IJM")
+
+        self.assertIsNotNone(info)
+        self.assertAlmostEqual(info["prix_unitaire"], 0.14)
+        self.assertEqual(info["prix_ht"], 70.0)
+        self.assertEqual(info["source_catalogue"], "Catalogue IJM 2025")
+
+    def test_ligne_manuelle_exacte_sans_prix_ne_fuzzy_match_pas(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([
+            {
+                "Code NACRES": "NB11",
+                "Consommable": "Tube manuel",
+                "Prix du conditionnement": "",
+                "Nbr par conditionnement": "",
+            },
+            {
+                "Code NACRES": "NB11",
+                "Consommable": "Tube catalogue",
+                "Prix du conditionnement": 70.0,
+                "Nbr par conditionnement": 500,
+                "Source catalogue IJM": "Catalogue IJM 2025",
+            },
+        ])
+
+        info = dm.get_prix_unitaire_info("NB11", "Tube manuel")
+
+        self.assertIsNone(info)
 
 
 if __name__ == "__main__":

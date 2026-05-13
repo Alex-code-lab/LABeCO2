@@ -15,6 +15,7 @@
 import sys
 import os
 import math
+import re
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
@@ -2171,13 +2172,15 @@ class MainWindow(QMainWindow):
             self._current_prix_unitaire = prix
             condt = prix_info.get("conditionnement", "")
             condt_text = str(condt or "").strip()
+            price_source = str(prix_info.get("source_catalogue") or "").strip()
+            source_label = "catalogue IJM" if price_source else "base consommables"
             if condt_text and condt_text.lower() != "nan":
                 label_text = (
-                    f"ℹ  Prix par unité (catalogue IJM) : {prix:.4f} €  |  "
+                    f"ℹ  Prix par unité ({source_label}) : {prix:.4f} €  |  "
                     f"Conditionnement : {condt_text}"
                 )
             else:
-                label_text = f"ℹ  Prix par unité (catalogue IJM) : {prix:.4f} €"
+                label_text = f"ℹ  Prix par unité ({source_label}) : {prix:.4f} €"
             self.prix_unitaire_label.setText(label_text)
             self._current_prix_unitaire_info_text = self._format_prix_unitaire_tooltip(prix_info)
             self.prix_unitaire_label.setToolTip(self._current_prix_unitaire_info_text)
@@ -2254,8 +2257,13 @@ class MainWindow(QMainWindow):
         )
 
     def _format_prix_unitaire_tooltip(self, prix_info):
-        """Construit l'infobulle de détail du produit catalogue IJM."""
-        lines = ["Produit catalogue IJM utilisé pour le prix :"]
+        """Construit l'infobulle de détail du prix utilisé."""
+        source_catalogue = str(prix_info.get("source_catalogue") or "").strip()
+        lines = [
+            "Produit catalogue IJM utilisé pour le prix :"
+            if source_catalogue else
+            "Prix renseigné dans la base consommables :"
+        ]
         fields = [
             ("Désignation", prix_info.get("designation")),
             ("Code IJM", prix_info.get("code_ijm")),
@@ -2264,6 +2272,7 @@ class MainWindow(QMainWindow):
             ("Conditionnement", prix_info.get("conditionnement")),
             ("Nombre d'unités", prix_info.get("nb_unites")),
             ("Prix par unité", prix_info.get("prix_unitaire")),
+            ("Source catalogue", source_catalogue),
             ("Score de rapprochement", prix_info.get("score_match")),
         ]
 
@@ -2445,6 +2454,11 @@ class MainWindow(QMainWindow):
         de données de masse enregistrées dans la base.
         """
         import pandas as pd
+
+        def _missing_text(value):
+            text = clean_text(value)
+            return not text or text.casefold() in {"na", "n/a"}
+
         selected = self._selected_consumable_data()
         if not selected:
             self.masse_manquante_label.setVisible(False)
@@ -2456,20 +2470,25 @@ class MainWindow(QMainWindow):
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
             )
+            unit = clean_text(liq_row.get("Unité", "") if liq_row is not None else "").casefold()
+            is_volume_based = unit in {"ml", "millilitre", "millilitres"} or (
+                liq_row is not None and safe_float(liq_row.get("Volume flacon (mL)", 0.0), default=0.0) > 0
+            )
             has_container = (
                 liq_row is not None and
-                str(liq_row.get("Matériau contenant", "") or "").strip() != "" and
-                float(liq_row.get("Masse contenant (g)", 0.0) or 0.0) > 0
+                not _missing_text(liq_row.get("Matériau contenant", "")) and
+                safe_float(liq_row.get("Masse contenant (g)", 0.0), default=0.0) > 0
             )
             self.masse_manquante_label.setText(
-                "✔  Données liquide disponibles."
+                "✔  Données liquide/solvant disponibles." if is_volume_based
+                else "✔  Données consommable disponibles."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #166534; background-color: #dcfce7; "
                 "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
             )
             self.masse_manquante_label.setVisible(True)
-            if not has_container:
+            if is_volume_based and not has_container:
                 self.contenant_warning_label.setText(
                     "⚠  Contenant (flacon) non renseigné. Cliquez sur « Enrichir » pour ajouter "
                     "le matériau et la masse du flacon : cela peut modifier significativement le résultat."
@@ -2505,7 +2524,8 @@ class MainWindow(QMainWindow):
             self.masse_manquante_label.setVisible(True)
             return
 
-        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        solid_row = row.iloc[0]
+        masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
         if pd.isna(masse) or str(masse).strip() == "":
             self.masse_manquante_label.setText(
                 "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
@@ -2523,11 +2543,66 @@ class MainWindow(QMainWindow):
                 "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
             )
         self.masse_manquante_label.setVisible(True)
+
+        has_packaging = (
+            not _missing_text(solid_row.get(self.data_manager.MATERIAU_EMBALLAGE_COL, "")) and
+            safe_float(solid_row.get(self.data_manager.MASSE_EMBALLAGE_COL, 0.0), default=0.0) > 0
+        )
+        if not has_packaging:
+            self.contenant_warning_label.setText(
+                "⚠  Emballage non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                "le matériau et la masse de l'emballage : cela peut modifier significativement le résultat."
+            )
+            self.contenant_warning_label.setStyleSheet(
+                "color: #92400e; background-color: #fffbeb; "
+                "border: 1px solid #fcd34d; border-radius: 4px; padding: 4px 8px;"
+            )
+            self.contenant_warning_label.setVisible(True)
+        else:
+            self.contenant_warning_label.setVisible(False)
+
+    def _liquid_conditionnement_quantity(self, row, unit):
+        """Quantité contenue dans une unité de conditionnement, exprimée dans l'unité de saisie."""
+        unit_clean = clean_text(unit).casefold() or "ml"
+        condt = clean_text(row.get("condt_ijm", "")).casefold().replace(",", ".")
+
+        if unit_clean in {"ml", "millilitre", "millilitres"}:
+            volume = safe_float(row.get("Volume flacon (mL)", None), default=0.0)
+            if volume > 0:
+                return volume
+            match_ml = re.search(r"(\d+(?:\.\d+)?)\s*ml\b", condt)
+            if match_ml:
+                return safe_float(match_ml.group(1), default=0.0)
+            match_l = re.search(r"(\d+(?:\.\d+)?)\s*(?:l|litre|liter)s?\b", condt)
+            if match_l:
+                return safe_float(match_l.group(1), default=0.0) * 1000.0
+            return 0.0
+
+        if unit_clean in {"g", "gramme", "grammes"}:
+            match_kg = re.search(r"(\d+(?:\.\d+)?)\s*kg\b", condt)
+            if match_kg:
+                return safe_float(match_kg.group(1), default=0.0) * 1000.0
+            match_g = re.search(r"(\d+(?:\.\d+)?)\s*g\b", condt)
+            if match_g:
+                return safe_float(match_g.group(1), default=0.0)
+            return 0.0
+
+        if unit_clean in {"kg", "kilogramme", "kilogrammes"}:
+            match_kg = re.search(r"(\d+(?:\.\d+)?)\s*kg\b", condt)
+            if match_kg:
+                return safe_float(match_kg.group(1), default=0.0)
+            match_g = re.search(r"(\d+(?:\.\d+)?)\s*g\b", condt)
+            if match_g:
+                return safe_float(match_g.group(1), default=0.0) / 1000.0
+            return 0.0
+
+        return 0.0
+
     def _auto_fill_prix(self):
         """
         Remplit automatiquement le champ prix (input_field).
         - Solides : quantité (unités) × prix unitaire IJM
-        - Liquides : (volume_mL / volume_flacon_mL) × prix flacon IJM
+        - Liquides : quantité / quantité du conditionnement × prix de l'unité IJM
         """
         if self._current_prix_unitaire is None:
             return
@@ -2547,10 +2622,11 @@ class MainWindow(QMainWindow):
             )
             if row is None:
                 return
-            vol_flacon = row.get("Volume flacon (mL)", None)
-            if not vol_flacon or float(vol_flacon or 0) <= 0:
+            unit = clean_text(row.get("Unité", "")) or "mL"
+            conditionnement_qty = self._liquid_conditionnement_quantity(row, unit)
+            if conditionnement_qty <= 0:
                 return
-            prix_total = (qty / float(vol_flacon)) * self._current_prix_unitaire
+            prix_total = (qty / conditionnement_qty) * self._current_prix_unitaire
         elif self._current_masse_unitaire_g and self._current_masse_unitaire_g > 0:
             # Solide vendu en vrac : qty est en grammes
             prix_total = (qty / self._current_masse_unitaire_g) * self._current_prix_unitaire
@@ -2591,7 +2667,7 @@ class MainWindow(QMainWindow):
         )
         if row is None:
             return False
-        return float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0) or 0.0) > 0
+        return safe_float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0), default=0.0) > 0
 
     def _update_quantity_label(self, selected):
         """Met à jour le texte du label Quantité et le champ FE selon le type de consommable."""
@@ -2604,12 +2680,15 @@ class MainWindow(QMainWindow):
             unit = "mL"
             if row is not None:
                 u = str(row.get("Unité", "") or "").strip()
-                if u and u.lower() != "ml":
-                    unit = "mL"
+                if u:
+                    unit = u
             self._current_masse_unitaire_g = None
             self.quantity_label.setText(f"Quantité ({unit}) :")
             has_factor = self._liquid_has_co2_factor(selected)
-            self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/L) :")
+            if clean_text(unit).casefold() in {"g", "kg", "gramme", "grammes", "kilogramme", "kilogrammes"}:
+                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/kg) :")
+            else:
+                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/L) :")
             self.fe_massique_label.setVisible(not has_factor)
             self.fe_massique_input.setVisible(not has_factor)
         else:
@@ -3139,14 +3218,23 @@ class MainWindow(QMainWindow):
 
         liquid_row = self._find_liquid_row(code_nacres, consommable)
         if liquid_row is not None:
+            unit = clean_text(liquid_row.get("Unité", "")) or "mL"
+            unit_clean = unit.casefold()
             dens = safe_float(liquid_row.get("Densité (g/mL)"), default=0.0)
-            mass_kg = dens * quantity / 1000.0
-            return [
-                "Détail masse liquide :",
-                f"- Volume : {format_quantity(quantity)} mL",
-                f"- Densité : {dens:.4f} g/mL",
-                f"Masse totale : {mass_kg:.4f} kg",
-            ]
+            if unit_clean in {"kg", "kilogramme", "kilogrammes"}:
+                mass_kg = quantity
+                detail = f"- Quantité : {format_quantity(quantity)} {unit}"
+            elif unit_clean in {"g", "gramme", "grammes"}:
+                mass_kg = quantity / 1000.0
+                detail = f"- Quantité : {format_quantity(quantity)} {unit}"
+            else:
+                mass_kg = dens * quantity / 1000.0
+                detail = f"- Volume : {format_quantity(quantity)} {unit}"
+            lines = ["Détail masse liquide :", detail]
+            if dens > 0 and unit_clean not in {"g", "kg", "gramme", "grammes", "kilogramme", "kilogrammes"}:
+                lines.append(f"- Densité : {dens:.4f} g/mL")
+            lines.append(f"Masse totale : {mass_kg:.4f} kg")
+            return lines
 
         total_mass = safe_float(data.get("total_mass"), default=0.0)
         if total_mass > 0:

@@ -1,8 +1,8 @@
 """
 merge_prix_consommables.py
 
-Enrichit le fichier de masses des consommables avec les prix du catalogue IJM,
-puis produit un catalogue complet en ajoutant les produits IJM non matchés.
+Produit un catalogue complet en gardant les lignes saisies a la main separees
+des lignes prix issues du catalogue IJM.
 
 Usage :
     python Scrapping/merge_prix_consommables.py
@@ -13,16 +13,19 @@ Entrées :
 
 Sorties :
     Scrapping/output/masses_consommable_with_prix.csv
-        → Consommables de la base masse enrichis des prix IJM.
-          Seuls les matchs "même famille produit" sont conservés.
+        → Consommables de la base masse, sans prix catalogue injecte
+          automatiquement.
 
     Scrapping/output/catalogue_complet.csv
-        → Tout : base masse (enrichie) + produits IJM sans correspondance masse.
-          Les colonnes masse sont vides pour les produits IJM seuls.
+        → Base masse + produits IJM en lignes separees. Le prix catalogue est
+          stocke dans "Prix du conditionnement"; la provenance dans
+          "Source catalogue IJM".
 """
 
 import os
 import csv
+import re
+from datetime import date
 from difflib import SequenceMatcher
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +33,7 @@ MASSES_CSV = os.path.join(BASE_DIR, "masses_consommable - liste consommables (1)
 PRIX_CSV   = os.path.join(BASE_DIR, "output", "prix_ijm_2025.csv")
 OUT_MASSE  = os.path.join(BASE_DIR, "output", "masses_consommable_with_prix.csv")
 OUT_COMPLET= os.path.join(BASE_DIR, "output", "catalogue_complet.csv")
+RUN_DATE = date.today().isoformat()
 
 os.makedirs(os.path.join(BASE_DIR, "output"), exist_ok=True)
 
@@ -93,6 +97,36 @@ def build_prix_index(prix_rows):
     return index
 
 
+def packaging_text(row):
+    return f"{row.get('condt', '')} {row.get('designation', '')}".casefold().replace(",", ".")
+
+
+def infer_unit(row):
+    text = packaging_text(row)
+    if re.search(r"\d+(?:\.\d+)?\s*(?:µl|μl|ul|ml|millilitres?|milliliters?)\b", text):
+        return "mL"
+    if re.search(r"\d+(?:\.\d+)?\s*(?:l|litres?|liters?)\b", text):
+        return "mL"
+    if re.search(r"\d+(?:\.\d+)?\s*kg\b", text) or re.search(r"\d+(?:\.\d+)?\s*g\b", text):
+        return "g"
+    return ""
+
+
+def is_liquid_catalogue_row(row):
+    return row["code_nacres"].strip()[:4].upper().startswith("NA") and infer_unit(row) == "mL"
+
+
+def infer_conditionnement_mass_g(row):
+    text = packaging_text(row)
+    match_kg = re.search(r"(\d+(?:\.\d+)?)\s*kg\b", text)
+    if match_kg:
+        return str(float(match_kg.group(1)) * 1000.0)
+    match_g = re.search(r"(\d+(?:\.\d+)?)\s*g\b", text)
+    if match_g:
+        return str(float(match_g.group(1)))
+    return ""
+
+
 def best_match(consommable_name, candidates):
     """
     Parmi les candidats, cherche d'abord dans la même famille produit.
@@ -114,13 +148,11 @@ def best_match(consommable_name, candidates):
     return best_row, round(best_score, 3), bool(same_fam)
 
 
-# ── Colonnes ajoutées côté prix ───────────────────────────────────────────────
+# ── Colonnes ajoutées côté catalogue ──────────────────────────────────────────
 PRIX_FIELDS = [
     "code_nacres_court",
-    "prix_ht_ijm",
+    "Source catalogue IJM",
     "condt_ijm",
-    "nb_unites_ijm",
-    "prix_unitaire_ijm",
     "designation_ijm",
     "code_ijm",
     "marque_ijm",
@@ -132,41 +164,24 @@ def merge():
     masses_rows, masses_fields = load_csv(MASSES_CSV)
     prix_rows, _               = load_csv(PRIX_CSV)
 
-    prix_index = build_prix_index(prix_rows)
+    out_fields = list(masses_fields)
+    for col in ["Prix du conditionnement", "Nbr par conditionnement"]:
+        if col not in out_fields:
+            out_fields.append(col)
+    if "date d'ajout" not in out_fields:
+        out_fields.append("date d'ajout")
+    for col in PRIX_FIELDS:
+        if col not in out_fields:
+            out_fields.append(col)
 
-    out_fields = list(masses_fields) + PRIX_FIELDS
-
-    results     = []       # lignes enrichies pour fichier 1
-    matched_ijm = set()    # index des lignes IJM utilisées (pour fichier 2)
-
-    kept = 0
-    removed = 0
+    results = []
 
     for row in masses_rows:
         code_long   = row.get("Code NACRES", "").strip()
-        consommable = row.get("Consommable", "").strip()
         code4       = extract_code4(code_long)
 
         extra = {f: "" for f in PRIX_FIELDS}
         extra["code_nacres_court"] = code4
-
-        candidates = prix_index.get(code4)
-        if candidates:
-            best, score, has_family = best_match(consommable, candidates)
-            if has_family:
-                extra["prix_ht_ijm"]       = best["prix_ht"]
-                extra["condt_ijm"]         = best["condt"]
-                extra["nb_unites_ijm"]     = best["nb_unites"]
-                extra["prix_unitaire_ijm"] = best["prix_unitaire"]
-                extra["designation_ijm"]   = best["designation"]
-                extra["code_ijm"]          = best["code_ijm"]
-                extra["marque_ijm"]        = best["marque"]
-                extra["score_match"]       = score
-                matched_ijm.add(best["code_ijm"])
-                kept += 1
-            else:
-                extra["score_match"] = f"REMOVED({score})"
-                removed += 1
 
         results.append({**row, **extra})
 
@@ -177,19 +192,20 @@ def merge():
         writer.writerows(results)
 
     # ── Fichier 2 : catalogue complet ────────────────────────────────────────
-    # Lignes IJM non utilisées → colonnes masse vides
+    # Lignes IJM en lignes separees -> colonnes masse vides.
+    # Les codes NA* volumiques restent exclus ici : ils sont verses dans Liquides & Solvants
+    # par migrate_ijm_price_schema.py pour eviter les doublons du menu.
     ijm_only_rows = []
     for row in prix_rows:
-        if row["code_ijm"] in matched_ijm:
-            continue  # déjà représentée côté masse
-
+        code4 = row["code_nacres"].strip()[:4].upper()
+        if is_liquid_catalogue_row(row):
+            continue
         masse_empty = {f: "" for f in masses_fields}
+        page = row.get("page", "").strip()
         prix_extra  = {
-            "code_nacres_court": row["code_nacres"].strip()[:4].upper(),
-            "prix_ht_ijm"      : row["prix_ht"],
+            "code_nacres_court": code4,
+            "Source catalogue IJM": f"Catalogue IJM 2025, page {page}" if page else "Catalogue IJM 2025",
             "condt_ijm"        : row["condt"],
-            "nb_unites_ijm"    : row["nb_unites"],
-            "prix_unitaire_ijm": row["prix_unitaire"],
             "designation_ijm"  : row["designation"],
             "code_ijm"         : row["code_ijm"],
             "marque_ijm"       : row["marque"],
@@ -198,7 +214,13 @@ def merge():
         # On peut pré-remplir quelques champs évidents
         masse_empty["Consommable"] = row["designation"]
         masse_empty["Marque"]      = row["marque"]
+        masse_empty["Référence"]   = row["code_ijm"]
+        masse_empty["Catégorie"]   = "Autres consommables"
         masse_empty["Code NACRES"] = row["code_nacres"]
+        masse_empty["Masse unitaire (g)"] = infer_conditionnement_mass_g(row)
+        masse_empty["Prix du conditionnement"] = row["prix_ht"]
+        masse_empty["Nbr par conditionnement"] = row["nb_unites"]
+        masse_empty["date d'ajout"] = RUN_DATE
 
         ijm_only_rows.append({**masse_empty, **prix_extra})
 
@@ -212,24 +234,13 @@ def merge():
     # ── Résumé ────────────────────────────────────────────────────────────────
     print(f"\n{'─'*70}")
     print(f"Consommables traités        : {len(masses_rows)}")
-    print(f"  Matchés (même famille)    : {kept}")
-    print(f"  Supprimés (famille diff.) : {removed}")
+    print("  Prix IJM injectés         : 0 (lignes catalogue séparées)")
     print(f"\nFichier 1 ({len(results)} lignes)      : {OUT_MASSE}")
     print(f"Fichier 2 ({len(complet_rows)} lignes) : {OUT_COMPLET}")
     print(f"  dont {len(ijm_only_rows)} produits IJM sans données masse (à compléter)")
     print(f"{'─'*70}\n")
 
-    print(f"{'Score':<14} {'Consommable (base)':<33} {'Désignation IJM':<38} Code")
-    print("-" * 95)
-    for r in sorted(results, key=lambda x: str(x["score_match"])):
-        score = r["score_match"]
-        flag  = " ✗" if str(score).startswith("REMOVED") else ""
-        print(
-            f"{str(score):<14} "
-            f"{r['Consommable'][:31]:<33} "
-            f"{r.get('designation_ijm','')[:36]:<38} "
-            f"{r['code_nacres_court']}{flag}"
-        )
+    print(f"  Produits IJM séparés      : {len(ijm_only_rows)}")
 
 
 if __name__ == "__main__":
