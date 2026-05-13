@@ -92,6 +92,11 @@ class DataMassWindow(QMainWindow):
             "Concentration (mg/mL)",
             "Facteur CO₂ (kg CO₂e/kg)",
             "Incertitude (%)",
+            "Volume flacon (mL)",
+            "Matériau contenant",
+            "Masse contenant (g)",
+            "Matériau emballage",
+            "Masse emballage (g)",
             "Source/Signature",
             "Note"
         ]
@@ -343,12 +348,35 @@ class DataMassWindow(QMainWindow):
         self.conc_input    = QLineEdit()
         self.factor_input  = QLineEdit()
         self.uncert_input  = QLineEdit()
+        self.vol_flacon_input = QLineEdit()
+        self.vol_flacon_input.setPlaceholderText("ex: 1000 (mL) — optionnel")
+
+        # Contenant (bouteille verre, plastique…)
+        self.mat_contenant_liq_combo = QComboBox()
+        self.mat_contenant_liq_combo.addItems([''] + mats)
+        self.mat_contenant_liq_row = self.create_material_selector(self.mat_contenant_liq_combo)
+        self.masse_contenant_liq_input = QLineEdit()
+        self.masse_contenant_liq_input.setPlaceholderText("ex: 200 g (optionnel)")
+
+        # Emballage (carton, film…) liquide
+        self.mat_emb_liq_combo = QComboBox()
+        self.mat_emb_liq_combo.addItems([''] + mats)
+        self.mat_emb_liq_row = self.create_material_selector(self.mat_emb_liq_combo)
+        self.masse_emb_liq_input = QLineEdit()
+        self.masse_emb_liq_input.setPlaceholderText("ex: 50 g (optionnel)")
 
         self.add_section_header("Données liquide", mode="liquid")
         self.form_layout.addRow("Densité (g/mL):",      self.dens_input)
         self.form_layout.addRow("Concentration (mg/mL):", self.conc_input)
         self.form_layout.addRow("Facteur CO₂ (kg/kg):", self.factor_input)
         self.form_layout.addRow("Incertitude (%) :",    self.uncert_input)
+        self.form_layout.addRow("Volume flacon (mL) :", self.vol_flacon_input)
+
+        self.add_section_header("Contenant & emballage (optionnel)", mode="liquid")
+        self.form_layout.addRow("Matériau contenant :", self.mat_contenant_liq_row)
+        self.form_layout.addRow("Masse contenant (g) :", self.masse_contenant_liq_input)
+        self.form_layout.addRow("Matériau emballage :", self.mat_emb_liq_row)
+        self.form_layout.addRow("Masse emballage (g) :", self.masse_emb_liq_input)
 
         self.register_required_field(self.dens_input, "Densité")
         self.register_required_field(self.factor_input, "Facteur CO₂")
@@ -359,7 +387,12 @@ class DataMassWindow(QMainWindow):
         self.register_required_field(self.source_input, "Source/Signature")
 
         # Masquer ces lignes initialement
-        for w in (self.dens_input, self.conc_input, self.factor_input, self.uncert_input):
+        for w in (
+            self.dens_input, self.conc_input, self.factor_input, self.uncert_input,
+            self.vol_flacon_input,
+            self.mat_contenant_liq_row, self.masse_contenant_liq_input,
+            self.mat_emb_liq_row, self.masse_emb_liq_input,
+        ):
             w.setVisible(False)
 
         form_container = QWidget()
@@ -740,6 +773,11 @@ class DataMassWindow(QMainWindow):
             conc       = self.conc_input.text().strip().replace(',', '.')
             facteur    = self.factor_input.text().strip().replace(',', '.')
             incert     = self.uncert_input.text().strip().replace(',', '.')
+            vol_flacon = self.vol_flacon_input.text().strip().replace(',', '.')
+            mat_cont   = self.mat_contenant_liq_combo.currentText().strip()
+            masse_cont = self.masse_contenant_liq_input.text().strip().replace(',', '.')
+            mat_emb_liq = self.mat_emb_liq_combo.currentText().strip()
+            masse_emb_liq = self.masse_emb_liq_input.text().strip().replace(',', '.')
         else:
             dens = conc = facteur = incert = ""
 
@@ -801,6 +839,11 @@ class DataMassWindow(QMainWindow):
                 "Concentration (mg/mL)": conc,
                 "Facteur CO₂ (kg CO₂e/kg)": facteur,
                 "Incertitude (%)": incert,
+                "Volume flacon (mL)": vol_flacon or None,
+                "Matériau contenant": mat_cont,
+                "Masse contenant (g)": masse_cont or None,
+                "Matériau emballage": mat_emb_liq,
+                "Masse emballage (g)": masse_emb_liq or None,
                 "Source/Signature": source,
                 "Note": lien_note
             }
@@ -874,6 +917,11 @@ class DataMassWindow(QMainWindow):
         self.conc_input.clear()
         self.factor_input.clear()
         self.uncert_input.clear()
+        self.vol_flacon_input.clear()
+        self.masse_contenant_liq_input.clear()
+        self.masse_emb_liq_input.clear()
+        self.mat_contenant_liq_combo.setCurrentIndex(0)
+        self.mat_emb_liq_combo.setCurrentIndex(0)
         self.prefill_row_index = None
         self.add_button.setText("Ajouter l'objet")
         self.update_required_indicators()
@@ -971,7 +1019,10 @@ class DataMassWindow(QMainWindow):
         # Champs propres aux liquides
         for w in (
             self.dens_input, self.conc_input,
-            self.factor_input, self.uncert_input
+            self.factor_input, self.uncert_input,
+            self.vol_flacon_input,
+            self.mat_contenant_liq_row, self.masse_contenant_liq_input,
+            self.mat_emb_liq_row, self.masse_emb_liq_input,
         ):
             lab = self.form_layout.labelForField(w)
             if lab:

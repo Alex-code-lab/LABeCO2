@@ -154,6 +154,22 @@ class CarbonCalculator:
                     # Masse pour transport : densité si dispo, sinon 1 g/mL
                     dens = float(liq_row.get("Densité (g/mL)", 0.0) or 0.0)
                     m_liq = (dens if dens > 0 else 1.0) * quantity / 1000.0
+
+                # Émissions du contenant et de l'emballage (proratées au volume utilisé)
+                vol_flacon = float(liq_row.get("Volume flacon (mL)", 0.0) or 0.0)
+                if vol_flacon > 0:
+                    fraction = quantity / vol_flacon
+                    for col_mat, col_masse in (
+                        ("Matériau contenant", "Masse contenant (g)"),
+                        ("Matériau emballage", "Masse emballage (g)"),
+                    ):
+                        mat = str(liq_row.get(col_mat, "") or "").strip()
+                        masse_g = float(liq_row.get(col_masse, 0.0) or 0.0)
+                        if mat and masse_g > 0:
+                            co2_mat, _ = self.dm.get_material_data(mat)
+                            if co2_mat:
+                                e_liq += fraction * (masse_g / 1000.0) * co2_mat
+
                 transport_em = m_liq * transport_factor
                 transport_err = transport_em * transport_uncert
                 em     = e_liq + transport_em
