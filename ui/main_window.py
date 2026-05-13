@@ -545,6 +545,10 @@ class MainWindow(QMainWindow):
         self.masse_manquante_label.setWordWrap(True)
         self.masse_manquante_label.setVisible(False)
 
+        self.contenant_warning_label = QLabel("")
+        self.contenant_warning_label.setWordWrap(True)
+        self.contenant_warning_label.setVisible(False)
+
         self.manage_consumables_button = QPushButton("Enrichir le consommable choisi")
         self.manage_consumables_button.setToolTip("Enrichir le consommable choisi")
         self.manage_consumables_button.setEnabled(False)
@@ -631,6 +635,7 @@ class MainWindow(QMainWindow):
         existing_layout.addWidget(self.origine_row_widget)
         existing_layout.addLayout(prix_unitaire_layout)
         existing_layout.addWidget(self.masse_manquante_label)
+        existing_layout.addWidget(self.contenant_warning_label)
         existing_layout.addWidget(self.input_label)
         existing_layout.addWidget(self.input_field)
         existing_layout.addWidget(self.days_label)
@@ -1242,6 +1247,7 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label,
             self.prix_info_button,
             self.masse_manquante_label,
+            self.contenant_warning_label,
             self.consumable_actions_widget,
             self.manage_consumables_button,
             self.add_consumable_button,
@@ -1278,6 +1284,8 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label.setToolTip("")
         if self.masse_manquante_label is not None:
             self.masse_manquante_label.setText("")
+        if self.contenant_warning_label is not None:
+            self.contenant_warning_label.setText("")
         if self.manage_consumables_button is not None:
             self.manage_consumables_button.setEnabled(False)
     # ------------------------------------------------------------------
@@ -1569,6 +1577,7 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label,
             self.prix_info_button,
             self.masse_manquante_label,
+            self.contenant_warning_label,
         ):
             if widget is not None:
                 widget.setVisible(False)
@@ -1577,6 +1586,7 @@ class MainWindow(QMainWindow):
         self._current_prix_unitaire_info_text = ""
         self.prix_unitaire_label.setToolTip("")
         self.masse_manquante_label.setText("")
+        self.contenant_warning_label.setText("")
         self.update_manage_consumable_button_state()
         self._update_field_indicators()
 
@@ -1710,6 +1720,7 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
+            self.contenant_warning_label.setVisible(False)
             # On met à jour la liste des consommables
             self.update_conso_filtered_combo()
         else:
@@ -1922,6 +1933,7 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
+            self.contenant_warning_label.setVisible(False)
             self._current_prix_unitaire = None
             self._current_prix_unitaire_info_text = ""
             self.update_manage_consumable_button_state()
@@ -1972,6 +1984,7 @@ class MainWindow(QMainWindow):
                 self.prix_unitaire_label,
                 self.prix_info_button,
                 self.masse_manquante_label,
+                self.contenant_warning_label,
                 self.consumable_actions_widget,
             ):
                 if widget is not None:
@@ -1980,6 +1993,7 @@ class MainWindow(QMainWindow):
             self._current_prix_unitaire_info_text = ""
             self.prix_unitaire_label.setToolTip("")
             self.masse_manquante_label.setText("")
+            self.contenant_warning_label.setText("")
             self.update_unit()
             self.update_manage_consumable_button_state()
             self._update_field_indicators()
@@ -2038,6 +2052,7 @@ class MainWindow(QMainWindow):
             self.prix_unitaire_label.setVisible(False)
             self.prix_info_button.setVisible(False)
             self.masse_manquante_label.setVisible(False)
+            self.contenant_warning_label.setVisible(False)
             if not has_nacres_code:
                 # Aucune sélection exploitable : on revient à l'état vide.
                 self.subsub_name_combo.blockSignals(True)
@@ -2421,25 +2436,49 @@ class MainWindow(QMainWindow):
 
     def _update_masse_warning(self):
         """
-        Affiche un avertissement rouge si le consommable sélectionné n'a pas
+        Affiche un avertissement si le consommable sélectionné n'a pas
         de données de masse enregistrées dans la base.
         """
         import pandas as pd
         selected = self._selected_consumable_data()
         if not selected:
             self.masse_manquante_label.setVisible(False)
+            self.contenant_warning_label.setVisible(False)
             return
 
         if selected.get("source") == "liquid":
+            liq_row = self.data_manager.get_liquid_data(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            has_container = (
+                liq_row is not None and
+                str(liq_row.get("Matériau contenant", "") or "").strip() != "" and
+                float(liq_row.get("Masse contenant (g)", 0.0) or 0.0) > 0
+            )
             self.masse_manquante_label.setText(
-                "✔  Données liquide disponibles — calcul eCO₂ par volume et densité effectué."
+                "✔  Données liquide disponibles."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #166534; background-color: #dcfce7; "
                 "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
             )
             self.masse_manquante_label.setVisible(True)
+            if not has_container:
+                self.contenant_warning_label.setText(
+                    "⚠  Contenant (flacon) non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                    "le matériau et la masse du flacon : cela peut modifier significativement le résultat."
+                )
+                self.contenant_warning_label.setStyleSheet(
+                    "color: #92400e; background-color: #fffbeb; "
+                    "border: 1px solid #fcd34d; border-radius: 4px; padding: 4px 8px;"
+                )
+                self.contenant_warning_label.setVisible(True)
+            else:
+                self.contenant_warning_label.setVisible(False)
             return
+
+        self.contenant_warning_label.setVisible(False)
 
         code_nacres = selected["code_nacres"]
         consommable_name = selected["consommable"]
@@ -2479,7 +2518,6 @@ class MainWindow(QMainWindow):
                 "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
             )
         self.masse_manquante_label.setVisible(True)
-
     def _auto_fill_prix(self):
         """
         Remplit automatiquement le champ prix (input_field).
@@ -2622,10 +2660,11 @@ class MainWindow(QMainWindow):
             return
 
         selected = self._selected_consumable_data()
-        prefill_code, prefill_name = None, None
+        prefill_code, prefill_name, prefill_source = None, None, "solid"
         if selected:
             prefill_code = selected["code_nacres"]
             prefill_name = selected["consommable"]
+            prefill_source = selected.get("source", "solid")
 
         self.data_mass_window = DataMassWindow(
             parent=self,
@@ -2634,6 +2673,7 @@ class MainWindow(QMainWindow):
             user_path=self.data_manager.user_path,
             prefill_code=prefill_code,
             prefill_name=prefill_name,
+            prefill_source=prefill_source,
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()

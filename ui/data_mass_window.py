@@ -23,7 +23,8 @@ class DataMassWindow(QMainWindow):
     data_added = Signal()
 
     def __init__(self, parent=None, data_materials=None, base_path=None,
-                 user_path=None, prefill_code=None, prefill_name=None):
+                 user_path=None, prefill_code=None, prefill_name=None,
+                 prefill_source="solid"):
         super().__init__(parent)
 
         self.setWindowTitle("Gestion des consommables")
@@ -119,7 +120,7 @@ class DataMassWindow(QMainWindow):
         self.afficher_donnees()
 
         if prefill_code or prefill_name:
-            self.prefill_consumable(prefill_code or "", prefill_name or "")
+            self.prefill_consumable(prefill_code or "", prefill_name or "", source=prefill_source)
 
     def charger_ou_initialiser_donnees(self):
         if os.path.exists(self.hdf5_file):
@@ -949,6 +950,22 @@ class DataMassWindow(QMainWindow):
                 df_liq[col] = ""
 
         new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
+
+        # Mise à jour de la ligne existante si mode enrichissement
+        if getattr(self, '_prefill_liq_produit', None):
+            mask = df_liq["Produit"].astype(str).str.strip() == self._prefill_liq_produit
+            if mask.any():
+                idx = df_liq[mask].index[0]
+                for col in self.columns_liquids:
+                    val = new_line[col].iloc[0] if col in new_line.columns else ""
+                    df_liq.at[idx, col] = val
+                self._prefill_liq_produit = None
+                df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
+                self.data_liquids = df_liq
+                if self.is_liquid:
+                    self.afficher_donnees()
+                return
+
         df_liq = pd.concat([df_liq, new_line], ignore_index=True)
         df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
         self.data_liquids = df_liq
@@ -1118,14 +1135,14 @@ class DataMassWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de mettre à jour la base :\n{e}")
 
-    def prefill_consumable(self, code_nacres, consommable_name):
+    def prefill_consumable(self, code_nacres, consommable_name, source="solid"):
         """
         Pré-remplit le formulaire avec les données du consommable sélectionné
-        dans la fenêtre principale.  Si une ligne existe déjà dans data_masse,
-        tous les champs sont remplis (mode enrichissement).
-        Sélectionne aussi la ligne correspondante dans le tableau.
+        dans la fenêtre principale.  Si une ligne existe déjà, tous les champs
+        sont remplis (mode enrichissement). Gère solides et liquides.
         """
         self.prefill_row_index = None
+        self._prefill_liq_produit = None
         self.add_button.setText("Ajouter l'objet")
 
         def _clean_value(value):
@@ -1134,7 +1151,74 @@ class DataMassWindow(QMainWindow):
             text = str(value).strip()
             return "" if text.lower() in ("", "nan", "n/a", "none") else text
 
-        # ── Forcer le type "Consommable solide" ──────────────────────────────
+        # ── NACRES : extraire le préfixe 4 chars ─────────────────────────────
+        code4 = str(code_nacres).strip().upper()[:4]
+
+        # ── Liquide ──────────────────────────────────────────────────────────
+        if source == "liquid":
+            self.type_combo.blockSignals(True)
+            self.type_combo.setCurrentIndex(1)
+            self.type_combo.blockSignals(False)
+            self.is_liquid = True
+            self.data_liquids = self.load_liquid_df()
+            self.update_form_visibility()
+            self.afficher_donnees()
+
+            self.nom_input.setText(consommable_name)
+
+            # Code NACRES
+            idx = self.nacres_combo.findData(code4)
+            if idx == -1:
+                for i in range(self.nacres_combo.count()):
+                    if self.nacres_combo.itemText(i).startswith(code4):
+                        idx = i
+                        break
+            if idx != -1:
+                self.nacres_combo.setCurrentIndex(idx)
+
+            # Chercher la ligne dans data_liquids
+            df_liq = self.data_liquids
+            mask = df_liq["Produit"].astype(str).str.strip() == consommable_name.strip()
+            rows = df_liq[mask]
+
+            if not rows.empty:
+                row = rows.iloc[0]
+                self._prefill_liq_produit = consommable_name.strip()
+                self.add_button.setText("Enregistrer les informations")
+
+                def _fill(field, col):
+                    v = _clean_value(row.get(col, ""))
+                    if v:
+                        field.setText(v)
+
+                _fill(self.dens_input,               "Densité (g/mL)")
+                _fill(self.conc_input,               "Concentration (mg/mL)")
+                _fill(self.factor_input,             "Facteur CO₂ (kg CO₂e/kg)")
+                _fill(self.uncert_input,             "Incertitude (%)")
+                _fill(self.vol_flacon_input,         "Volume flacon (mL)")
+                _fill(self.masse_contenant_liq_input,"Masse contenant (g)")
+                _fill(self.masse_emb_liq_input,      "Masse emballage (g)")
+                _fill(self.source_input,             "Source/Signature")
+                _fill(self.lien_input,               "Note")
+
+                for combo, col in [
+                    (self.mat_contenant_liq_combo, "Matériau contenant"),
+                    (self.mat_emb_liq_combo,       "Matériau emballage"),
+                ]:
+                    val = _clean_value(row.get(col, ""))
+                    i = combo.findText(val)
+                    if i != -1:
+                        combo.setCurrentIndex(i)
+
+                # Sélectionner la ligne dans le tableau
+                for r in range(self.table.rowCount()):
+                    item = self.table.item(r, 0)
+                    if item and item.text().strip() == consommable_name.strip():
+                        self.table.selectRow(r)
+                        break
+            return
+
+        # ── Solide ───────────────────────────────────────────────────────────
         self.type_combo.setCurrentIndex(0)
 
         # ── Nom ──────────────────────────────────────────────────────────────
