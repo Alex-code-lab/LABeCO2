@@ -196,7 +196,13 @@ def merge():
     # Les codes NA* volumiques restent exclus ici : ils sont verses dans Liquides & Solvants
     # par migrate_ijm_price_schema.py pour eviter les doublons du menu.
     ijm_only_rows = []
+    seen_ijm_codes = set()
     for row in prix_rows:
+        code_ijm = row.get("code_ijm", "").strip()
+        if code_ijm and code_ijm in seen_ijm_codes:
+            continue
+        if code_ijm:
+            seen_ijm_codes.add(code_ijm)
         code4 = row["code_nacres"].strip()[:4].upper()
         if is_liquid_catalogue_row(row):
             continue

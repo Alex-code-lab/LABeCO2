@@ -181,6 +181,11 @@ def migration_source(path: Path) -> Path:
 def load_price_catalogue() -> pd.DataFrame:
     df = pd.read_csv(PRICE_CSV, dtype=str).fillna("")
     df["code_nacres"] = df["code_nacres"].map(lambda v: clean(v).upper()[:4])
+    if "code_ijm" in df.columns:
+        codes = df["code_ijm"].map(clean)
+        with_code = df[codes != ""].drop_duplicates(subset=["code_ijm"], keep="first")
+        without_code = df[codes == ""]
+        df = pd.concat([with_code, without_code], ignore_index=True)
     return df
 
 
@@ -304,6 +309,12 @@ def merge_legacy_catalogue_data(new_row: dict, legacy_row) -> dict:
     if legacy_row is None:
         return new_row
     for col in LEGACY_CATALOGUE_DATA_COLUMNS:
+        if (
+            col == "Masse unitaire (g)"
+            and is_nonempty_manual_value(new_row.get(col, ""))
+            and not is_nonempty_manual_value(legacy_row.get("Matériau consommable", ""))
+        ):
+            continue
         value = legacy_row.get(col, "")
         if is_nonempty_manual_value(value):
             new_row[col] = value
