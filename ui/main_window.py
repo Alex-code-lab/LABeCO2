@@ -1894,13 +1894,6 @@ class MainWindow(QMainWindow):
             if consommable and (not filter_text or filter_text in haystack):
                 entries.append((consommable.casefold(), full_code, consommable, "solid"))
 
-        for _, row in self.data_liquides.iterrows():
-            code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            produit = clean_text(row.get("Produit", ""))
-            haystack = normalize_search(f"{code} {produit}")
-            if produit and (not filter_text or filter_text in haystack):
-                entries.append((produit.casefold(), code, produit, "liquid"))
-
         for _, code, name, source in sorted(entries):
             self._add_consumable_combo_item(code, name, source)
 
@@ -1957,13 +1950,6 @@ class MainWindow(QMainWindow):
             consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
             if consommable and normalize_nacres_prefix(full_code) == code_nacres_4:
                 filtered_items.append((consommable.casefold(), full_code, consommable, "solid"))
-
-                # --- Ajout : intégrer les consommables liquides ---
-        for _, row in self.data_liquides.iterrows():
-            full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            produit = clean_text(row.get("Produit", ""))
-            if produit and normalize_nacres_prefix(full_code) == code_nacres_4:
-                filtered_items.append((produit.casefold(), full_code, produit, "liquid"))
 
         if not filtered_items:
             self.conso_filtered_combo.blockSignals(True)
@@ -2445,8 +2431,33 @@ class MainWindow(QMainWindow):
         row = df[mask]
         if row.empty:
             return False
+        solid_row = row.iloc[0]
+        if self._solid_row_liquid_factor(solid_row) is not None:
+            return True
         masse = row[self.data_manager.MASSE_G_COL].iloc[0]
         return not (pd.isna(masse) or str(masse).strip() == "")
+
+    def _solid_row_liquid_factor(self, solid_row):
+        factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")
+        factor_name = clean_text(solid_row.get(factor_col, ""))
+        if not factor_name:
+            return None
+        return self.data_manager.get_liquid_data(
+            solid_row.get(self.data_manager.CODE_NACRES_COL, ""),
+            factor_name,
+        )
+
+    def _is_solid_liquid_product(self, solid_row):
+        if solid_row is None:
+            return False
+        factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")
+        unit_col = getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")
+        volume_col = getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)")
+        return bool(
+            clean_text(solid_row.get(factor_col, "")) or
+            clean_text(solid_row.get(unit_col, "")) or
+            safe_float(solid_row.get(volume_col, 0.0), default=0.0) > 0
+        )
 
     def _update_masse_warning(self):
         """
@@ -2525,6 +2536,48 @@ class MainWindow(QMainWindow):
             return
 
         solid_row = row.iloc[0]
+        if self._is_solid_liquid_product(solid_row):
+            factor_row = self._solid_row_liquid_factor(solid_row)
+            factor_name = clean_text(solid_row.get(
+                getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source"),
+                ""
+            ))
+            if factor_row is not None:
+                self.masse_manquante_label.setText(
+                    f"✔  Facteur liquide/solvant disponible : {factor_name}."
+                )
+                self.masse_manquante_label.setStyleSheet(
+                    "color: #166534; background-color: #dcfce7; "
+                    "border: 1px solid #86efac; border-radius: 4px; padding: 4px 8px;"
+                )
+            else:
+                self.masse_manquante_label.setText(
+                    "⚠  Aucun facteur liquide/solvant lié — renseignez un facteur d'émission ou enrichissez le consommable."
+                )
+                self.masse_manquante_label.setStyleSheet(
+                    "color: #92400e; background-color: #fef3c7; "
+                    "border: 1px solid #f59e0b; border-radius: 4px; padding: 4px 8px;"
+                )
+            self.masse_manquante_label.setVisible(True)
+
+            has_container = (
+                not _missing_text(solid_row.get(self.data_manager.MATERIAU_CONDITIONNEMENT_COL, "")) and
+                safe_float(solid_row.get(self.data_manager.MASSE_CONDITIONNEMENT_COL, 0.0), default=0.0) > 0
+            )
+            if not has_container:
+                self.contenant_warning_label.setText(
+                    "⚠  Contenant (flacon) non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                    "le matériau et la masse du flacon : cela peut modifier significativement le résultat."
+                )
+                self.contenant_warning_label.setStyleSheet(
+                    "color: #92400e; background-color: #fffbeb; "
+                    "border: 1px solid #fcd34d; border-radius: 4px; padding: 4px 8px;"
+                )
+                self.contenant_warning_label.setVisible(True)
+            else:
+                self.contenant_warning_label.setVisible(False)
+            return
+
         masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
         if pd.isna(masse) or str(masse).strip() == "":
             self.masse_manquante_label.setText(
@@ -2627,9 +2680,22 @@ class MainWindow(QMainWindow):
             if conditionnement_qty <= 0:
                 return
             prix_total = (qty / conditionnement_qty) * self._current_prix_unitaire
-        elif self._current_masse_unitaire_g and self._current_masse_unitaire_g > 0:
-            # Solide vendu en vrac : qty est en grammes
-            prix_total = (qty / self._current_masse_unitaire_g) * self._current_prix_unitaire
+        elif selected:
+            solid_row = self._find_consumable_mass_row(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            if solid_row is not None and self._is_solid_liquid_product(solid_row):
+                unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
+                conditionnement_qty = self._liquid_conditionnement_quantity(solid_row, unit)
+                if conditionnement_qty <= 0:
+                    return
+                prix_total = (qty / conditionnement_qty) * self._current_prix_unitaire
+            elif self._current_masse_unitaire_g and self._current_masse_unitaire_g > 0:
+                # Solide vendu en vrac : qty est en grammes
+                prix_total = (qty / self._current_masse_unitaire_g) * self._current_prix_unitaire
+            else:
+                prix_total = qty * self._current_prix_unitaire
         else:
             prix_total = qty * self._current_prix_unitaire
 
@@ -2654,6 +2720,8 @@ class MainWindow(QMainWindow):
         if df_row.empty:
             return 0.0
         row = df_row.iloc[0]
+        if self._is_solid_liquid_product(row):
+            return 0.0
         materiau = str(row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
         if materiau:
             return 0.0  # Objet discret avec matériau connu — pas de mode vrac
@@ -2661,10 +2729,17 @@ class MainWindow(QMainWindow):
 
     def _liquid_has_co2_factor(self, selected):
         """Retourne True si le consommable liquide a un facteur CO₂ défini dans la base."""
-        row = self.data_manager.get_liquid_data(
-            selected.get("code_nacres", ""),
-            selected.get("consommable", ""),
-        )
+        if selected.get("source") == "solid":
+            solid_row = self._find_consumable_mass_row(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            row = self._solid_row_liquid_factor(solid_row) if solid_row is not None else None
+        else:
+            row = self.data_manager.get_liquid_data(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
         if row is None:
             return False
         return safe_float(row.get("Facteur CO₂ (kg CO₂e/kg)", 0.0), default=0.0) > 0
@@ -2692,6 +2767,19 @@ class MainWindow(QMainWindow):
             self.fe_massique_label.setVisible(not has_factor)
             self.fe_massique_input.setVisible(not has_factor)
         else:
+            solid_row = self._find_consumable_mass_row(
+                selected.get("code_nacres", ""),
+                selected.get("consommable", ""),
+            )
+            if solid_row is not None and self._is_solid_liquid_product(solid_row):
+                unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
+                self._current_masse_unitaire_g = None
+                self.quantity_label.setText(f"Quantité ({unit}) :")
+                has_factor = self._liquid_has_co2_factor(selected)
+                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/L) :")
+                self.fe_massique_label.setVisible(not has_factor)
+                self.fe_massique_input.setVisible(not has_factor)
+                return
             masse_g = self._get_masse_unitaire_g(selected)
             if masse_g > 0:
                 self._current_masse_unitaire_g = masse_g
@@ -3182,6 +3270,20 @@ class MainWindow(QMainWindow):
 
         solid_row = self._find_consumable_mass_row(code_nacres, consommable)
         if solid_row is not None:
+            factor_row = self._solid_row_liquid_factor(solid_row)
+            if factor_row is not None:
+                unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
+                dens = safe_float(factor_row.get("Densité (g/mL)"), default=0.0)
+                mass_kg = dens * quantity / 1000.0 if clean_text(unit).casefold() == "ml" else 0.0
+                lines = [
+                    "Détail masse liquide :",
+                    f"- Quantité : {format_quantity(quantity)} {unit}",
+                    f"- Facteur source : {clean_text(factor_row.get('Produit', ''))}",
+                ]
+                if dens > 0:
+                    lines.append(f"- Densité : {dens:.4f} g/mL")
+                lines.append(f"Masse totale : {mass_kg:.4f} kg")
+                return lines
             specs = [
                 ("Consommable", self.data_manager.MASSE_G_COL, self.data_manager.MATERIAU_COL, False),
                 ("Consommable 2", getattr(self.data_manager, "MASSE_G2_COL", ""), getattr(self.data_manager, "MATERIAU2_COL", ""), False),

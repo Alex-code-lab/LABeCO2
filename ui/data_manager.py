@@ -52,6 +52,9 @@ class DataManager:
     # bases non migrées.
     PRIX_CONDITIONNEMENT_COL = "Prix du conditionnement"
     SOURCE_CATALOGUE_IJM_COL = "Source catalogue IJM"
+    UNITE_LIQUIDE_COL = "Unité liquide"
+    VOLUME_FLACON_COL = "Volume flacon (mL)"
+    FACTEUR_LIQUIDE_SOURCE_COL = "Facteur liquide source"
     PRIX_UNITAIRE_COL = "prix_unitaire_ijm"
     PRIX_HT_COL       = "prix_ht_ijm"
     CONDT_IJM_COL     = "condt_ijm"
@@ -477,3 +480,38 @@ class DataManager:
             mask &= df["Produit"].astype(str).str.strip() == produit_clean
         filtered = df[mask]
         return filtered.iloc[0] if not filtered.empty else None
+
+    def get_consumable_row(self, code_nacres, consommable_name):
+        if self.data_masse.empty:
+            return None
+        df = self.data_masse
+        mask = (
+            self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres) &
+            (df[self.CONSOMMABLE_COL].astype(str).str.strip() == clean_text(consommable_name))
+        )
+        rows = df[mask]
+        return rows.iloc[0] if not rows.empty else None
+
+    def get_consumable_liquid_factor_data(self, code_nacres, consommable_name):
+        """
+        Retourne (ligne consommable, ligne facteur liquide) pour un produit
+        commercial stocké dans la base consommables mais lié à un facteur de
+        la base Liquides & Solvants.
+        """
+        product_row = self.get_consumable_row(code_nacres, consommable_name)
+        if product_row is None:
+            return None, None
+        factor_name = self._clean_cell(product_row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, ""))
+        if not factor_name:
+            return product_row, None
+        factor_row = self.get_liquid_data(code_nacres, factor_name)
+        return product_row, factor_row
+
+    def is_liquid_commercial_row(self, row):
+        if row is None:
+            return False
+        return bool(
+            self._clean_cell(row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, "")) or
+            self._clean_cell(row.get(self.UNITE_LIQUIDE_COL, "")) or
+            self._to_float_or_none(row.get(self.VOLUME_FLACON_COL, None)) is not None
+        )

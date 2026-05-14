@@ -161,10 +161,17 @@ class CarbonCalculator:
             transport_factor, transport_uncert = self.dm.get_transport_factor(origine)
             custom_fe = self._safe_float(data_dict.get('custom_fe', 0.0))
 
-            # 1) On regarde si c'est un liquide
-            liq_row = self.dm.get_liquid_data(code_nacres, consommable)
+            # 1) On regarde si c'est un liquide/facteur liquide, soit direct,
+            # soit via un produit commercial stocké dans la base consommables.
+            product_row, linked_liq_row = (None, None)
+            linked_lookup = getattr(self.dm, "get_consumable_liquid_factor_data", None)
+            if callable(linked_lookup):
+                lookup_result = linked_lookup(code_nacres, consommable)
+                if isinstance(lookup_result, tuple) and len(lookup_result) == 2:
+                    product_row, linked_liq_row = lookup_result
+            liq_row = linked_liq_row if linked_liq_row is not None else self.dm.get_liquid_data(code_nacres, consommable)
             if liq_row is not None:
-                e_liq, m_liq, err_liq = self._calculate_liquid_emissions(code_nacres, quantity, consommable)
+                e_liq, m_liq, err_liq = self._calculate_liquid_emissions_from_row(liq_row, quantity)
                 # Facteur personnalisé (kg eCO₂/L) si aucun facteur en base
                 if e_liq == 0.0 and custom_fe > 0.0:
                     unit = clean_text(liq_row.get("Unité", "")).casefold()
@@ -183,15 +190,28 @@ class CarbonCalculator:
                         m_liq = (dens if dens > 0 else 1.0) * quantity / 1000.0
 
                 # Émissions du contenant et de l'emballage (proratées au volume utilisé)
-                vol_flacon = self._safe_float(liq_row.get("Volume flacon (mL)", 0.0))
+                vol_flacon = self._safe_float(
+                    product_row.get(getattr(self.dm, "VOLUME_FLACON_COL", "Volume flacon (mL)"), 0.0)
+                    if product_row is not None else
+                    liq_row.get("Volume flacon (mL)", 0.0)
+                )
                 if vol_flacon > 0:
                     fraction = quantity / vol_flacon
-                    for col_mat, col_masse in (
-                        ("Matériau contenant", "Masse contenant (g)"),
-                        ("Matériau emballage", "Masse emballage (g)"),
-                    ):
-                        mat = str(liq_row.get(col_mat, "") or "").strip()
-                        masse_g = self._safe_float(liq_row.get(col_masse, 0.0))
+                    if product_row is not None:
+                        packaging_specs = (
+                            (self.dm.MATERIAU_CONDITIONNEMENT_COL, self.dm.MASSE_CONDITIONNEMENT_COL),
+                            (self.dm.MATERIAU_EMBALLAGE_COL, self.dm.MASSE_EMBALLAGE_COL),
+                        )
+                        packaging_row = product_row
+                    else:
+                        packaging_specs = (
+                            ("Matériau contenant", "Masse contenant (g)"),
+                            ("Matériau emballage", "Masse emballage (g)"),
+                        )
+                        packaging_row = liq_row
+                    for col_mat, col_masse in packaging_specs:
+                        mat = str(packaging_row.get(col_mat, "") or "").strip()
+                        masse_g = self._safe_float(packaging_row.get(col_masse, 0.0))
                         if mat and masse_g > 0:
                             co2_mat, _ = self.dm.get_material_data(mat)
                             if co2_mat:
@@ -202,6 +222,19 @@ class CarbonCalculator:
                 em     = e_liq + transport_em
                 em_err = (err_liq ** 2 + transport_err ** 2) ** 0.5
                 tm     = m_liq
+            elif (
+                product_row is not None
+                and hasattr(self.dm, "is_liquid_commercial_row")
+                and self.dm.is_liquid_commercial_row(product_row)
+            ):
+                e_liq = (quantity / 1000.0) * custom_fe if custom_fe > 0.0 else 0.0
+                err_liq = 0.0
+                m_liq = quantity / 1000.0
+                transport_em = m_liq * transport_factor
+                transport_err = transport_em * transport_uncert
+                em = e_liq + transport_em
+                em_err = (err_liq ** 2 + transport_err ** 2) ** 0.5
+                tm = m_liq
             else:
                 # 2) Calcul classique pour consommables solides
                 e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
@@ -326,7 +359,9 @@ class CarbonCalculator:
         row = self.dm.get_liquid_data(code_nacres, consommable)
         if row is None:
             return (0.0, 0.0, 0.0)
+        return self._calculate_liquid_emissions_from_row(row, volume_ml)
 
+    def _calculate_liquid_emissions_from_row(self, row, volume_ml):
         # Colonnes de la table liquid
         dens = self._safe_float(row.get("Densité (g/mL)", 0.0))
         conc = self._safe_float(row.get("Concentration (mg/mL)", 0.0))

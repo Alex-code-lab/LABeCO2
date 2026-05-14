@@ -168,8 +168,9 @@ def merge():
     for col in ["Prix du conditionnement", "Nbr par conditionnement"]:
         if col not in out_fields:
             out_fields.append(col)
-    if "date d'ajout" not in out_fields:
-        out_fields.append("date d'ajout")
+    for col in ["Unité liquide", "Volume flacon (mL)", "Facteur liquide source", "date d'ajout"]:
+        if col not in out_fields:
+            out_fields.append(col)
     for col in PRIX_FIELDS:
         if col not in out_fields:
             out_fields.append(col)
@@ -193,8 +194,8 @@ def merge():
 
     # ── Fichier 2 : catalogue complet ────────────────────────────────────────
     # Lignes IJM en lignes separees -> colonnes masse vides.
-    # Les codes NA* volumiques restent exclus ici : ils sont verses dans Liquides & Solvants
-    # par migrate_ijm_price_schema.py pour eviter les doublons du menu.
+    # Les codes NA* volumiques restent dans les consommables comme produits
+    # commerciaux; le facteur est reference depuis la base Liquides & Solvants.
     ijm_only_rows = []
     seen_ijm_codes = set()
     for row in prix_rows:
@@ -204,8 +205,6 @@ def merge():
         if code_ijm:
             seen_ijm_codes.add(code_ijm)
         code4 = row["code_nacres"].strip()[:4].upper()
-        if is_liquid_catalogue_row(row):
-            continue
         masse_empty = {f: "" for f in masses_fields}
         page = row.get("page", "").strip()
         prix_extra  = {
@@ -226,6 +225,21 @@ def merge():
         masse_empty["Masse unitaire (g)"] = infer_conditionnement_mass_g(row)
         masse_empty["Prix du conditionnement"] = row["prix_ht"]
         masse_empty["Nbr par conditionnement"] = row["nb_unites"]
+        if is_liquid_catalogue_row(row):
+            masse_empty["Unité liquide"] = "mL"
+            # La base facteur est choisie/enrichie dans migrate_ijm_price_schema.py.
+            masse_empty["Facteur liquide source"] = ""
+            # Fonction volontairement simple ici: le script de migration reste
+            # la référence pour l'inférence précise.
+            text = packaging_text(row)
+            vol = ""
+            match_ml = re.search(r"(\d+(?:\.\d+)?)\s*(?:ml|millilitres?|milliliters?)\b", text)
+            match_l = re.search(r"(\d+(?:\.\d+)?)\s*(?:l|litres?|liters?)\b", text)
+            if match_ml:
+                vol = match_ml.group(1)
+            elif match_l:
+                vol = str(float(match_l.group(1)) * 1000.0)
+            masse_empty["Volume flacon (mL)"] = vol
         masse_empty["date d'ajout"] = RUN_DATE
 
         ijm_only_rows.append({**masse_empty, **prix_extra})

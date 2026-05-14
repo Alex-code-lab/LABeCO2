@@ -68,6 +68,9 @@ class DataMassWindow(QMainWindow):
             "Matériau conditionnement",
             "Nbr par conditionnement",
             "Prix du conditionnement",
+            "Unité liquide",
+            "Volume flacon (mL)",
+            "Facteur liquide source",
             "date d'ajout",
             "Source/Signature",
             "Source catalogue IJM",
@@ -91,22 +94,9 @@ class DataMassWindow(QMainWindow):
             "Concentration (mg/mL)",
             "Facteur CO₂ (kg CO₂e/kg)",
             "Incertitude (%)",
-            "Volume flacon (mL)",
-            "Matériau contenant",
-            "Masse contenant (g)",
-            "Matériau emballage",
-            "Masse emballage (g)",
             "Source/Signature",
             "date d'ajout",
             "Note",
-            "Prix du conditionnement",
-            "Nbr par conditionnement",
-            "Source catalogue IJM",
-            "condt_ijm",
-            "designation_ijm",
-            "code_ijm",
-            "marque_ijm",
-            "score_match",
         ]
 
         # Fichier pour les consommables liquides (modifiable → user_path)
@@ -231,7 +221,7 @@ class DataMassWindow(QMainWindow):
         # Sélecteur de type
         self.add_section_header("Identification")
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Consommable solide", "Consommable liquide"])
+        self.type_combo.addItems(["Consommable / produit commercial", "Référentiel liquide / solvant"])
         self.type_combo.currentIndexChanged.connect(self.on_type_changed)
         self.form_layout.addRow("Type d'objet :", self.type_combo)
         self.is_liquid = False  # par défaut
@@ -341,6 +331,21 @@ class DataMassWindow(QMainWindow):
         self.form_layout.addRow("Prix:", self.price_row_widget)
         self.form_layout.addRow("", self.price_preview_label)
 
+        self.add_section_header("Facteur liquide/solvant (optionnel)", mode="solid")
+        self.liquid_factor_combo = QComboBox()
+        self.liquid_factor_combo.addItem("Aucun", "")
+        if hasattr(self, "data_liquids") and self.data_liquids is not None and not self.data_liquids.empty:
+            for _, row in self.data_liquids.iterrows():
+                name = str(row.get("Produit", "") or "").strip()
+                code = str(row.get("Code NACRES", "") or "").strip()[:4]
+                if name:
+                    self.liquid_factor_combo.addItem(f"{name} ({code})", name)
+        self.liquid_factor_combo.currentIndexChanged.connect(self.on_commercial_liquid_factor_selected)
+        self.solid_liquid_volume_input = QLineEdit()
+        self.solid_liquid_volume_input.setPlaceholderText("ex: 1000 pour un flacon de 1 L")
+        self.form_layout.addRow("Facteur liquide/solvant :", self.liquid_factor_combo)
+        self.form_layout.addRow("Volume du conditionnement (mL):", self.solid_liquid_volume_input)
+
         self.register_required_field(self.type_combo, "Type d'objet")
         self.register_required_field(self.nacres_widget, "Code NACRES", control=self.nacres_combo)
         self.register_required_field(self.nom_input, "Consommable")
@@ -357,6 +362,16 @@ class DataMassWindow(QMainWindow):
         self.vol_flacon_input = QLineEdit()
         self.vol_flacon_input.setPlaceholderText("ex: 1000 (mL) — optionnel")
 
+        self.liquid_copy_factor_combo = QComboBox()
+        self.liquid_copy_factor_combo.addItem("Nouveau facteur", None)
+        if hasattr(self, "data_liquids") and self.data_liquids is not None and not self.data_liquids.empty:
+            for _, row in self.data_liquids.iterrows():
+                name = str(row.get("Produit", "") or "").strip()
+                code = str(row.get("Code NACRES", "") or "").strip()[:4]
+                if name:
+                    self.liquid_copy_factor_combo.addItem(f"{name} ({code})", row.to_dict())
+        self.liquid_copy_factor_combo.currentIndexChanged.connect(self.on_liquid_factor_template_selected)
+
         # Contenant (bouteille verre, plastique…)
         self.mat_contenant_liq_combo = QComboBox()
         self.mat_contenant_liq_combo.addItems([''] + mats)
@@ -372,6 +387,7 @@ class DataMassWindow(QMainWindow):
         self.masse_emb_liq_input.setPlaceholderText("ex: 50 g (optionnel)")
 
         self.add_section_header("Données liquide", mode="liquid")
+        self.form_layout.addRow("Copier un facteur existant :", self.liquid_copy_factor_combo)
         self.form_layout.addRow("Densité (g/mL):",      self.dens_input)
         self.form_layout.addRow("Concentration (mg/mL):", self.conc_input)
         self.form_layout.addRow("Facteur CO₂ (kg/kg):", self.factor_input)
@@ -394,6 +410,7 @@ class DataMassWindow(QMainWindow):
 
         # Masquer ces lignes initialement
         for w in (
+            self.liquid_copy_factor_combo,
             self.dens_input, self.conc_input, self.factor_input, self.uncert_input,
             self.vol_flacon_input,
             self.mat_contenant_liq_row, self.masse_contenant_liq_input,
@@ -727,6 +744,64 @@ class DataMassWindow(QMainWindow):
         )
         self.price_preview_label.setStyleSheet("color: #15803d; font-weight: 600;")
 
+    def _select_nacres_code(self, code_value):
+        code4 = str(code_value or "").strip().upper()[:4]
+        if not code4:
+            return
+        idx = self.nacres_combo.findData(code4)
+        if idx == -1:
+            for i in range(self.nacres_combo.count()):
+                if self.nacres_combo.itemText(i).startswith(code4):
+                    idx = i
+                    break
+        if idx != -1:
+            self.nacres_combo.setCurrentIndex(idx)
+
+    def _find_liquid_factor_row(self, factor_name):
+        name = str(factor_name or "").strip()
+        if not name or self.data_liquids is None or self.data_liquids.empty:
+            return None
+        rows = self.data_liquids[
+            self.data_liquids["Produit"].astype(str).str.strip() == name
+        ]
+        return rows.iloc[0] if not rows.empty else None
+
+    def on_commercial_liquid_factor_selected(self):
+        """Prépare le formulaire produit commercial quand un facteur liquide est choisi."""
+        if self.is_liquid:
+            return
+        factor_name = self.liquid_factor_combo.currentData()
+        row = self._find_liquid_factor_row(factor_name)
+        if row is None:
+            return
+        self._select_nacres_code(row.get("Code NACRES", ""))
+
+    def on_liquid_factor_template_selected(self):
+        """Copie un facteur existant dans les champs du référentiel liquide/solvant."""
+        row = self.liquid_copy_factor_combo.currentData()
+        if not isinstance(row, dict):
+            return
+
+        def _clean_value(value):
+            if pd.isna(value):
+                return ""
+            text = str(value).strip()
+            return "" if text.lower() in ("", "nan", "n/a", "none") else text
+
+        self._select_nacres_code(row.get("Code NACRES", ""))
+
+        for field, col in (
+            (self.dens_input, "Densité (g/mL)"),
+            (self.conc_input, "Concentration (mg/mL)"),
+            (self.factor_input, "Facteur CO₂ (kg CO₂e/kg)"),
+            (self.uncert_input, "Incertitude (%)"),
+            (self.source_input, "Source/Signature"),
+            (self.lien_input, "Note"),
+        ):
+            value = _clean_value(row.get(col, ""))
+            if value:
+                field.setText(value)
+
     def verifier_existence_objet(self, nom, reference, code_nacres, ignore_index=None):
         df = self.data
         if ignore_index is not None:
@@ -756,6 +831,11 @@ class DataMassWindow(QMainWindow):
         mat_cond     = self.mat_cond_combo.currentText()
         nbr_cond     = self.nbr_cond_input.text().strip()
         price_text   = self.price_input.text().strip()
+        liquid_factor_source = ""
+        liquid_volume = ""
+        if not is_liq:
+            liquid_factor_source = self.liquid_factor_combo.currentData() or ""
+            liquid_volume = self.solid_liquid_volume_input.text().strip().replace(',', '.')
         lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
         self.update_required_indicators()
@@ -800,6 +880,7 @@ class DataMassWindow(QMainWindow):
                 masse2_str = self._parse_optional_float(masse2_str, "La masse unitaire 2")
                 masse_emb_str = self._parse_optional_float(masse_emb_str, "La masse emballage")
                 masse_cond_str = self._parse_optional_float(masse_cond_str, "La masse conditionnement")
+                liquid_volume = self._parse_optional_float(liquid_volume, "Le volume du conditionnement liquide")
                 price_fields = self.compute_manual_price_fields(nbr_cond_value)
             except ValueError as exc:
                 QMessageBox.warning(self, "Erreur", str(exc))
@@ -864,6 +945,9 @@ class DataMassWindow(QMainWindow):
                 "Masse condionnement (g)": masse_cond_str,
                 "Matériau conditionnement": mat_cond,
                 "Nbr par conditionnement": nbr_cond_value,
+                "Unité liquide": "mL" if liquid_factor_source or liquid_volume else "",
+                "Volume flacon (mL)": liquid_volume,
+                "Facteur liquide source": liquid_factor_source,
                 "date d'ajout": date.today().isoformat(),
                 "Lien / Note / Remarque": lien_note,
                 "Source/Signature": source
@@ -897,6 +981,9 @@ class DataMassWindow(QMainWindow):
         self.nbr_cond_input.clear()
         self.price_mode_combo.setCurrentIndex(0)
         self.price_input.clear()
+        self.liquid_factor_combo.setCurrentIndex(0)
+        self.liquid_copy_factor_combo.setCurrentIndex(0)
+        self.solid_liquid_volume_input.clear()
         self.lien_input.clear()
         self.source_input.clear()
         self.nacres_combo.setCurrentIndex(0 if self.nacres_combo.count() else -1)
@@ -1012,7 +1099,9 @@ class DataMassWindow(QMainWindow):
             self.masse_cond_input, self.mat_cond_row_widget,
             self.nbr_cond_input,
             self.price_row_widget,
-            self.price_preview_label
+            self.price_preview_label,
+            self.liquid_factor_combo,
+            self.solid_liquid_volume_input,
         ):
             lab = self.form_layout.labelForField(w)
             if lab:
@@ -1021,6 +1110,7 @@ class DataMassWindow(QMainWindow):
 
         # Champs propres aux liquides
         for w in (
+            self.liquid_copy_factor_combo,
             self.dens_input, self.conc_input,
             self.factor_input, self.uncert_input,
             self.vol_flacon_input,
@@ -1246,6 +1336,7 @@ class DataMassWindow(QMainWindow):
             _fill(self.masse_emb_input, "Masse emballage unitaire (g)")
             _fill(self.masse_cond_input,"Masse condionnement (g)")
             _fill(self.nbr_cond_input,  "Nbr par conditionnement")
+            _fill(self.solid_liquid_volume_input, "Volume flacon (mL)")
             if not self.nbr_cond_input.text().strip():
                 _fill(self.nbr_cond_input, "nb_unites_ijm")
             _fill(self.lien_input,      "Lien / Note / Remarque")
@@ -1273,6 +1364,12 @@ class DataMassWindow(QMainWindow):
                 i = combo.findText(val)
                 if i != -1:
                     combo.setCurrentIndex(i)
+
+            factor_source = _clean_value(row.get("Facteur liquide source", ""))
+            if factor_source:
+                i = self.liquid_factor_combo.findData(factor_source)
+                if i != -1:
+                    self.liquid_factor_combo.setCurrentIndex(i)
 
             # Sélectionner et scroller jusqu'à la ligne dans le tableau
             for row_idx in range(self.table.rowCount()):

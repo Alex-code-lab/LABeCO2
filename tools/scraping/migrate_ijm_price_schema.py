@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -53,6 +54,9 @@ SOLID_COLUMNS = [
     "Matériau conditionnement",
     "Nbr par conditionnement",
     "Prix du conditionnement",
+    "Unité liquide",
+    "Volume flacon (mL)",
+    "Facteur liquide source",
     "date d'ajout",
     "Source/Signature",
     "Source catalogue IJM",
@@ -78,19 +82,6 @@ LIQUID_COLUMNS = [
     "Source/Signature",
     "date d'ajout",
     "Note",
-    "Volume flacon (mL)",
-    "Matériau contenant",
-    "Masse contenant (g)",
-    "Matériau emballage",
-    "Masse emballage (g)",
-    "Prix du conditionnement",
-    "Nbr par conditionnement",
-    "Source catalogue IJM",
-    "condt_ijm",
-    "designation_ijm",
-    "code_ijm",
-    "marque_ijm",
-    "score_match",
 ]
 
 MANUAL_SOLID_MARKERS = [
@@ -142,7 +133,9 @@ def clean_number(value):
 
 
 def normalize(value) -> str:
-    return re.sub(r"[^a-z0-9]+", "", clean(value).lower())
+    text = unicodedata.normalize("NFD", clean(value).lower())
+    text = text.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "", text)
 
 
 def is_nonempty_manual_value(value) -> bool:
@@ -242,7 +235,63 @@ def infer_conditionnement_mass_g(row):
     return ""
 
 
+def derive_liquid_factor_name(value) -> str:
+    text = clean(value)
+    text = re.sub(r"\([^)]*(?:ml|litre|liter|kg|g)[^)]*\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\d+(?:[,.]\d+)?\s*(?:µl|μl|ul|ml|millilitres?|milliliters?|l|litres?|liters?)\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:np|pa|hplc|chroma|technique|rectapur|merck)\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\baprès justification.*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpour\s*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\d+(?:[,.]\d+)?\s*%\b", lambda m: m.group(0), text)
+    text = re.sub(r"\s+", " ", text).strip(" -")
+    return text or clean(value)
+
+
+def clean_factor_display_name(value) -> str:
+    text = clean(value)
+    text = re.sub(r"\([^)]*(?:µl|μl|ul|ml|millilitres?|milliliters?|l|litres?|liters?)\s*[^)]*\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b\d+(?:[,.]\d+)?\s*(?:µl|μl|ul|ml|millilitres?|milliliters?|l|litres?|liters?)\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip(" -")
+    return text or clean(value)
+
+
+def build_liquid_factor_lookup(liquid_rows) -> dict:
+    lookup = {}
+    for row in liquid_rows:
+        name = clean(row.get("Produit", ""))
+        if not name:
+            continue
+        code = clean(row.get("Code NACRES", "")).upper()[:4]
+        lookup.setdefault((code, normalize(name)), name)
+    return lookup
+
+
+def resolve_liquid_factor_source(row, factor_lookup: dict) -> str:
+    if not belongs_to_liquids_catalogue(row):
+        return ""
+    code = catalogue_code(row)
+    derived = derive_liquid_factor_name(row.get("designation", ""))
+    key = (code, normalize(derived))
+    if key in factor_lookup:
+        return factor_lookup[key]
+
+    designation_norm = normalize(row.get("designation", ""))
+    best_name = ""
+    best_score = 0
+    for (candidate_code, candidate_key), candidate_name in factor_lookup.items():
+        if candidate_code != code:
+            continue
+        score = len(set(designation_norm) & set(candidate_key))
+        if candidate_key and candidate_key in designation_norm:
+            score += 1000
+        if score > best_score:
+            best_score = score
+            best_name = candidate_name
+    return best_name
+
+
 def catalogue_row_from_price(row) -> dict:
+    unit = infer_catalogue_unit(row)
     return {
         "Consommable": clean(row.get("designation")),
         "Marque": clean(row.get("marque")),
@@ -262,6 +311,9 @@ def catalogue_row_from_price(row) -> dict:
         "Matériau conditionnement": "",
         "Nbr par conditionnement": clean_number(row.get("nb_unites")),
         "Prix du conditionnement": clean_number(row.get("prix_ht")),
+        "Unité liquide": unit if unit == "mL" else "",
+        "Volume flacon (mL)": infer_volume_flacon_ml(row) if unit == "mL" else "",
+        "Facteur liquide source": clean(row.get("_liquid_factor_source", "")),
         "date d'ajout": RUN_DATE,
         "Source/Signature": "",
         "Source catalogue IJM": source_catalogue(row),
@@ -274,34 +326,21 @@ def catalogue_row_from_price(row) -> dict:
     }
 
 
-def liquid_catalogue_row_from_price(row) -> dict:
+def liquid_factor_row_from_existing(row) -> dict:
     return {
-        "Produit": clean(row.get("designation")),
-        "Type": "Catalogue IJM",
-        "Code NACRES": catalogue_code(row),
-        "CAS": "",
-        "Référence": clean(row.get("code_ijm")),
-        "Unité": infer_catalogue_unit(row),
-        "Densité (g/mL)": "",
-        "Concentration (mg/mL)": "",
-        "Facteur CO₂ (kg CO₂e/kg)": "",
-        "Incertitude (%)": "",
-        "Source/Signature": "",
-        "date d'ajout": RUN_DATE,
-        "Note": "",
-        "Volume flacon (mL)": infer_volume_flacon_ml(row),
-        "Matériau contenant": "",
-        "Masse contenant (g)": "",
-        "Matériau emballage": "",
-        "Masse emballage (g)": "",
-        "Prix du conditionnement": clean_number(row.get("prix_ht")),
-        "Nbr par conditionnement": clean_number(row.get("nb_unites")),
-        "Source catalogue IJM": source_catalogue(row),
-        "condt_ijm": clean(row.get("condt")),
-        "designation_ijm": clean(row.get("designation")),
-        "code_ijm": clean(row.get("code_ijm")),
-        "marque_ijm": clean(row.get("marque")),
-        "score_match": "",
+        "Produit": clean_factor_display_name(row.get("Produit")),
+        "Type": clean(row.get("Type")) or "Liquide / solvant",
+        "Code NACRES": clean(row.get("Code NACRES")).upper()[:4],
+        "CAS": clean(row.get("CAS")),
+        "Référence": clean(row.get("Référence")),
+        "Unité": clean(row.get("Unité")) or "mL",
+        "Densité (g/mL)": clean_number(row.get("Densité (g/mL)")),
+        "Concentration (mg/mL)": clean_number(row.get("Concentration (mg/mL)")),
+        "Facteur CO₂ (kg CO₂e/kg)": clean_number(row.get("Facteur CO₂ (kg CO₂e/kg)")),
+        "Incertitude (%)": clean_number(row.get("Incertitude (%)")),
+        "Source/Signature": clean(row.get("Source/Signature")),
+        "date d'ajout": clean(row.get("date d'ajout")),
+        "Note": clean(row.get("Note")),
     }
 
 
@@ -330,8 +369,9 @@ def should_merge_exact(manual_row, price_row) -> bool:
     return bool(brand_match and name_match)
 
 
-def migrate_solids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
+def migrate_solids(price_df: pd.DataFrame, liquid_factor_lookup: dict | None = None) -> tuple[pd.DataFrame, list[dict]]:
     df = pd.read_hdf(migration_source(SOLID_PATH))
+    liquid_factor_lookup = liquid_factor_lookup or {}
     price_by_code = {
         clean(row.get("code_ijm")): row
         for _, row in price_df.iterrows()
@@ -397,11 +437,12 @@ def migrate_solids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
         })
 
     for _, row in price_df.iterrows():
-        if belongs_to_liquids_catalogue(row):
-            continue
         code_ijm = clean(row.get("code_ijm"))
         if code_ijm and code_ijm in merged_codes:
             continue
+        if belongs_to_liquids_catalogue(row):
+            row = row.copy()
+            row["_liquid_factor_source"] = resolve_liquid_factor_source(row, liquid_factor_lookup)
         new_row = catalogue_row_from_price(row)
         legacy_row = legacy_catalogue_by_code.get(code_ijm)
         new_row = merge_legacy_catalogue_data(new_row, legacy_row)
@@ -432,93 +473,46 @@ def migrate_solids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
     return out, audit_rows
 
 
-def migrate_liquids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
+def migrate_liquids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict], dict]:
     if not LIQUID_PATH.exists():
-        return pd.DataFrame(columns=LIQUID_COLUMNS), []
+        return pd.DataFrame(columns=LIQUID_COLUMNS), [], {}
 
     df = pd.read_hdf(migration_source(LIQUID_PATH))
-    price_by_code = {
-        clean(row.get("code_ijm")): row
-        for _, row in price_df.iterrows()
-        if clean(row.get("code_ijm"))
-    }
     audit_rows = []
     migrated_rows = []
+    existing_factor_keys = set()
 
     for idx, row in df.iterrows():
-        new_row = {col: row.get(col, "") for col in LIQUID_COLUMNS}
         old_price = clean(row.get("prix_ht_ijm", "")) or clean(row.get("Prix du conditionnement", ""))
-        old_nb = clean(row.get("nb_unites_ijm", "")) or clean(row.get("Nbr par conditionnement", ""))
-        if not clean(new_row.get("Prix du conditionnement")):
-            new_row["Prix du conditionnement"] = clean_number(old_price)
-        if not clean(new_row.get("Nbr par conditionnement")):
-            new_row["Nbr par conditionnement"] = clean_number(old_nb)
-
-        code_ijm = clean(row.get("code_ijm", ""))
-        if old_price and not clean(new_row.get("Source catalogue IJM")):
-            price_row = price_by_code.get(code_ijm)
-            new_row["Source catalogue IJM"] = (
-                source_catalogue(price_row) if price_row is not None else "Catalogue IJM 2025"
-            )
-        if clean(new_row.get("Source catalogue IJM", "")) and not clean(new_row.get("date d'ajout", "")):
-            new_row["date d'ajout"] = RUN_DATE
-
+        if old_price:
+            factor_name = derive_liquid_factor_name(row.get("Produit", ""))
+            row = row.copy()
+            row["Produit"] = factor_name
+            row["Référence"] = ""
+        new_row = liquid_factor_row_from_existing(row)
+        key = (clean(new_row.get("Code NACRES", "")).upper()[:4], normalize(new_row.get("Produit", "")))
+        if key in existing_factor_keys:
+            continue
+        existing_factor_keys.add(key)
         migrated_rows.append(new_row)
         if old_price:
             audit_rows.append({
                 "type": "liquide",
-                "action": "liquide_prix_catalogue_migre",
+                "action": "liquide_catalogue_transforme_en_facteur",
                 "index_source": idx,
                 "consommable": clean(row.get("Produit")),
-                "marque": clean(row.get("marque_ijm")),
-                "reference": clean(row.get("Référence")),
+                "marque": "",
+                "reference": "",
                 "code_nacres": clean(row.get("Code NACRES")),
                 "ancien_prix_conditionnement": clean(row.get("Prix du conditionnement", "")),
                 "ancien_prix_ht_ijm": old_price,
-                "code_ijm": code_ijm,
+                "code_ijm": clean(row.get("code_ijm", "")),
                 "score_match": clean(row.get("score_match")),
             })
 
-    existing_codes = {
-        clean(row.get("code_ijm", ""))
-        for row in migrated_rows
-        if clean(row.get("code_ijm", ""))
-    }
-    existing_products = {
-        (clean(row.get("Code NACRES", "")).upper()[:4], normalize(row.get("Produit", "")))
-        for row in migrated_rows
-        if clean(row.get("Produit", ""))
-    }
-
-    for _, row in price_df.iterrows():
-        if not belongs_to_liquids_catalogue(row):
-            continue
-        code_ijm = clean(row.get("code_ijm"))
-        product_key = (catalogue_code(row), normalize(row.get("designation", "")))
-        if (code_ijm and code_ijm in existing_codes) or product_key in existing_products:
-            continue
-
-        new_row = liquid_catalogue_row_from_price(row)
-        migrated_rows.append(new_row)
-        if code_ijm:
-            existing_codes.add(code_ijm)
-        existing_products.add(product_key)
-        audit_rows.append({
-            "type": "liquide",
-            "action": "catalogue_ijm_ligne_liquides_solvents",
-            "index_source": "",
-            "consommable": new_row["Produit"],
-            "marque": new_row["marque_ijm"],
-            "reference": new_row["Référence"],
-            "code_nacres": new_row["Code NACRES"],
-            "ancien_prix_conditionnement": "",
-            "ancien_prix_ht_ijm": new_row["Prix du conditionnement"],
-            "code_ijm": new_row["code_ijm"],
-            "score_match": "",
-        })
-
     out = pd.DataFrame(migrated_rows).reindex(columns=LIQUID_COLUMNS)
-    return out, audit_rows
+    lookup = build_liquid_factor_lookup(migrated_rows)
+    return out, audit_rows, lookup
 
 
 def write_reference_excel(solid_df: pd.DataFrame, liquid_df: pd.DataFrame) -> None:
@@ -545,8 +539,8 @@ def main() -> None:
     liquid_backup = backup(LIQUID_PATH)
     reference_backup = backup(REFERENCE_XLSX)
 
-    solid_df, solid_audit = migrate_solids(price_df)
-    liquid_df, liquid_audit = migrate_liquids(price_df)
+    liquid_df, liquid_audit, liquid_factor_lookup = migrate_liquids(price_df)
+    solid_df, solid_audit = migrate_solids(price_df, liquid_factor_lookup)
     audit_df = pd.DataFrame(solid_audit + liquid_audit)
 
     solid_df.to_hdf(SOLID_PATH, key="data", mode="w", complevel=5)

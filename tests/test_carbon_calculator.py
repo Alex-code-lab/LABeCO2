@@ -399,6 +399,54 @@ class TestLiquidEmissions(unittest.TestCase):
         self.assertAlmostEqual(emission, 60.0)
         self.assertEqual(err, 0.0)
 
+    def test_produit_commercial_liquide_utilise_facteur_reference(self):
+        """Un solvant commercial stocké en consommable peut pointer vers un facteur liquide."""
+        main_data = pd.DataFrame({
+            'category': ['Achats'],
+            'subcategory': ['Consommables'],
+            'subsubcategory': ['NA02'],
+            'name': ['SOLVANTS : ACETONE'],
+            'year': [''],
+            'total': [0.45],
+            'uncertainty': [0.0],
+            'unit': ['euro'],
+        })
+        product_row = pd.Series({
+            'Code NACRES': 'NA02',
+            'Consommable': 'ACETONE TECHNIQUE 5 litres',
+            'Volume flacon (mL)': 5000,
+            'Facteur liquide source': 'Acétone',
+        })
+        factor_row = pd.Series({
+            'Code NACRES': 'NA02',
+            'Produit': 'Acétone',
+            'Unité': 'mL',
+            'Densité (g/mL)': 0.79,
+            'Facteur CO₂ (kg CO₂e/kg)': 2.55,
+            'Incertitude (%)': 30.0,
+        })
+        dm = _make_dm(main_data=main_data, liquid_row=None)
+        dm.get_consumable_liquid_factor_data.return_value = (product_row, factor_row)
+        dm.get_transport_factor.return_value = (0.0, 0.0)
+        calc = CarbonCalculator(dm)
+
+        ep, ep_err, em, em_err, tm, msg = calc.compute_emission_data({
+            'category': 'Achats',
+            'subcategory': 'Consommables',
+            'subsubcategory': 'NA02',
+            'name': 'SOLVANTS : ACETONE',
+            'value': 10.04,
+            'code_nacres': 'NA02',
+            'consommable': 'ACETONE TECHNIQUE 5 litres',
+            'quantity': 5000,
+        })
+
+        self.assertIsNone(msg)
+        self.assertAlmostEqual(ep, 4.518)
+        self.assertAlmostEqual(tm, 3.95)
+        self.assertAlmostEqual(em, 10.0725)
+        self.assertAlmostEqual(em_err, 3.02175)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. get_material_data — gestion des NaN

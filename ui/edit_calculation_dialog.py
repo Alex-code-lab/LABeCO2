@@ -191,9 +191,9 @@ class EditCalculationDialog(QDialog):
         consommable = data.get('consommable', '')
         if not code_nacres or code_nacres == 'NA':
             return False
-        # Liquide
-        if not self.data_liquides.empty and self.data_manager is not None:
-            liq = self.data_manager.get_liquid_data(code_nacres, consommable)
+        # Produit commercial liquide lié à un facteur Liquides & Solvants.
+        if self.data_manager is not None and hasattr(self.data_manager, "get_consumable_liquid_factor_data"):
+            _, liq = self.data_manager.get_consumable_liquid_factor_data(code_nacres, consommable)
             if liq is not None:
                 return True
         # Solide
@@ -759,13 +759,6 @@ class EditCalculationDialog(QDialog):
                         code_val = clean_text(row.get("Code NACRES", ""))
                         if nom_objet_val:
                             entries.append((nom_objet_val.casefold(), code_val, nom_objet_val, "solid"))
-
-                if self.data_liquides is not None and not self.data_liquides.empty:
-                    for _, row in self.data_liquides.iterrows():
-                        code_val = clean_text(row.get("Code NACRES", ""))
-                        produit = clean_text(row.get("Produit", ""))
-                        if produit and normalize_nacres_prefix(code_val) == code_nacres_prefix:
-                            entries.append((produit.casefold(), code_val, produit, "liquid"))
 
                 if not entries:
                     self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)

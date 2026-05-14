@@ -29,6 +29,7 @@ NUMERIC_COLS = [
     "Masse condionnement (g)",
     "Nbr par conditionnement",
     "Prix du conditionnement",
+    "Volume flacon (mL)",
 ]
 
 

@@ -109,14 +109,26 @@ solide,catalogue_ijm_ligne_separee,,"ETIQUETTES BRADY B-499 Blanc nylon 19,1mmX5
 solide,catalogue_ijm_ligne_separee,,"GAZE HYDROPHILE ""CHEESECLOTH"" (64mX91,4cm)",,E044,NB11,,154.39,E044,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,COTON CARDÉ ÉCRU 500g,,E0171,NB11,,5.89,E0171,
 solide,catalogue_ijm_ligne_separee,,COTON TIGES,,D016,BB01,,2.03,D016,
+solide,catalogue_ijm_ligne_separee,,ACIDE ACÉTIQUE 1litre,PROLABO,C003,NA21,,4.58,C003,
+solide,catalogue_ijm_ligne_separee,,ACIDE CHLORHYDRIQUE 37% NP 1litre,PROLABO,C005,NA21,,5.22,C005,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,ACIDE CITRIQUE NP 1Kg,PROLABO,C006,NA21,,12.84,C006,
+solide,catalogue_ijm_ligne_separee,,ACIDE NITRIQUE 69% NP 1 litre,PROLABO,C007,NA21,,9.23,C007,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,ACIDE BORIQUE Christallisé NP 1Kg,PROLABO,C008,NA21,,18.69,C008,
+solide,catalogue_ijm_ligne_separee,,ACIDE SULFURIQUE 95% NP 1 litre,PROLABO,C009,NA21,,6.09,C009,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,ACIDE TRICHLOROACÉTIQUE NP 1Kg,PROLABO,C010,NA21,,69.8,C010,
+solide,catalogue_ijm_ligne_separee,,ACIDE PROPIONIQUE pour la synthèse 1 litre Usage sous condition avec protection,MERCK,C069,NA21,,39.59,C069,
 solide,catalogue_ijm_ligne_separee,,"ACRYLAMIDE (99,4%) Bis Acrylamide 19/1 40% Solution 500ml",EUROMEDEX,C0024,NB22,,37.66,C0024,
 solide,catalogue_ijm_ligne_separee,,"ACRYLAMIDE (99,4%) Bis Acrylamide 29/1 40% Solution 500ml",EUROMEDEX,C0025,NB22,,37.66,C0025,
 solide,catalogue_ijm_ligne_separee,,"ACRYLAMIDE (99,4%) Bis Acrylamide 37,5/1 40% Solution 500ml",EUROMEDEX,C0022,NB22,,37.66,C0022,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,AGAROSE Standard 100g,EUROMEDEX,C0023,NB22,,44.94,C0023,
 solide,catalogue_ijm_ligne_separee,,DMSO 250ml,EUROMEDEX,C0027,NB22,,75.49,C0027,
+solide,catalogue_ijm_ligne_separee,,ETHIDIUM BROMIDE (BET) Solution 10ml 0.5mg/ml,EUROMEDEX,E406,NA31,,15.41,E406,
+solide,catalogue_ijm_ligne_separee,,"SYBR Safe DNA gel stain - 10,000X concent in DMSO (400µl)",LIFE Technologie,C075,NA31,,98.27,C075,
+solide,catalogue_ijm_ligne_separee,,DNA Stain: ClearSight DNA Stain 1ml,EUROMEDEX,C076,NA31,,60.94,C076,
+solide,catalogue_ijm_ligne_separee,,"TAE 10X Solution 2,5 litres",EUROMEDEX,C0626,NA25,,18.46,C0626,
+solide,catalogue_ijm_ligne_separee,,"TBE 10X Solution 2,5 litres",EUROMEDEX,C0621A,NA25,,24.72,C0621A,
+solide,catalogue_ijm_ligne_separee,,TEMED 25ml,EUROMEDEX,C0623,NA31,,16.37,C0623,
+solide,catalogue_ijm_ligne_separee,,"TRIS -Glycine SDS Solution 10X 2,5 litres",EUROMEDEX,C0647,NA25,,27.39,C0647,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,AMMONIUM ACÉTATE NP 1Kg,PROLABO,C013,NA21,,14.18,C013,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,AMMONIUM CHLORURE NP 1Kg,PROLABO,C0131,NA21,,25.06,C0131,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,AMMONIUM SULFATE NP 1Kg,PROLABO,C014,NA21,,20.44,C014,
@@ -125,8 +137,11 @@ solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,CALCIUM CHLORURE NP
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,DTT (Purity: 99%) 25g,EUROMEDEX,C034,NA25,,110.96,C034,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,GLUCOSE D(+) Anhydre GPR Rectapur 1Kg,PROLABO,C030,NA21,,19.8,C030,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,GLUCOSE 1Kg,EUROMEDEX,C030A,NA21,,26.38,C030A,
+solide,catalogue_ijm_ligne_separee,,"GLYCEROL BI-DISTILLE 99,5% NP 1 litre",PROLABO,C031,NA25,,16.26,C031,
+solide,catalogue_ijm_ligne_separee,,GLYCEROL High Purity 1 litre,EUROMEDEX,C032,NA25,,35.1,C032,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,GLYCINE PA 1Kg,EUROMEDEX,C0312,NA26,,32.9,C0312,
 solide,catalogue_ijm_ligne_separee,,GLYCOGEN 20mg/ml,ROCHE,C0311,NA21,,118.13,C0311,
+solide,catalogue_ijm_ligne_separee,,"GLYCOGEN 20mg/ml (2x0,25ml)",EUROMEDEX,C0313,NA21,,104.0,C0313,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,IPTG Dioxane free 5g,EUROMEDEX,C0321,NA55,,25.52,C0321,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,KANAMYCIN MonoSULFATE 25g,EUROMEDEX,C015,NA76,,95.5,C015,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,MAGNÉSIUM CHLORURE HEXAHYDRATE PA 250g,MERCK,C074,NA21,,19.26,C074,
@@ -138,21 +153,45 @@ solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,PARAFORMALDEHYDE en
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,POTASSIUM ACÉTATE NP 1Kg,EUROMEDEX,C044,NA21,,38.2,C044,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,POTASSIUM CHLORURE PA 1Kg,PROLABO,C045,NA21,,19.37,C045,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,POTASSIUM DIHYDROGENOPHOSPHATE NP1Kg,PROLABO,C046,NA21,,32.31,C046,
+solide,catalogue_ijm_ligne_separee,,POTASSIUM HYDROXYDE Solution 38 % NP 1 litre,PROLABO,C047,NA21,,38.11,C047,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,POTASSIUM HYDROXYDE en pastilles 1Kg,PROLABO,C048,NA21,,30.28,C048,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,DI-POTASSIUM HYDROGENOPHOSPHATE Rectapur 1Kg,PROLABO,C051,NA21,,29.64,C051,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,URÉE NP 1Kg,PROLABO,C065,NA21,,20.22,C065,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SACCHAROSE NP 1Kg,PROLABO,C054,NA28,,16.59,C054,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SUCROSE D (+) SACCHAROSE 1Kg,EUROMEDEX,C0541,NA21,,13.48,C0541,
+solide,catalogue_ijm_ligne_separee,,SDS Ultra pur 99% (Sodium Dodecyl Sulfate) 20% solution 1 litre,EUROMEDEX,C0544,NA25,,75.49,C0544,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM ACÉTATE PA 1Kg,PROLABO,C055,NA21,,48.82,C055,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM HYDROGÉNOCARBONATE NP 1Kg,PROLABO,C056,NA21,,16.93,C056,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM CHLORURE PA 1Kg,PROLABO,C057,NA21,,11.88,C057,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM CHLORURE PA 1Kg,EUROMEDEX,C057A,NA21,,15.41,C057A,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,TRI-SODIUM CITRATE NP1Kg,PROLABO,C058,NA21,,23.3,C058,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM HYDROXYDE PASTILLES PA 1Kg,PROLABO,C059,NA21,,18.52,C059,
+solide,catalogue_ijm_ligne_separee,,SODIUM HYDROXYDE SOLUTION PA 1 litre,PROLABO,C060,NA21,,13.7,C060,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,DI-SODIUM HYDROGENOPHOSPHATE PA 1Kg,VWR,C061,NA21,,33.06,C061,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,SODIUM DIHYDROGÉNOPHOSPHATE 1Kg,PROLABO,C062,NA21,,23.56,C062,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,TRIS BASE Ultra pur 1Kg,EUROMEDEX,C0641,NA21,,76.08,C0641,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,X-GAL 1g,EUROMEDEX,C066A,NA55,,59.12,C066A,
+solide,catalogue_ijm_ligne_separee,,ACETONE TECHNIQUE 5 litres,PROLABO,C001,NA02,,10.04,C001,
+solide,catalogue_ijm_ligne_separee,,ACETONE NP 1 litre,PROLABO,C002,NA02,,4.91,C002,
+solide,catalogue_ijm_ligne_separee,,ACETONITRILE pour HPLC CHROMA 1 litre,PROLABO,C0026,NA03,,11.24,C0026,
+solide,catalogue_ijm_ligne_separee,,"ACETONITRILE pour HPLC CHROMA 2,5 litre",PROLABO,C0021,NA03,,22.59,C0021,
+solide,catalogue_ijm_ligne_separee,,CHLOROFORME NP 1 litre,PROLABO,C023,NA04,,7.96,C023,
+solide,catalogue_ijm_ligne_separee,,DIETHYLE OXYDE (ETHER) NP 1 litre  après justification de l'usage,PROLABO,C024,NA07,,7.28,C024,
+solide,catalogue_ijm_ligne_separee,,ETHANOL 95 % Rectapur 5 litres,PROLABO,C027,NA05,,12.84,C027,
+solide,catalogue_ijm_ligne_separee,,ETHANOL 70% Rectapur 5 litres,PROLABO,C027A,NA05,,15.14,C027A,
+solide,catalogue_ijm_ligne_separee,,ETHANOL ABSOLU MERCK 1 litre,MERCK,C028,NA05,,17.11,C028,
+solide,catalogue_ijm_ligne_separee,,ETHANOL ABSOLU NP 1 litre,PROLABO,C029,NA05,,5.35,C029,
+solide,catalogue_ijm_ligne_separee,,HEXANE NP 1 litre,PROLABO,C004,NA05,,9.5,C004,
+solide,catalogue_ijm_ligne_separee,,METHANOL PA MERCK 1 litre,MERCK,C035,NA05,,9.05,C035,
+solide,catalogue_ijm_ligne_separee,,METHANOL HPLC 1 litre,PROLABO,C037,NA05,,4.63,C037,
+solide,catalogue_ijm_ligne_separee,,METHANOL NP 1 litre,PROLABO,C038,NA05,,4.23,C038,
+solide,catalogue_ijm_ligne_separee,,METHANOL Rectapur 5 litres,PROLABO,C040,NA05,,6.31,C040,
+solide,catalogue_ijm_ligne_separee,,PHÉNOL 99% Tris Saturated Tamponné 100ml,VWR,C0432,NA52,,24.61,C0432,
+solide,catalogue_ijm_ligne_separee,,PHÉNOL 99% Tris Saturated Tamponné 400ml,VWR,C0433,NA52,,69.55,C0433,
+solide,catalogue_ijm_ligne_separee,,PROPANOL 2 (ISO) PA MERCK 1 litre,MERCK,C052,NA05,,12.47,C052,
+solide,catalogue_ijm_ligne_separee,,PROPANOL 2 (ISO) NP 1 litre,PROLABO,C053,NA05,,6.14,C053,
+solide,catalogue_ijm_ligne_separee,,TOLUENE NP 1 litre,PROLABO,C063,NA06,,4.91,C063,
+solide,catalogue_ijm_ligne_separee,,XYLENE NP 1 litre,PROLABO,C067,NA06,,6.1,C067,
 solide,catalogue_ijm_ligne_separee,,"NuPAGE Novex 4-12% Bis-Tris Gel 1.0mm, 10 well","réf LIFE Technologie
 NP0321BOX",C082,NB22,,125.36,C082,
 solide,catalogue_ijm_ligne_separee,,"NuPAGE Novex 4-12% Bis-Tris Gel 1.0mm, 12well","réf LIFE Technologie
@@ -179,6 +218,10 @@ solide,catalogue_ijm_ligne_separee,,IBLOT NC GEL TRANSFER STACKS Mini - 10 rxn,"
 IB23002",C133,NB22,,159.21,C133,
 solide,catalogue_ijm_ligne_separee,,NuPAGE Antioxidant 15ml,"réf LIFE Technologie
 NP0005",C090,NB22,,36.36,C090,
+solide,catalogue_ijm_ligne_separee,,NuPAGE MES SDS Running Buffer (20X) 500ml,"réf LIFE Technologie
+NP0002",C091,NA25,,85.16,C091,
+solide,catalogue_ijm_ligne_separee,,NuPAGE MOPS SDS Running Buffer (20X) 500ml,"réf LIFE Technologie
+NP0001",C092,NA25,,85.89,C092,
 solide,catalogue_ijm_ligne_separee,,NuPAGE Sample Reducing Agent (10X) 250µl,"réf LIFE Technologie
 NP0004",C093,NB22,,14.18,C093,
 solide,catalogue_ijm_ligne_separee,,NuPAGE Sample Reducing Agent (10X) 10ml,"réf LIFE Technologie
@@ -187,6 +230,9 @@ solide,catalogue_ijm_ligne_separee,,NuPAGE Transfert Buffer (20X) 125ml,"réf LI
 NP0006",C094,NB22,,32.98,C094,
 solide,catalogue_ijm_ligne_separee,,NuPAGE LDS Sample Buffer (4X) 10ml,"réf LIFE Technologie
 NP0007",C095,NB22,,22.77,C095,
+solide,catalogue_ijm_ligne_separee,,LANE MARKER Reducing Sample Buffer 5ml,"réf LIFE Technologie
+39000",C111,NA25,,97.94,C111,
+solide,catalogue_ijm_ligne_separee,,PageBlue PROTEIN STAINING Solution 1000ml,Réf PIERCE 24620,C113,NA25,,137.12,C113,
 solide,catalogue_ijm_ligne_separee,,"NOVEX WedgeWell 10% Tris-Glycine Mini Gels, 10 well","réf LIFE Technologie
 XP00100BOX",C120,NB22,,94.46,C120,
 solide,catalogue_ijm_ligne_separee,,"NOVEX WedgeWell 4-12% Tris-Glycine Mini Gels, 10 well","réf LIFE Technologie
@@ -197,6 +243,16 @@ solide,catalogue_ijm_ligne_separee,,"NOVEX WedgeWell 4-20% Tris-Glycine Mini Gel
 XP04202BOX",C123,NB22,,94.46,C123,
 solide,catalogue_ijm_ligne_separee,,"NOVEX WedgeWell 4-20% Tris-Glycine Mini Gels, 15 well","réf LIFE Technologie
 XP04205BOX",C124,NB22,,94.46,C124,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 10% Stain free, 10 well 50µl",réf BIORAD 4568034,C102,NA56,,111.07,C102,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 12% Stain free, 10 well 50µl",réf BIORAD 4568044,C103,NA56,,111.07,C103,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 12% Stain free, 15 well 15µl",réf BIORAD 4568046,C104,NA56,,111.07,C104,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 4-15% Stain free, 10 well 50µl",réf BIORAD 4568084,C105,NA56,,111.07,C105,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 4-20% Stain free, 10 well 50µl",réf BIORAD 4568094,C106,NA56,,111.07,C106,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 4-20% Stain free, 12 well 20µl",réf BIORAD 4568095,C107,NA56,,111.07,C107,
+solide,catalogue_ijm_ligne_separee,,"Mini-PROTEAN TGX 4-20% Stain free, 15 well 15µl",réf BIORAD 4568096,C108,NA56,,111.07,C108,
+solide,catalogue_ijm_ligne_separee,,Laemmli Sample Buffer (4X) 10ml,réf BIORAD 1610747,C109,NA25,,23.47,C109,
+solide,catalogue_ijm_ligne_separee,,Laemmli Sample Buffer (2X) 30ml,réf BIORAD 1610737,C109A,NA25,,68.16,C109A,
+solide,catalogue_ijm_ligne_separee,,Native Sample Buffer 30ml,réf BIORAD 1610738,C110,NA25,,68.16,C110,
 solide,catalogue_ijm_ligne_separee,,ECL Standard Western Blotting for 2000cm2 KIT 250 (125ml de A - 125ml de B),Réf CYTIVA RPN2209,KB002,NB23,,110.09,KB002,
 solide,catalogue_ijm_ligne_separee,,ECL PRIME Western Blotting for 1000cm2 KIT 100ml (50ml de A - 50ml de B),Réf CYTIVA RPN2232,KB009,NB23,,149.7,KB009,
 solide,catalogue_ijm_ligne_separee,,ECL SELECT Western Blotting for 1000cm2 (KIT 100ml) Equivalent FEMTO - PIERCE,Réf CYTIVA RPN2235,KB011,NB23,,210.9,KB011,
@@ -213,6 +269,10 @@ solide,catalogue_ijm_ligne_separee,,"INHIBITEUR de PROTEASES Complete, Mini, EDT
 11836170001",C099,NA28,,152.88,C099,
 solide,catalogue_ijm_ligne_separee,,PhosSTOP (20 Tablets),"Réf ROCHE
 04906837001",C100,NA28,,260.35,C100,
+solide,catalogue_ijm_ligne_separee,,PIERCE PROTEIN A/G MAGNETIC BEADS 1ml,Réf THERMO 88802,C111A,NA56,,229.68,C111A,
+solide,catalogue_ijm_ligne_separee,,PIERCE PROTEIN A/G MAGNETIC BEADS 5ml,Réf THERMO 88803,C112,NA56,,849.85,C112,
+solide,catalogue_ijm_ligne_separee,,Goat ANTI-MOUSSE IgG (H+L) Preroxidase Conjugated 2ml,Réf THERMO 31430,C115,NA46,,353.81,C115,
+solide,catalogue_ijm_ligne_separee,,Goat ANTI-RABBIT IgG (H+L) Preroxidase Conjugated 2ml,Réf THERMO 31460,C116,NA46,,302.68,C116,
 solide,catalogue_ijm_ligne_separee,,"Mix2Seq Kit ""EUROFINS"" (SmartSeq KIT - 96 individuals pre-labelled tubes)",EUROFINS,B1097,NE02,,304.95,B1097,
 solide,catalogue_ijm_ligne_separee,,"Custom DNA Sequencing ""GATC"" SUPREMERun tube / Barcode",EUROFINS,B1095,NE02,,3.42,B1095,
 solide,catalogue_ijm_ligne_separee,,"Custom DNA Sequencing ""GATC"" LIGHTRun Tube / Barcode",EUROFINS,B1096,NE02,,3.32,B1096,
@@ -241,8 +301,13 @@ solide,catalogue_ijm_ligne_separee,,NUCLEOSPIN RNA VIRUS (50 preps),Réf MN 7409
 solide,catalogue_ijm_ligne_separee,,NUCLEOSPIN RNA COLUMNS (50 colonnes),Réf MN 740955.50S,G4402,NA52,,131.61,G4402,
 solide,catalogue_ijm_ligne_separee,,LOOKOUT MYCOPLASMA PCR DETECTION KIT,SIGMA / MERCK,C10KT,NA52,,268.44,C10KT,
 solide,catalogue_ijm_ligne_separee,,REDEXTRACT-N-AMP Tissue PCR Kit,SIGMA / MERCK,C30KT,NA52,,284.87,C30KT,
+solide,catalogue_ijm_ligne_separee,,TISSUE PREPARATION SOLUTION 30ml,SIGMA / MERCK,C40KT,NA52,,277.88,C40KT,
+solide,catalogue_ijm_ligne_separee,,"REDEXTRACT-N-AMP PCR Ready MIX 1,2ml",SIGMA / MERCK,C50KT,NA52,,126.76,C50KT,
+solide,catalogue_ijm_ligne_separee,,TRI-REAGENT RNA Extraction reagent (Equivalent TRIZOL) 100ml,EUROMEDEX,KBM546,NA52,,135.52,KBM546,
 solide,catalogue_ijm_ligne_separee,,WIZARD SV GEL & PCR Clean-Up System (50 preps),PROMEGA,A9281,NA52,,106.57,A9281,
 solide,catalogue_ijm_ligne_separee,,Rneasy Mini Kit (50 preps),QIAGEN Réf 74104,C0539,NA52,,365.28,C0539,
+solide,catalogue_ijm_ligne_separee,,LightCycler SYBR Green Master 5ml,ROCHE,KBM538,NA31,,180.04,KBM538,
+solide,catalogue_ijm_ligne_separee,,POWER SYBR Green PCR Master Mix (5ml),LIFE TECHNOLOGIE,KBM5372,NA31,,345.49,KBM5372,
 solide,catalogue_ijm_ligne_separee,,T4 DNA LIGASE (100u),LIFE Technologie,EM004,NA54,,27.37,EM004,
 solide,catalogue_ijm_ligne_separee,,T4 DNA LIGASE (20 000u),BIOLABS,M0202S,NA54,,59.39,M0202S,
 solide,catalogue_ijm_ligne_separee,,"DNase I recombinant, RNase free solution (10 000u)",ROCHE,EM0022,NA54,,192.81,EM0022,
@@ -261,6 +326,7 @@ solide,catalogue_ijm_ligne_separee,,QUICK LIGATION KIT 30 Réactions,BIOLABS,M22
 solide,catalogue_ijm_ligne_separee,,TAQ DNA POLYMERASE (400u) (Tampon + MgSO4),BIOLABS,M0267S,NA55,,47.99,M0267S,
 solide,catalogue_ijm_ligne_separee,,PLATINIUM TAQ DNA POLYMERASE (100 Réactions),LIFE Technologie,EM0031,NA55,,78.57,EM0031,
 solide,catalogue_ijm_ligne_separee,,GoTAQ G2 POLYMERASE (500u),PROMEGA,EM0025,NA55,,91.38,EM0025,
+solide,catalogue_ijm_ligne_separee,,GoTAQ qPCR Master Mix 5ml,PROMEGA,EM0024,NA55,,126.74,EM0024,
 solide,catalogue_ijm_ligne_separee,,TAQ POLYMERASE (500u),LIFE Technologie,EM003,NA55,,150.15,EM003,
 solide,catalogue_ijm_ligne_separee,,TAQ DNA POLYMERASE (400u) (Tampon + MgCL2),BIOLABS,M0273S,NA55,,47.99,M0273S,
 solide,catalogue_ijm_ligne_separee,,VENT DNA POLYMERASE (200u),BIOLABS,M0254S,NA55,,63.67,M0254S,
@@ -325,16 +391,83 @@ solide,catalogue_ijm_ligne_separee,,XHO I (5 000u),BIOLABS,R0146S,NA53,,63.4,R01
 solide,catalogue_ijm_ligne_separee,,XMA I (500u),BIOLABS,R0180S,NA53,,65.0,R0180S,
 solide,catalogue_ijm_ligne_separee,,XMN I (1 000u),BIOLABS,R0194S,NA53,,60.19,R0194S,
 solide,catalogue_ijm_ligne_separee,,dNTP set 100 mM/4x25 µmol,PROMEGA,NU005,NA55,,79.2,NU005,
+solide,catalogue_ijm_ligne_separee,,PCR Nucléotide Mix 200 µl,ROCHE,NU008,NA55,,34.2,NU008,
 solide,catalogue_ijm_ligne_separee,,100mM dNTP Set (4x25µmol),LIFE Technologie,NU007,NA55,,115.37,NU007,
 solide,catalogue_ijm_ligne_separee,,1Kb PLUS DNA Ladder (250µg),LIFE Technologie,PM001,NA31,,166.68,PM001,
 solide,catalogue_ijm_ligne_separee,,1Kb DNA Ladder (100µg ),BIOLABS,N3232S,NA31,,48.15,N3232S,
 solide,catalogue_ijm_ligne_separee,,100bp DNA Ladder (50µg ),BIOLABS,N3231S,NA31,,50.18,N3231S,
 solide,catalogue_ijm_ligne_separee,,"Blue Protein Standard, Broad Range (100rxns) Remplace P7706S",BIOLABS,P7718S,NA31,,151.89,P7718S,
+solide,catalogue_ijm_ligne_separee,,PageRuler PLUS Prestained Protein Ladder (10-250Kda) (2x250µl),réf THERMO 26619,PM017,NA31,,151.59,PM017,
+solide,catalogue_ijm_ligne_separee,,PageRuler Prestained Protein Ladder (10-170Kda) (2x250µl),réf THERMO 26616,PM018,NA31,,150.7,PM018,
+solide,catalogue_ijm_ligne_separee,,SeeBlue Plus2 Pre-Standard 500µl,LIFE Technologie,PM008,NA31,,211.97,PM008,
 solide,catalogue_ijm_ligne_separee,,Recombinant Rnasin (2 500u),PROMEGA,R001,NA54,,80.79,R001,
 solide,catalogue_ijm_ligne_separee,,RNaseOUT Recombinant Ribonuclease Inhibitor (5 000u),LIFE Technologie,R002,NA54,,98.64,R002,
 solide,catalogue_ijm_ligne_separee,,"Rnase Inhibitor, Human placenta (2 000u)",BIOLABS,M0307S,NA54,,77.84,M0307S,
+solide,catalogue_ijm_ligne_separee,,"MEM (1X), liquid, avec Earles salts, avec Glutamax I, 500ml","Réf LIFE Technologie
+41090028",RCC101,NA71,,9.1,RCC101,
+solide,catalogue_ijm_ligne_separee,,"MEM (100X), liquid, sans L-Glutamine 100ml","Réf LIFE Technologie
+11140035",RCC102,NA71,,7.63,RCC102,
+solide,catalogue_ijm_ligne_separee,,"D-MEM (1X), liquid (High Glucose), avec Glutamax I, avec Sodium Pyrivate, 500ml","Réf LIFE Technologie
+31966021",RCC111,NA71,,8.09,RCC111,
+solide,catalogue_ijm_ligne_separee,,"D-MEM (1X), liquid (High Glucose), avec Glutamax I, sans Sodium Pyrivate, 500ml","Réf LIFE Technologie
+61965026",RCC112,NA71,,6.88,RCC112,
+solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4,5g/L glucose avec Sodium Pyrivate,
+500ml","Réf LIFE Technologie
+41966029",RCC113,NA71,,6.36,RCC113,
+solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4,5g/L glucose sans Sodium Pyrivate,
+500ml","Réf LIFE Technologie
+41965039",RCC116,NA71,,6.47,RCC116,
+solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,"D-MEM (1X), liquid (Low Glucose), avec L-Glutamine, 1g/L glucose avec Sodium Pyrivate,
+500ml","Réf LIFE Technologie
+31885023",RCC114,NA71,,6.35,RCC114,
+solide,catalogue_ijm_ligne_separee,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4500mg/L D-glucose sans Sodium
+Pyrivate, sans Rouge de phénol 500ml","Réf LIFE Technologie
+21063029",RCC118,NA71,,8.56,RCC118,
+solide,catalogue_ijm_ligne_separee,,"D-MEM/F-12 (1:1) (1X), liquid avec Glutamax, 500ml","Réf LIFE Technologie
+31331028",RCC115,NA71,,12.71,RCC115,
+solide,catalogue_ijm_ligne_separee,,"D-MEM/F-12 (1:1) (1X), liquid sans L-Glutamine, 500ml","Réf LIFE Technologie
+21331020",RCC117,NA71,,11.3,RCC117,
+solide,catalogue_ijm_ligne_separee,,"RPMI 1640 Medium (1X), liquid, avec L-Glutamine, 500ml","Réf LIFE Technologie
+21875034",RCC121,NA71,,5.23,RCC121,
+solide,catalogue_ijm_ligne_separee,,"RPMI 1640 Medium (1X), liquid, sans L-Glutamine, 500ml","Réf LIFE Technologie
+31870025",RCC122,NA71,,5.24,RCC122,
+solide,catalogue_ijm_ligne_separee,,"RPMI 1640 Medium (1X), liquid, avec Glutamax I, 500ml","Réf LIFE Technologie
+61870010",RCC123,NA71,,6.17,RCC123,
+solide,catalogue_ijm_ligne_separee,,"Opti-MEM (1X) avec Glutamax I, 2400mg/L … 500ml","Réf LIFE Technologie
+51985026",RCC124,NA71,,17.18,RCC124,
+solide,catalogue_ijm_ligne_separee,,"L-Glutamine 200mM (100X), liquid 100ml","Réf LIFE Technologie
+25030024",RCC131,NA26,,7.27,RCC131,
+solide,catalogue_ijm_ligne_separee,,"D-PBS (10X), liquid, sans Calcium, sans Magnésium, 500ml","Réf LIFE Technologie
+14200067",RCC201,NA71,,14.31,RCC201,
+solide,catalogue_ijm_ligne_separee,,"D-PBS (1X), liquid, sans Calcium, sans Magnésium, sans Phenol Red, 500ml","Réf LIFE Technologie
+14190094",RCC202,NA71,,5.15,RCC202,
+solide,catalogue_ijm_ligne_separee,,UltraPure Dnase/Rnase-Free Distilled Water 500ml,"Réf LIFE Technologie
+10977035",RCC211,NA25,,5.94,RCC211,
+solide,catalogue_ijm_ligne_separee,,"Lipofectamine 2000 Transfection Reagent 1,5ml","Réf LIFE Technologie
+11668019",RCC301,NA56,,819.15,RCC301,
+solide,catalogue_ijm_ligne_separee,,"Lipofectamine 2000 Transfection Reagent 0,75ml","Réf LIFE Technologie
+11668027",RCC302,NA56,,525.52,RCC302,
+solide,catalogue_ijm_ligne_separee,,"Lipofectamine 3000 0,75ml","Réf LIFE Technologie
+L3000008",RCC308,NA56,,614.3,RCC308,
+solide,catalogue_ijm_ligne_separee,,"Lipofectamine RNAIMAX 0,75ml","Réf LIFE Technologie
+13778075",RCC312,NA56,,696.14,RCC312,
+solide,catalogue_ijm_ligne_separee,,Lipofectamine LTX 1ml,"Réf LIFE Technologie
+15338100",RCC313,NA56,,797.62,RCC313,
+solide,catalogue_ijm_ligne_separee,,TurboFect Transfection Reagent 1ml,Réf THERMO R0531,RCC307,NA56,,255.25,RCC307,
+solide,catalogue_ijm_ligne_separee,,Oligofectamine Transfection Reagent 1ml,"Réf LIFE Technologie
+12252011",RCC304,NA56,,680.06,RCC304,
+solide,catalogue_ijm_ligne_separee,,"FBS Fœtal Bovine Serum, Value FBS (Origin: Brazil) 500ml",A5256701,RCC401,NA71,,213.79,RCC401,
+solide,catalogue_ijm_ligne_separee,,"Penicillin-Streptomycin, liquid 100ml",15140122,RCC501,NA76,,9.98,RCC501,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,Ampicillin Sodium salt 1g,EUROMEDEX,RCC502,NA76,,4.49,RCC502,
 solide,catalogue_ijm_ligne_separee_donnees_masse_conservees,,Ampicillin Sodium salt 10g,EUROMEDEX,RCC504,NA76,,20.06,RCC504,
+solide,catalogue_ijm_ligne_separee,,"GENETICIN Selective Antibiotic (G418 Sulfate) 50mg/ml, 20ml","Réf LIFE Technologie
+10131035",RCC503,NA76,,116.26,RCC503,
+solide,catalogue_ijm_ligne_separee,,ANTIBIOTIC ANTIMYCOTIC 100ml,"Réf LIFE Technologie
+15240062",RCC505,NA76,,61.42,RCC505,
+solide,catalogue_ijm_ligne_separee,,"Trypsin-EDTA (1X) 0,05% (Trypsin with EDTA 4Na) Phenol Red 100ml","Réf LIFE Technologie
+25300054",C0642,NA78,,6.58,C0642,
+solide,catalogue_ijm_ligne_separee,,"Trypsin-EDTA (1X) 0,25% Phenol Red 100ml","Réf LIFE Technologie
+25200056",C0643,NA78,,7.01,C0643,
 solide,catalogue_ijm_ligne_separee,,SERINGUE STÉRILE 1ml TUBERCULINE Sans aiguille (x100),TERUMO,D0491,NB03,,8.62,D0491,
 solide,catalogue_ijm_ligne_separee,,SERINGUE STÉRILE 3ml (x100),TERUMO,D0492,NB03,,8.62,D0492,
 solide,catalogue_ijm_ligne_separee,,SERINGUE STÉRILE 5ml (x100),TERUMO,D04921,NB03,,13.47,D04921,
@@ -914,136 +1047,13 @@ solide,catalogue_ijm_ligne_separee,,PINCE AGRAFEUSE (pour agrafes N°10),,B014,A
 solide,catalogue_ijm_ligne_separee,,ARRACHE-AGRAFES (Dégrafeur),,B015,AB01,,0.21,B015,
 solide,catalogue_ijm_ligne_separee,,ATTACHE-LETTRE (Trombone) 32mm (Bte de100),,B016,AB01,,0.28,B016,
 solide,catalogue_ijm_ligne_separee,,ATTACHE-LETTRE GÉANTES 50x60mm (Bte de 50),,B016A,AB01,,1.26,B016A,
-liquide,liquide_prix_catalogue_migre,22,ACETONE TECHNIQUE 5 litres,PROLABO,,"NA02 Solvants oxygénés (acétone, acétate d'éthyle, méthyl éthyl cétone…)",,10.04,C001,
-liquide,liquide_prix_catalogue_migre,23,ACETONE NP 1 litre,PROLABO,,"NA02 Solvants oxygénés (acétone, acétate d'éthyle, méthyl éthyl cétone…)",,4.91,C002,
-liquide,liquide_prix_catalogue_migre,24,ACETONITRILE pour HPLC CHROMA 1 litre,PROLABO,,NA03 Solvants : acétonitrile et autres nitriles,,11.24,C0026,
-liquide,liquide_prix_catalogue_migre,25,"ACETONITRILE pour HPLC CHROMA 2,5 litre",PROLABO,,NA03 Solvants : acétonitrile et autres nitriles,,22.59,C0021,
-liquide,liquide_prix_catalogue_migre,26,CHLOROFORME NP 1 litre,PROLABO,,"NA04 Solvants chlorés (dichlorométhane, chloroforme…)",,7.96,C023,
-liquide,liquide_prix_catalogue_migre,27,DIETHYLE OXYDE (ETHER) NP 1 litre  après justification de l'usage,PROLABO,,NA07 Autres solvants (éthers…),,7.28,C024,
-liquide,liquide_prix_catalogue_migre,28,ETHANOL 95 % Rectapur 5 litres,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,12.84,C027,
-liquide,liquide_prix_catalogue_migre,29,ETHANOL 70% Rectapur 5 litres,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,15.14,C027A,
-liquide,liquide_prix_catalogue_migre,30,ETHANOL ABSOLU MERCK 1 litre,MERCK,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,17.11,C028,
-liquide,liquide_prix_catalogue_migre,31,ETHANOL ABSOLU NP 1 litre,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,5.35,C029,
-liquide,liquide_prix_catalogue_migre,32,HEXANE NP 1 litre,PROLABO,,"NA06 Solvants : hydrocarbures (pentane, hexane, heptane…)",,9.5,C004,
-liquide,liquide_prix_catalogue_migre,33,METHANOL PA MERCK 1 litre,MERCK,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,9.05,C035,
-liquide,liquide_prix_catalogue_migre,34,METHANOL HPLC 1 litre,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,4.63,C037,
-liquide,liquide_prix_catalogue_migre,35,METHANOL NP 1 litre,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,4.23,C038,
-liquide,liquide_prix_catalogue_migre,36,METHANOL Rectapur 5 litres,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,6.31,C040,
-liquide,liquide_prix_catalogue_migre,37,PHÉNOL 99% Tris Saturated Tamponné 100ml,VWR,,NA52 Réactifs & kits de biologie moléculaire,,24.61,C0432,
-liquide,liquide_prix_catalogue_migre,38,PHÉNOL 99% Tris Saturated Tamponné 400ml,VWR,,NA52 Réactifs & kits de biologie moléculaire,,69.55,C0433,
-liquide,liquide_prix_catalogue_migre,39,PROPANOL 2 (ISO) PA MERCK 1 litre,MERCK,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,12.47,C052,
-liquide,liquide_prix_catalogue_migre,40,PROPANOL 2 (ISO) NP 1 litre,PROLABO,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,6.14,C053,
-liquide,liquide_prix_catalogue_migre,41,TOLUENE NP 1 litre,PROLABO,,"NA06 Solvants : hydrocarbures (pentane, hexane, heptane…)",,4.91,C063,
-liquide,liquide_prix_catalogue_migre,42,XYLENE NP 1 litre,PROLABO,,"NA06 Solvants : hydrocarbures (pentane, hexane, heptane…)",,6.1,C067,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ACIDE ACÉTIQUE 1litre,PROLABO,C003,NA21,,4.58,C003,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ACIDE CHLORHYDRIQUE 37% NP 1litre,PROLABO,C005,NA21,,5.22,C005,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ACIDE NITRIQUE 69% NP 1 litre,PROLABO,C007,NA21,,9.23,C007,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ACIDE SULFURIQUE 95% NP 1 litre,PROLABO,C009,NA21,,6.09,C009,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ACIDE PROPIONIQUE pour la synthèse 1 litre Usage sous condition avec protection,MERCK,C069,NA21,,39.59,C069,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ETHIDIUM BROMIDE (BET) Solution 10ml 0.5mg/ml,EUROMEDEX,E406,NA31,,15.41,E406,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"SYBR Safe DNA gel stain - 10,000X concent in DMSO (400µl)",LIFE Technologie,C075,NA31,,98.27,C075,
-liquide,catalogue_ijm_ligne_liquides_solvents,,DNA Stain: ClearSight DNA Stain 1ml,EUROMEDEX,C076,NA31,,60.94,C076,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"TAE 10X Solution 2,5 litres",EUROMEDEX,C0626,NA25,,18.46,C0626,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"TBE 10X Solution 2,5 litres",EUROMEDEX,C0621A,NA25,,24.72,C0621A,
-liquide,catalogue_ijm_ligne_liquides_solvents,,TEMED 25ml,EUROMEDEX,C0623,NA31,,16.37,C0623,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"TRIS -Glycine SDS Solution 10X 2,5 litres",EUROMEDEX,C0647,NA25,,27.39,C0647,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"GLYCEROL BI-DISTILLE 99,5% NP 1 litre",PROLABO,C031,NA25,,16.26,C031,
-liquide,catalogue_ijm_ligne_liquides_solvents,,GLYCEROL High Purity 1 litre,EUROMEDEX,C032,NA25,,35.1,C032,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"GLYCOGEN 20mg/ml (2x0,25ml)",EUROMEDEX,C0313,NA21,,104.0,C0313,
-liquide,catalogue_ijm_ligne_liquides_solvents,,POTASSIUM HYDROXYDE Solution 38 % NP 1 litre,PROLABO,C047,NA21,,38.11,C047,
-liquide,catalogue_ijm_ligne_liquides_solvents,,SDS Ultra pur 99% (Sodium Dodecyl Sulfate) 20% solution 1 litre,EUROMEDEX,C0544,NA25,,75.49,C0544,
-liquide,catalogue_ijm_ligne_liquides_solvents,,SODIUM HYDROXYDE SOLUTION PA 1 litre,PROLABO,C060,NA21,,13.7,C060,
-liquide,catalogue_ijm_ligne_liquides_solvents,,NuPAGE MES SDS Running Buffer (20X) 500ml,"réf LIFE Technologie
-NP0002",C091,NA25,,85.16,C091,
-liquide,catalogue_ijm_ligne_liquides_solvents,,NuPAGE MOPS SDS Running Buffer (20X) 500ml,"réf LIFE Technologie
-NP0001",C092,NA25,,85.89,C092,
-liquide,catalogue_ijm_ligne_liquides_solvents,,LANE MARKER Reducing Sample Buffer 5ml,"réf LIFE Technologie
-39000",C111,NA25,,97.94,C111,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PageBlue PROTEIN STAINING Solution 1000ml,Réf PIERCE 24620,C113,NA25,,137.12,C113,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 10% Stain free, 10 well 50µl",réf BIORAD 4568034,C102,NA56,,111.07,C102,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 12% Stain free, 10 well 50µl",réf BIORAD 4568044,C103,NA56,,111.07,C103,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 12% Stain free, 15 well 15µl",réf BIORAD 4568046,C104,NA56,,111.07,C104,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 4-15% Stain free, 10 well 50µl",réf BIORAD 4568084,C105,NA56,,111.07,C105,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 4-20% Stain free, 10 well 50µl",réf BIORAD 4568094,C106,NA56,,111.07,C106,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 4-20% Stain free, 12 well 20µl",réf BIORAD 4568095,C107,NA56,,111.07,C107,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Mini-PROTEAN TGX 4-20% Stain free, 15 well 15µl",réf BIORAD 4568096,C108,NA56,,111.07,C108,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Laemmli Sample Buffer (4X) 10ml,réf BIORAD 1610747,C109,NA25,,23.47,C109,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Laemmli Sample Buffer (2X) 30ml,réf BIORAD 1610737,C109A,NA25,,68.16,C109A,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Native Sample Buffer 30ml,réf BIORAD 1610738,C110,NA25,,68.16,C110,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PIERCE PROTEIN A/G MAGNETIC BEADS 1ml,Réf THERMO 88802,C111A,NA56,,229.68,C111A,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PIERCE PROTEIN A/G MAGNETIC BEADS 5ml,Réf THERMO 88803,C112,NA56,,849.85,C112,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Goat ANTI-MOUSSE IgG (H+L) Preroxidase Conjugated 2ml,Réf THERMO 31430,C115,NA46,,353.81,C115,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Goat ANTI-RABBIT IgG (H+L) Preroxidase Conjugated 2ml,Réf THERMO 31460,C116,NA46,,302.68,C116,
-liquide,catalogue_ijm_ligne_liquides_solvents,,TISSUE PREPARATION SOLUTION 30ml,SIGMA / MERCK,C40KT,NA52,,277.88,C40KT,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"REDEXTRACT-N-AMP PCR Ready MIX 1,2ml",SIGMA / MERCK,C50KT,NA52,,126.76,C50KT,
-liquide,catalogue_ijm_ligne_liquides_solvents,,TRI-REAGENT RNA Extraction reagent (Equivalent TRIZOL) 100ml,EUROMEDEX,KBM546,NA52,,135.52,KBM546,
-liquide,catalogue_ijm_ligne_liquides_solvents,,LightCycler SYBR Green Master 5ml,ROCHE,KBM538,NA31,,180.04,KBM538,
-liquide,catalogue_ijm_ligne_liquides_solvents,,POWER SYBR Green PCR Master Mix (5ml),LIFE TECHNOLOGIE,KBM5372,NA31,,345.49,KBM5372,
-liquide,catalogue_ijm_ligne_liquides_solvents,,GoTAQ qPCR Master Mix 5ml,PROMEGA,EM0024,NA55,,126.74,EM0024,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PCR Nucléotide Mix 200 µl,ROCHE,NU008,NA55,,34.2,NU008,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PageRuler PLUS Prestained Protein Ladder (10-250Kda) (2x250µl),réf THERMO 26619,PM017,NA31,,151.59,PM017,
-liquide,catalogue_ijm_ligne_liquides_solvents,,PageRuler Prestained Protein Ladder (10-170Kda) (2x250µl),réf THERMO 26616,PM018,NA31,,150.7,PM018,
-liquide,catalogue_ijm_ligne_liquides_solvents,,SeeBlue Plus2 Pre-Standard 500µl,LIFE Technologie,PM008,NA31,,211.97,PM008,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"MEM (1X), liquid, avec Earles salts, avec Glutamax I, 500ml","Réf LIFE Technologie
-41090028",RCC101,NA71,,9.1,RCC101,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"MEM (100X), liquid, sans L-Glutamine 100ml","Réf LIFE Technologie
-11140035",RCC102,NA71,,7.63,RCC102,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (High Glucose), avec Glutamax I, avec Sodium Pyrivate, 500ml","Réf LIFE Technologie
-31966021",RCC111,NA71,,8.09,RCC111,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (High Glucose), avec Glutamax I, sans Sodium Pyrivate, 500ml","Réf LIFE Technologie
-61965026",RCC112,NA71,,6.88,RCC112,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4,5g/L glucose avec Sodium Pyrivate,
-500ml","Réf LIFE Technologie
-41966029",RCC113,NA71,,6.36,RCC113,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4,5g/L glucose sans Sodium Pyrivate,
-500ml","Réf LIFE Technologie
-41965039",RCC116,NA71,,6.47,RCC116,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (Low Glucose), avec L-Glutamine, 1g/L glucose avec Sodium Pyrivate,
-500ml","Réf LIFE Technologie
-31885023",RCC114,NA71,,6.35,RCC114,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM (1X), liquid (High Glucose), avec L-Glutamine, 4500mg/L D-glucose sans Sodium
-Pyrivate, sans Rouge de phénol 500ml","Réf LIFE Technologie
-21063029",RCC118,NA71,,8.56,RCC118,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM/F-12 (1:1) (1X), liquid avec Glutamax, 500ml","Réf LIFE Technologie
-31331028",RCC115,NA71,,12.71,RCC115,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-MEM/F-12 (1:1) (1X), liquid sans L-Glutamine, 500ml","Réf LIFE Technologie
-21331020",RCC117,NA71,,11.3,RCC117,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"RPMI 1640 Medium (1X), liquid, avec L-Glutamine, 500ml","Réf LIFE Technologie
-21875034",RCC121,NA71,,5.23,RCC121,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"RPMI 1640 Medium (1X), liquid, sans L-Glutamine, 500ml","Réf LIFE Technologie
-31870025",RCC122,NA71,,5.24,RCC122,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"RPMI 1640 Medium (1X), liquid, avec Glutamax I, 500ml","Réf LIFE Technologie
-61870010",RCC123,NA71,,6.17,RCC123,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Opti-MEM (1X) avec Glutamax I, 2400mg/L … 500ml","Réf LIFE Technologie
-51985026",RCC124,NA71,,17.18,RCC124,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"L-Glutamine 200mM (100X), liquid 100ml","Réf LIFE Technologie
-25030024",RCC131,NA26,,7.27,RCC131,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-PBS (10X), liquid, sans Calcium, sans Magnésium, 500ml","Réf LIFE Technologie
-14200067",RCC201,NA71,,14.31,RCC201,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"D-PBS (1X), liquid, sans Calcium, sans Magnésium, sans Phenol Red, 500ml","Réf LIFE Technologie
-14190094",RCC202,NA71,,5.15,RCC202,
-liquide,catalogue_ijm_ligne_liquides_solvents,,UltraPure Dnase/Rnase-Free Distilled Water 500ml,"Réf LIFE Technologie
-10977035",RCC211,NA25,,5.94,RCC211,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Lipofectamine 2000 Transfection Reagent 1,5ml","Réf LIFE Technologie
-11668019",RCC301,NA56,,819.15,RCC301,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Lipofectamine 2000 Transfection Reagent 0,75ml","Réf LIFE Technologie
-11668027",RCC302,NA56,,525.52,RCC302,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Lipofectamine 3000 0,75ml","Réf LIFE Technologie
-L3000008",RCC308,NA56,,614.3,RCC308,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Lipofectamine RNAIMAX 0,75ml","Réf LIFE Technologie
-13778075",RCC312,NA56,,696.14,RCC312,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Lipofectamine LTX 1ml,"Réf LIFE Technologie
-15338100",RCC313,NA56,,797.62,RCC313,
-liquide,catalogue_ijm_ligne_liquides_solvents,,TurboFect Transfection Reagent 1ml,Réf THERMO R0531,RCC307,NA56,,255.25,RCC307,
-liquide,catalogue_ijm_ligne_liquides_solvents,,Oligofectamine Transfection Reagent 1ml,"Réf LIFE Technologie
-12252011",RCC304,NA56,,680.06,RCC304,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"FBS Fœtal Bovine Serum, Value FBS (Origin: Brazil) 500ml",A5256701,RCC401,NA71,,213.79,RCC401,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Penicillin-Streptomycin, liquid 100ml",15140122,RCC501,NA76,,9.98,RCC501,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"GENETICIN Selective Antibiotic (G418 Sulfate) 50mg/ml, 20ml","Réf LIFE Technologie
-10131035",RCC503,NA76,,116.26,RCC503,
-liquide,catalogue_ijm_ligne_liquides_solvents,,ANTIBIOTIC ANTIMYCOTIC 100ml,"Réf LIFE Technologie
-15240062",RCC505,NA76,,61.42,RCC505,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Trypsin-EDTA (1X) 0,05% (Trypsin with EDTA 4Na) Phenol Red 100ml","Réf LIFE Technologie
-25300054",C0642,NA78,,6.58,C0642,
-liquide,catalogue_ijm_ligne_liquides_solvents,,"Trypsin-EDTA (1X) 0,25% Phenol Red 100ml","Réf LIFE Technologie
-25200056",C0643,NA78,,7.01,C0643,
+liquide,liquide_catalogue_transforme_en_facteur,24,ACETONITRILE,,,NA03 Solvants : acétonitrile et autres nitriles,,11.24,C0026,
+liquide,liquide_catalogue_transforme_en_facteur,26,CHLOROFORME,,,"NA04 Solvants chlorés (dichlorométhane, chloroforme…)",,7.96,C023,
+liquide,liquide_catalogue_transforme_en_facteur,27,DIETHYLE OXYDE (ETHER),,,NA07 Autres solvants (éthers…),,7.28,C024,
+liquide,liquide_catalogue_transforme_en_facteur,28,ETHANOL 95 %,,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,12.84,C027,
+liquide,liquide_catalogue_transforme_en_facteur,29,ETHANOL 70%,,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,15.14,C027A,
+liquide,liquide_catalogue_transforme_en_facteur,30,ETHANOL ABSOLU,,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,17.11,C028,
+liquide,liquide_catalogue_transforme_en_facteur,32,HEXANE,,,"NA06 Solvants : hydrocarbures (pentane, hexane, heptane…)",,9.5,C004,
+liquide,liquide_catalogue_transforme_en_facteur,37,PHÉNOL 99% Tris Saturated Tamponné,,,NA52 Réactifs & kits de biologie moléculaire,,24.61,C0432,
+liquide,liquide_catalogue_transforme_en_facteur,39,PROPANOL 2 (ISO),,,"NA05 Solvants : eau et alcools (méthanol, éthanol, propan-2-ol…)",,12.47,C052,
+liquide,liquide_catalogue_transforme_en_facteur,42,XYLENE,,,"NA06 Solvants : hydrocarbures (pentane, hexane, heptane…)",,6.1,C067,
