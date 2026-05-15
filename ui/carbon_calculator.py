@@ -7,7 +7,6 @@
 
 import math
 import pandas as pd
-from PySide6.QtWidgets import QMessageBox
 from ui.data_manager import DataManager
 from ui.display_utils import clean_text, normalize_nacres_prefix
 
@@ -255,11 +254,9 @@ class CarbonCalculator:
                 tm     = t_mass
                 if missing_mats:
                     noms = ", ".join(missing_mats)
-                    QMessageBox.warning(
-                        None,
-                        "Matériaux non trouvés",
-                        f"Les matériaux suivants sont absents de la base de données "
-                        f"et n'ont pas été comptabilisés dans le calcul :\n\n{noms}\n\n"
+                    error_message = (
+                        f"WARN:Les matériaux suivants sont absents de la base et "
+                        f"n'ont pas été comptabilisés :\n{noms}\n\n"
                         f"Vérifiez la base « empreinte_carbone_materiaux »."
                     )
 

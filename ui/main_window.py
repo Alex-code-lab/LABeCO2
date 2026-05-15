@@ -2147,17 +2147,7 @@ class MainWindow(QMainWindow):
         code_nacres_full = selected["code_nacres"]
         consommable_name = selected["consommable"]
 
-        # Pour les liquides : lookup direct dans data_liquides
-        if selected.get("source") == "liquid":
-            prix_info = self.data_manager.get_liquid_prix_unitaire_info(
-                code_nacres_full.strip(), consommable_name.strip()
-            )
-        else:
-            # Récupérer le Code NOM (4-5 chars IJM) depuis data_masse
-            code_nom = self.data_manager.get_code_nom(code_nacres_full.strip(), consommable_name.strip())
-            if code_nom is None:
-                code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
-            prix_info = self.data_manager.get_prix_unitaire_info(code_nom, consommable_name)
+        prix_info = self.data_manager.get_prix_unitaire_info(code_nacres_full.strip(), consommable_name)
         if prix_info and prix_info.get("prix_unitaire") is not None:
             prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
@@ -3103,33 +3093,23 @@ class MainWindow(QMainWindow):
             'custom_fe': custom_fe,
         }
 
-                # --- Enrichissement des données massiques pour le bilan carbone ---
-        # --- Enrichissement des données pour le calcul massique ---
         if category == 'Achats' and consommable and consommable != 'NA':
-            # Recherche de la ligne correspondante dans data_masse
             df_row = self.data_masse[
                 self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code_nacres) &
                 (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
             ]
             if not df_row.empty:
-                row = df_row.iloc[0]
-                # Masse et matériau du produit
-                data_dict['masse_unitaire'] = safe_float(row.get(self.data_manager.MASSE_G_COL, 0.0))
-                data_dict['materiau_conso']   = row.get(self.data_manager.MATERIAU_COL, "")
-                # Masse et matériau de l'emballage
-                data_dict['masse_emballage']  = safe_float(row.get(self.data_manager.MASSE_EMBALLAGE_COL, 0.0))
-                data_dict['materiau_emballage'] = row.get(self.data_manager.MATERIAU_EMBALLAGE_COL, "")
-                # Masse et matériau du conditionnement
-                data_dict['masse_conditionnement'] = safe_float(
-                    row.get(self.data_manager.MASSE_CONDITIONNEMENT_COL, 0.0)
+                data_dict['masse_unitaire'] = safe_float(
+                    df_row.iloc[0].get(self.data_manager.MASSE_G_COL, 0.0)
                 )
-                data_dict['materiau_conditionnement'] = row.get(self.data_manager.MATERIAU_CONDITIONNEMENT_COL, "")
-        # print("Debug - data_dict :", data_dict)
-        # Appel unifié
+
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
         if msg:
-            self._result_show_error(msg)
-            return
+            if msg.startswith("WARN:"):
+                QMessageBox.warning(self, "Matériaux non trouvés", msg[5:])
+            else:
+                self._result_show_error(msg)
+                return
 
         new_data = {
             'category': category,

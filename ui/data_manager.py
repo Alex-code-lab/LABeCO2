@@ -249,22 +249,6 @@ class DataManager:
                     pass
         return pd.DataFrame()
 
-    def get_code_nom(self, code_nacres_full, consommable_name):
-        """
-        Retourne le Code NOM (code NACRES IJM, ex: 'HA01') correspondant à un consommable
-        identifié par son Code NACRES complet et son nom.
-        """
-        if self.CODE_NOM_COL not in self.data_masse.columns:
-            return None
-        mask = (
-            self.nacres_code_mask(self.data_masse[self.CODE_NACRES_COL], code_nacres_full) &
-            (self.data_masse[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
-        )
-        filtered = self.data_masse[mask]
-        if filtered.empty:
-            return None
-        return str(filtered[self.CODE_NOM_COL].iloc[0]).strip()
-
     @staticmethod
     def _clean_cell(value):
         """Retourne une chaîne propre pour une cellule pandas possiblement vide."""
@@ -408,65 +392,6 @@ class DataManager:
             info["conditionnement"],
         )
 
-    def get_liquid_prix_unitaire_info(self, code_nacres, produit_name=""):
-        """
-        Retourne les métadonnées de prix pour un consommable liquide (data_liquides).
-        Cherche par code NACRES puis fuzzy match sur Produit.
-        Retourne None si aucun prix disponible.
-        """
-        from difflib import SequenceMatcher
-        if self.data_liquides.empty:
-            return None
-        df = self.data_liquides
-        if self.PRIX_CONDITIONNEMENT_COL not in df.columns and self.PRIX_UNITAIRE_COL not in df.columns:
-            return None
-        mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres)
-        candidates = df[mask]
-        if candidates.empty:
-            return None
-
-        if produit_name:
-            exact = candidates[
-                candidates["Produit"].astype(str).str.strip() == produit_name.strip()
-            ]
-            if not exact.empty:
-                for _, row in exact.iterrows():
-                    if self._row_has_price(row):
-                        candidates = exact
-                        break
-                else:
-                    return None
-
-        has_price = candidates.apply(self._row_has_price, axis=1)
-        price_cands = candidates[has_price]
-        if price_cands.empty:
-            return None
-        if len(price_cands) == 1 or not produit_name:
-            row = price_cands.iloc[0]
-        else:
-            name_lower = produit_name.lower()
-            best_score, best_row = -1.0, price_cands.iloc[0]
-            for _, r in price_cands.iterrows():
-                score = SequenceMatcher(None, name_lower, str(r.get("Produit", "")).lower()).ratio()
-                if score > best_score:
-                    best_score, best_row = score, r
-            row = best_row
-        prix_conditionnement = self._row_price_conditionnement(row)
-        nb_unites = self._row_nb_conditionnement(row)
-        prix_unitaire = self._row_prix_unitaire(row)
-        return {
-            "prix_unitaire": prix_unitaire,
-            "consommable": self._clean_cell(row.get("Produit", "")),
-            "designation": self._clean_cell(row.get(self.DESIGNATION_IJM_COL, "")) or self._clean_cell(row.get("Produit", "")),
-            "conditionnement": self._clean_cell(row.get(self.CONDT_IJM_COL, "")),
-            "nb_unites": "" if nb_unites is None else nb_unites,
-            "prix_ht": "" if prix_conditionnement is None else prix_conditionnement,
-            "code_ijm": self._clean_cell(row.get(self.CODE_IJM_COL, "")),
-            "marque": self._clean_cell(row.get(self.MARQUE_IJM_COL, "")),
-            "score_match": self._clean_cell(row.get(self.SCORE_MATCH_COL, "")),
-            "source_catalogue": self._clean_cell(row.get(self.SOURCE_CATALOGUE_IJM_COL, "")),
-        }
-
     def get_liquid_data(self, code_nacres, produit=None):
         """
         Cherche un consommable liquide par code NACRES.
@@ -514,5 +439,5 @@ class DataManager:
         return bool(
             self._clean_cell(row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, "")) or
             self._clean_cell(row.get(self.UNITE_LIQUIDE_COL, "")) or
-            self._to_float_or_none(row.get(self.VOLUME_FLACON_COL, None)) is not None
+            (self._to_float_or_none(row.get(self.VOLUME_FLACON_COL, None)) or 0.0) > 0
         )

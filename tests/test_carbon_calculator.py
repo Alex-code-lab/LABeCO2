@@ -506,5 +506,126 @@ class TestGetMaterialData(unittest.TestCase):
         self.assertIsNone(co2)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# WARN: prefix behavior in compute_emission_data
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestWarnPrefix(unittest.TestCase):
+    """Vérifie le comportement du préfixe WARN: lors du calcul des émissions."""
+
+    def _make_solid_data_masse(self, code='AA01', nom='Produit test',
+                                masse_g=10.0, materiau='Plastique'):
+        return pd.DataFrame([{
+            'Code NACRES':               code,
+            'Consommable':               nom,
+            'Masse unitaire (g)':        masse_g,
+            'Matériau consommable':      materiau,
+            'Masse unitaire deuxieme materiaux (g)': 0.0,
+            'Matériau deuxieme materiaux': '',
+            'Masse unitaire troisième materiaux (g)': 0.0,
+            'Matériau troisième materiaux': '',
+            'Masse emballage unitaire (g)': 0.0,
+            'Matériau emballage':         '',
+            'Masse condionnement (g)':    0.0,
+            'Matériau conditionnement':   '',
+            'Nbr par conditionnement':    1,
+        }])
+
+    def _make_cc(self, dm):
+        cc = CarbonCalculator.__new__(CarbonCalculator)
+        cc.dm = dm
+        # data/data_masse/data_materials sont des @property qui délèguent à dm
+        return cc
+
+    def test_materiau_absent_retourne_warn(self):
+        """Matériau renseigné mais absent de la base → msg commence par WARN:."""
+        data_masse = self._make_solid_data_masse(
+            code='AA01', nom='Produit test', masse_g=10.0, materiau='MatériauInconnu'
+        )
+        dm = _make_dm(
+            data_masse=data_masse,
+            material_map={},  # aucun matériau connu
+        )
+        dm.get_consumable_liquid_factor_data = MagicMock(return_value=(None, None))
+        dm.get_liquid_data.return_value = None
+        dm.get_transport_factor.return_value = (0.0, 0.0)
+        dm.TRANSPORT_DEFAULT = 'Inconnue (défaut)'
+
+        cc = self._make_cc(dm)
+        data_dict = {
+            'category': 'Achats',
+            'subcategory': 'Consommables de laboratoire',
+            'subsubcategory': 'AA01',
+            'name': 'Réactifs',
+            'year': '',
+            'value': 10.0,
+            'days': 1,
+            'code_nacres': 'AA01',
+            'consommable': 'Produit test',
+            'quantity': 5,
+        }
+        ep, _, _, _, _, msg = cc.compute_emission_data(data_dict)
+
+        self.assertIsNotNone(msg)
+        self.assertTrue(msg.startswith('WARN:'), f"Attendu WARN:, obtenu: {msg!r}")
+        # ep doit tout de même être calculé (pas une erreur fatale)
+        self.assertGreater(ep, 0.0)
+
+    def test_materiau_connu_pas_de_warn(self):
+        """Matériau trouvé → msg = None."""
+        data_masse = self._make_solid_data_masse(
+            code='AA01', nom='Produit test', masse_g=10.0, materiau='Plastique'
+        )
+        dm = _make_dm(
+            data_masse=data_masse,
+            material_map={'Plastique': (2.5, 0.1)},
+        )
+        dm.get_consumable_liquid_factor_data = MagicMock(return_value=(None, None))
+        dm.get_liquid_data.return_value = None
+        dm.get_transport_factor.return_value = (0.0, 0.0)
+        dm.TRANSPORT_DEFAULT = 'Inconnue (défaut)'
+
+        cc = self._make_cc(dm)
+        data_dict = {
+            'category': 'Achats',
+            'subcategory': 'Consommables de laboratoire',
+            'subsubcategory': 'AA01',
+            'name': 'Réactifs',
+            'year': '',
+            'value': 10.0,
+            'days': 1,
+            'code_nacres': 'AA01',
+            'consommable': 'Produit test',
+            'quantity': 5,
+        }
+        _, _, _, _, _, msg = cc.compute_emission_data(data_dict)
+        self.assertIsNone(msg)
+
+    def test_pas_de_donnees_retourne_erreur_fatale_non_warn(self):
+        """Catégorie introuvable → erreur fatale, pas de préfixe WARN:."""
+        dm = _make_dm(
+            main_data=pd.DataFrame(columns=[
+                'category', 'subcategory', 'subsubcategory', 'name', 'year',
+                'total', 'uncertainty', 'unit',
+            ]),
+        )
+        cc = self._make_cc(dm)
+        data_dict = {
+            'category': 'Achats',
+            'subcategory': 'CatégorieInexistante',
+            'subsubcategory': '',
+            'name': 'NomInexistant',
+            'year': '',
+            'value': 10.0,
+            'days': 1,
+            'code_nacres': 'NA',
+            'consommable': 'NA',
+            'quantity': 1,
+        }
+        _, _, _, _, _, msg = cc.compute_emission_data(data_dict)
+        self.assertIsNotNone(msg)
+        self.assertFalse(msg.startswith('WARN:'), f"Erreur fatale ne doit pas être WARN:, obtenu: {msg!r}")
+
+
 if __name__ == '__main__':
     unittest.main()
