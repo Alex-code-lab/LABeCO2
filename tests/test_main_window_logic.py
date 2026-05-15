@@ -163,6 +163,45 @@ def _solid_row(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Codes NACRES hors sous-catégorie Consommables
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestConsumableNacresLookup(unittest.TestCase):
+
+    def test_detecte_code_nacres_avec_consommable(self):
+        mw = _make_mw(data_masse=_solid_row(code='AA01', nom='Produit test'))
+        self.assertTrue(mw._nacres_prefix_has_consumables('AA01'))
+        self.assertTrue(mw._nacres_prefix_has_consumables('AA01 Pains'))
+        self.assertFalse(mw._nacres_prefix_has_consumables('ZZ99'))
+
+    def test_retrouve_ligne_achat_hors_sous_categorie_consommables(self):
+        mw = _make_mw(data_masse=_solid_row(code='AA01', nom='Produit test'))
+        mw.data = pd.DataFrame([
+            {
+                'category': 'Achats',
+                'subcategory': 'Vie du laboratoire',
+                'subsubcategory': 'AA01',
+                'name': 'Pains, patisseries, viennoiseries congeles',
+                'year': 2019,
+                'unit': 'euro',
+            },
+            {
+                'category': 'Achats',
+                'subcategory': 'Consommables (Matières premières)',
+                'subsubcategory': 'NB13',
+                'name': 'Culture cellulaire',
+                'year': 2019,
+                'unit': 'euro',
+            },
+        ])
+
+        row = mw._purchase_factor_row_for_nacres('AA01')
+        self.assertIsNotNone(row)
+        self.assertEqual(row['subcategory'], 'Vie du laboratoire')
+        self.assertEqual(row['subsubcategory'], 'AA01')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # _is_solid_liquid_product
 # ─────────────────────────────────────────────────────────────────────────────
 

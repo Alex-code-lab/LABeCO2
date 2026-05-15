@@ -1010,6 +1010,7 @@ class MainWindow(QMainWindow):
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
         self.subcategory_combo.currentIndexChanged.connect(self.update_quantity_visibility)
+        self.subcategory_combo.currentIndexChanged.connect(self.update_nacres_visibility)
 
         self.conso_search_field.textChanged.connect(
             lambda text: self.update_conso_filtered_combo(filter_text=text)
@@ -1146,6 +1147,59 @@ class MainWindow(QMainWindow):
             return ""
         subsubcategory, _ = self.split_subsub_name(subsub_name)
         return normalize_nacres_prefix(subsubcategory or subsub_name)
+
+    def _consumable_code_prefixes(self):
+        """Codes NACRES pour lesquels la base consommables contient au moins un produit."""
+        prefixes = set()
+        df = self.data_masse
+        if df is None or df.empty:
+            return prefixes
+        if (
+            self.data_manager.CODE_NACRES_COL not in df.columns or
+            self.data_manager.CONSOMMABLE_COL not in df.columns
+        ):
+            return prefixes
+
+        for _, row in df.iterrows():
+            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
+            prefix = normalize_nacres_prefix(row.get(self.data_manager.CODE_NACRES_COL, ""))
+            if consommable and prefix:
+                prefixes.add(prefix)
+        return prefixes
+
+    def _nacres_prefix_has_consumables(self, code_nacres):
+        return normalize_nacres_prefix(code_nacres) in self._consumable_code_prefixes()
+
+    def _purchase_factor_rows_for_nacres(self, code_nacres):
+        """Retourne les lignes Achats du référentiel monétaire pour un préfixe NACRES."""
+        prefix = normalize_nacres_prefix(code_nacres)
+        if not prefix or self.data is None or self.data.empty:
+            return pd.DataFrame()
+        subsub = self.data["subsubcategory"].fillna("").astype(str).str.strip().str.upper()
+        return self.data[
+            (self.data["category"] == "Achats") &
+            (subsub.str[:4] == prefix)
+        ]
+
+    def _purchase_factor_row_for_nacres(self, code_nacres, preferred_subcategory=None):
+        """Choisit la ligne d'achat à utiliser pour un code NACRES donné."""
+        rows = self._purchase_factor_rows_for_nacres(code_nacres)
+        if rows.empty:
+            return None
+
+        preferred = clean_text(preferred_subcategory)
+        if preferred:
+            exact = rows[rows["subcategory"].fillna("").astype(str).str.strip() == preferred]
+            if not exact.empty:
+                return exact.iloc[0]
+
+        consumables = rows[
+            rows["subcategory"].fillna("").astype(str).map(is_consumables_subcategory)
+        ]
+        if not consumables.empty:
+            return consumables.iloc[0]
+
+        return rows.iloc[0]
 
     def _current_subsub_data(self):
         if self.subsub_name_combo is None:
@@ -1707,14 +1761,20 @@ class MainWindow(QMainWindow):
         """
         Met à jour la visibilité de la zone des consommables (NACRES).
 
-        Affiche ou masque les éléments liés aux consommables en fonction de la catégorie sélectionnée et de la sous-catégorie.
-        Si la catégorie est 'Achats' et que la sous-catégorie contient 'Consommables', affiche les éléments,
-        sinon les masque.
+        Affiche ou masque les éléments liés aux consommables en fonction de la catégorie sélectionnée.
+        La zone est visible pour la sous-catégorie "Consommables", ainsi que pour un code NACRES
+        d'une autre famille lorsqu'un consommable existe déjà pour ce code.
         """
         category = self.category_combo.currentText()
         subcat = self._current_subcategory()
+        selected_prefix_has_consumables = (
+            category == 'Achats' and
+            self._nacres_prefix_has_consumables(self._selected_nacres_prefix())
+        )
 
-        if category == 'Achats' and subcat and is_consumables_subcategory(subcat):
+        if category == 'Achats' and subcat and (
+            is_consumables_subcategory(subcat) or selected_prefix_has_consumables
+        ):
             # On affiche la zone NACRES
             self._set_consumable_controls_visible(True)
             self.quantity_label.setVisible(False)
@@ -1754,15 +1814,16 @@ class MainWindow(QMainWindow):
 
         entries = []
         seen = set()
-        for _, row in filtered_data.iterrows():
+
+        def add_subsub_entry(row):
             subsubcategory = clean_text(row.get('subsubcategory', ''))
             name = clean_text(row.get('name', ''))
             display = clean_text(f"{subsubcategory} - {name}").strip(" - ")
             if not display:
-                continue
+                return
             haystack = normalize_search(display)
             if search_text and search_text not in haystack:
-                continue
+                return
             item_data = {
                 "category": clean_text(row.get('category', '')),
                 "subcategory": clean_text(row.get('subcategory', '')),
@@ -1776,9 +1837,23 @@ class MainWindow(QMainWindow):
                 item_data["name"],
             )
             if key in seen:
-                continue
+                return
             seen.add(key)
             entries.append((display.casefold(), display, item_data))
+
+        for _, row in filtered_data.iterrows():
+            add_subsub_entry(row)
+
+        if category == 'Achats' and subcategory and is_consumables_subcategory(subcategory):
+            existing_prefixes = {
+                normalize_nacres_prefix(data["subsubcategory"])
+                for _, _, data in entries
+                if normalize_nacres_prefix(data["subsubcategory"])
+            }
+            for prefix in sorted(self._consumable_code_prefixes() - existing_prefixes):
+                row = self._purchase_factor_row_for_nacres(prefix)
+                if row is not None:
+                    add_subsub_entry(row)
 
         self.subsub_name_combo.blockSignals(True)
         self.subsub_name_combo.clear()
@@ -1939,15 +2014,22 @@ class MainWindow(QMainWindow):
             return
 
         self._sync_subcategory_from_subsub_selection()
-        if self.category_combo.currentText() != 'Achats' or not is_consumables_subcategory(self._current_subcategory()):
+
+        # Récupère les 4 premiers caractères comme code NACRES approximatif
+        code_nacres_4 = self._selected_nacres_prefix() or normalize_nacres_prefix(subsub_name)
+        can_show_consumables = (
+            self.category_combo.currentText() == 'Achats' and
+            (
+                is_consumables_subcategory(self._current_subcategory()) or
+                self._nacres_prefix_has_consumables(code_nacres_4)
+            )
+        )
+        if not can_show_consumables:
             self._set_consumable_controls_visible(False, clear_selection=True)
             self.update_unit()
             self.update_manage_consumable_button_state()
             self._update_field_indicators()
             return
-
-        # Récupère les 4 premiers caractères comme code NACRES approximatif
-        code_nacres_4 = normalize_nacres_prefix(subsub_name)
 
         filtered_items = []
         for _, row in self.data_masse.iterrows():
@@ -2024,8 +2106,8 @@ class MainWindow(QMainWindow):
         """
         Gère l'événement de changement de sélection dans la combobox des consommables filtrés.
 
-        Met à jour la catégorie à 'Achats' si nécessaire, sélectionne la sous-catégorie "Consommables",
-        et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
+        Met à jour la catégorie à 'Achats' si nécessaire, sélectionne la sous-catégorie réelle
+        du code NACRES, et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
         Affiche la barre "Quantité" si un consommable valide est sélectionné.
         """
         selected = self._selected_consumable_data()
@@ -2061,39 +2143,42 @@ class MainWindow(QMainWindow):
         # Récupérer codeNACRES_4
         code_nacres_4 = normalize_nacres_prefix(selected["code_nacres"])
 
-        # Forcer la catégorie Achats, sous-cat contenant "Consommables"
+        # Forcer la catégorie Achats.
+        was_achats = self.category_combo.currentText() == "Achats"
         idx_cat = self.category_combo.findText("Achats")
         if idx_cat >= 0:
             self.category_combo.blockSignals(True)
             self.category_combo.setCurrentIndex(idx_cat)
             self.category_combo.blockSignals(False)
+            if not was_achats:
+                subcats = self.data[self.data['category'] == "Achats"]['subcategory'].dropna().unique()
+                self._populate_subcategory_combo(subcats.astype(str))
 
-        # Chercher sous-cat "Consommables"
-        target_subcat = None
-        for i in range(self.subcategory_combo.count()):
-            txt = clean_text(self.subcategory_combo.itemData(i)) or self.subcategory_combo.itemText(i)
-            if is_consumables_subcategory(txt):
-                target_subcat = txt
-                break
+        purchase_row = self._purchase_factor_row_for_nacres(
+            code_nacres_4,
+            preferred_subcategory=self._current_subcategory(),
+        )
+        target_subcat = (
+            clean_text(purchase_row.get("subcategory", ""))
+            if purchase_row is not None else
+            None
+        )
+        if not target_subcat:
+            for i in range(self.subcategory_combo.count()):
+                txt = clean_text(self.subcategory_combo.itemData(i)) or self.subcategory_combo.itemText(i)
+                if is_consumables_subcategory(txt):
+                    target_subcat = txt
+                    break
         if target_subcat is not None:
-            idx_sub = self.subcategory_combo.findData(target_subcat)
-            if idx_sub < 0:
-                idx_sub = self.subcategory_combo.findText(target_subcat)
-            if idx_sub != -1:
-                self.subcategory_combo.blockSignals(True)
-                self.subcategory_combo.setCurrentIndex(idx_sub)
-                self.subcategory_combo.blockSignals(False)
+            self.subcategory_combo.blockSignals(True)
+            self._select_subcategory(target_subcat)
+            self.subcategory_combo.blockSignals(False)
 
-        # On appelle update_subsubcategory_names() pour lister toutes les subsub
+        # On appelle update_subsubcategory_names() après avoir ciblé la sous-catégorie réelle
+        # du code NACRES. AA01, par exemple, garde ainsi son facteur monétaire d'origine.
         self.update_subsubcategory_names()
 
-        # Ensuite, on cherche la subsub dont .str[:4] == code_nacres_4
-        filtered_data = self.data[
-            (self.data['category'] == "Achats") &
-            (self.data['subcategory'].str.contains("Consommables", na=False)) &
-            (self.data['subsubcategory'].fillna('').str[:4] == code_nacres_4)
-        ]
-        if filtered_data.empty:
+        if purchase_row is None:
             # subsub => "non renseignée"
             self.subsub_name_combo.blockSignals(True)
             idx_nr = self.subsub_name_combo.findText("non renseignée")
@@ -2103,10 +2188,15 @@ class MainWindow(QMainWindow):
                 self.subsub_name_combo.setCurrentIndex(0)
             self.subsub_name_combo.blockSignals(False)
         else:
-            row = filtered_data.iloc[0]
-            real_subsub = row['subsubcategory'] or ''
-            real_name = row['name'] or ''
+            real_subsub = clean_text(purchase_row.get('subsubcategory', ''))
+            real_name = clean_text(purchase_row.get('name', ''))
             new_subsub_text = f"{real_subsub} - {real_name}".strip(" - ")
+            item_data = {
+                "category": "Achats",
+                "subcategory": clean_text(purchase_row.get('subcategory', '')),
+                "subsubcategory": real_subsub,
+                "name": real_name,
+            }
 
             self.subsub_name_combo.blockSignals(True)
             idx_ss = self.subsub_name_combo.findText(new_subsub_text)
@@ -2114,7 +2204,7 @@ class MainWindow(QMainWindow):
                 self.subsub_name_combo.setCurrentIndex(idx_ss)
             else:
                 # On ajoute
-                self.subsub_name_combo.addItem(new_subsub_text)
+                self.subsub_name_combo.addItem(new_subsub_text, userData=item_data)
                 self.subsub_name_combo.setCurrentIndex(self.subsub_name_combo.count() - 1)
             self.subsub_name_combo.blockSignals(False)
 
@@ -2897,6 +2987,9 @@ class MainWindow(QMainWindow):
                 self.data_manager.data_materials_path = materials_path
                 self.data_manager.data_materials = pd.read_hdf(materials_path)
                 self.data_materials = self.data_manager.get_data_materials()
+            if self.category_combo is not None:
+                self.update_subsubcategory_names()
+                self.update_nacres_visibility()
         except Exception as e:
             QMessageBox.warning(self, "Rechargement données",
                                 f"Impossible de recharger les consommables : {e}")
