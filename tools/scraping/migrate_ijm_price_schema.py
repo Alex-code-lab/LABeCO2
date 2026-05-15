@@ -4,7 +4,8 @@ Migrate consumable price columns to a single canonical conditionnement price.
 Rules:
     - "Prix du conditionnement" and "Nbr par conditionnement" are the only
       price/packaging columns used by the app.
-    - "Source/Signature" is preserved for mass/manual data.
+    - "Source" and "Signature" are separate everywhere:
+      Source = article/lien/documentation, Signature = nom/equipe/labo.
     - Catalogue provenance is stored separately in "Source catalogue IJM".
     - Manually-entered rows keep their manual fields; fuzzy IJM prices are
       moved to separate IJM catalogue rows.
@@ -58,7 +59,8 @@ SOLID_COLUMNS = [
     "Volume flacon (mL)",
     "Facteur liquide source",
     "date d'ajout",
-    "Source/Signature",
+    "Source",
+    "Signature",
     "Source catalogue IJM",
     "Lien / Note / Remarque",
     "condt_ijm",
@@ -79,13 +81,16 @@ LIQUID_COLUMNS = [
     "Concentration (mg/mL)",
     "Facteur CO₂ (kg CO₂e/kg)",
     "Incertitude (%)",
-    "Source/Signature",
+    "Source",
+    "Signature",
     "date d'ajout",
     "Note",
 ]
 
 MANUAL_SOLID_MARKERS = [
     "Référence",
+    "Source",
+    "Signature",
     "Source/Signature",
     "Lien / Note / Remarque",
     "Matériau consommable",
@@ -114,6 +119,41 @@ LEGACY_PRICE_COLUMNS = [
     "prix_unitaire_ijm",
 ]
 
+EXCEL_COLUMN_LABELS = {
+    "Consommable": "Consommable / produit commercial",
+    "Masse unitaire (g)": "Masse du consommable solide par unité (g)",
+    "Matériau consommable": "Matériau principal du consommable",
+    "Masse unitaire deuxieme materiaux (g)": "Masse du matériau secondaire par unité (g)",
+    "Matériau deuxieme materiaux": "Matériau secondaire du consommable",
+    "Masse unitaire troisième materiaux (g)": "Masse du troisième matériau par unité (g)",
+    "Matériau troisième materiaux": "Troisième matériau du consommable",
+    "Masse emballage unitaire (g)": "Masse de l'emballage secondaire par unité (g)",
+    "Matériau emballage": "Matériau de l'emballage secondaire",
+    "Masse condionnement (g)": "Masse du conditionnement primaire complet ou du contenant vide (g)",
+    "Matériau conditionnement": "Matériau du conditionnement primaire ou du contenant",
+    "Nbr par conditionnement": "Unités par conditionnement vendu",
+    "Prix du conditionnement": "Prix du conditionnement vendu (€ HT)",
+    "Unité liquide": "Unité du consommable liquide",
+    "Volume flacon (mL)": "Volume vendu par unité de consommable (mL)",
+    "Facteur liquide source": "Facteur liquide / solvant utilisé",
+    "date d'ajout": "Date d'ajout",
+    "Source catalogue IJM": "Source catalogue IJM",
+    "Lien / Note / Remarque": "Lien / note / remarque",
+    "condt_ijm": "Conditionnement vendu catalogue IJM",
+    "designation_ijm": "Désignation catalogue IJM",
+    "code_ijm": "Code catalogue IJM",
+    "marque_ijm": "Marque catalogue IJM",
+    "score_match": "Score de rapprochement catalogue",
+    "Produit": "Facteur liquide / solvant",
+    "Densité (g/mL)": "Densité (g/mL)",
+    "Concentration (mg/mL)": "Concentration (mg/mL)",
+    "Facteur CO₂ (kg CO₂e/kg)": "Facteur CO₂ (kg CO₂e/kg)",
+    "Incertitude (%)": "Incertitude (%)",
+    "Materiau": "Matériau",
+    "Equivalent CO₂ (kg eCO₂/kg)": "Facteur CO₂ matériau (kg eCO₂/kg)",
+    "uncertainty": "Incertitude",
+}
+
 
 def clean(value) -> str:
     if pd.isna(value):
@@ -132,6 +172,38 @@ def clean_number(value):
         return text
 
 
+def looks_like_documentary_source(value) -> bool:
+    text = clean(value)
+    if not text:
+        return False
+    return bool(
+        re.search(r"https?://|www\.|doi\s*:|doi\.org|10\.\d{4,9}/", text, flags=re.IGNORECASE)
+    )
+
+
+def row_source(row) -> str:
+    return clean(row.get("Source", ""))
+
+
+def row_signature(row) -> str:
+    return clean(row.get("Signature", "")) or clean(row.get("Source/Signature", ""))
+
+
+def split_solid_source_signature(row) -> tuple[str, str]:
+    source = row_source(row)
+    if not source:
+        note = clean(row.get("Lien / Note / Remarque", ""))
+        if looks_like_documentary_source(note):
+            source = note
+    return source, row_signature(row)
+
+
+def split_liquid_source_signature(row) -> tuple[str, str]:
+    source = row_source(row) or clean(row.get("Source/Signature", ""))
+    signature = clean(row.get("Signature", ""))
+    return source, signature
+
+
 def normalize(value) -> str:
     text = unicodedata.normalize("NFD", clean(value).lower())
     text = text.encode("ascii", "ignore").decode("ascii")
@@ -144,13 +216,14 @@ def is_nonempty_manual_value(value) -> bool:
 
 
 def is_manual_solid_row(row) -> bool:
-    if clean(row.get("Source catalogue IJM", "")) and not clean(row.get("Source/Signature", "")):
+    has_user_source = bool(row_source(row) or row_signature(row))
+    if clean(row.get("Source catalogue IJM", "")) and not has_user_source:
         return False
     if (
         clean(row.get("code_ijm", ""))
         and clean(row.get("Consommable", ""))
         and normalize(row.get("Consommable")) == normalize(row.get("designation_ijm"))
-        and not clean(row.get("Source/Signature", ""))
+        and not has_user_source
     ):
         return False
     return any(is_nonempty_manual_value(row.get(col, "")) for col in MANUAL_SOLID_MARKERS)
@@ -169,6 +242,16 @@ def backup(path: Path) -> Path | None:
 def migration_source(path: Path) -> Path:
     backup_path = path.with_suffix(path.suffix + ".backup_before_ijm_price_schema")
     return backup_path if backup_path.exists() else path
+
+
+def backup_before_source_signature_split(path: Path) -> Path | None:
+    if not path.exists():
+        return None
+    backup_path = path.with_suffix(path.suffix + ".backup_before_source_signature_split")
+    if backup_path.exists():
+        return backup_path
+    shutil.copy2(path, backup_path)
+    return backup_path
 
 
 def load_price_catalogue() -> pd.DataFrame:
@@ -315,7 +398,8 @@ def catalogue_row_from_price(row) -> dict:
         "Volume flacon (mL)": infer_volume_flacon_ml(row) if unit == "mL" else "",
         "Facteur liquide source": clean(row.get("_liquid_factor_source", "")),
         "date d'ajout": RUN_DATE,
-        "Source/Signature": "",
+        "Source": "",
+        "Signature": "",
         "Source catalogue IJM": source_catalogue(row),
         "Lien / Note / Remarque": "",
         "condt_ijm": clean(row.get("condt")),
@@ -327,6 +411,7 @@ def catalogue_row_from_price(row) -> dict:
 
 
 def liquid_factor_row_from_existing(row) -> dict:
+    source, signature = split_liquid_source_signature(row)
     return {
         "Produit": clean_factor_display_name(row.get("Produit")),
         "Type": clean(row.get("Type")) or "Liquide / solvant",
@@ -338,7 +423,8 @@ def liquid_factor_row_from_existing(row) -> dict:
         "Concentration (mg/mL)": clean_number(row.get("Concentration (mg/mL)")),
         "Facteur CO₂ (kg CO₂e/kg)": clean_number(row.get("Facteur CO₂ (kg CO₂e/kg)")),
         "Incertitude (%)": clean_number(row.get("Incertitude (%)")),
-        "Source/Signature": clean(row.get("Source/Signature")),
+        "Source": source,
+        "Signature": signature,
         "date d'ajout": clean(row.get("date d'ajout")),
         "Note": clean(row.get("Note")),
     }
@@ -393,6 +479,9 @@ def migrate_solids(price_df: pd.DataFrame, liquid_factor_lookup: dict | None = N
             continue
 
         new_row = {col: row.get(col, "") for col in SOLID_COLUMNS}
+        source, signature = split_solid_source_signature(row)
+        new_row["Source"] = source
+        new_row["Signature"] = signature
         old_ijm_code = clean(row.get("code_ijm", ""))
         old_ijm_price = clean(row.get("prix_ht_ijm", ""))
         old_manual_price = clean(row.get("Prix du conditionnement", ""))
@@ -403,11 +492,13 @@ def migrate_solids(price_df: pd.DataFrame, liquid_factor_lookup: dict | None = N
         if exact_price is not None and should_merge_exact(row, exact_price):
             new_row.update(catalogue_row_from_price(exact_price))
             for col in MANUAL_SOLID_MARKERS:
-                new_row[col] = row.get(col, "")
+                if col in SOLID_COLUMNS:
+                    new_row[col] = row.get(col, "")
             new_row["Consommable"] = row.get("Consommable", "")
             new_row["Marque"] = row.get("Marque", "")
             new_row["Référence"] = row.get("Référence", "")
-            new_row["Source/Signature"] = row.get("Source/Signature", "")
+            new_row["Source"] = source
+            new_row["Signature"] = signature
             new_row["Lien / Note / Remarque"] = row.get("Lien / Note / Remarque", "")
             merged_codes.add(old_ijm_code)
             action = "manuel_match_exact_prix_catalogue_conserve"
@@ -515,15 +606,41 @@ def migrate_liquids(price_df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict], d
     return out, audit_rows, lookup
 
 
+def migrate_reference_source_signature_columns(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_hdf(path)
+    changed = False
+    if "Source" not in df.columns:
+        df["Source"] = ""
+        changed = True
+    if "Signature" not in df.columns:
+        df["Signature"] = ""
+        changed = True
+    if "Source/Signature" in df.columns:
+        source_empty = df["Source"].fillna("").astype(str).str.strip() == ""
+        df.loc[source_empty, "Source"] = df.loc[source_empty, "Source/Signature"]
+        df = df.drop(columns=["Source/Signature"])
+        changed = True
+    if changed:
+        backup_before_source_signature_split(path)
+        df.to_hdf(path, key="data", mode="w", complevel=5)
+    return df
+
+
 def write_reference_excel(solid_df: pd.DataFrame, liquid_df: pd.DataFrame) -> None:
     REFERENCE_XLSX.parent.mkdir(parents=True, exist_ok=True)
-    materials = pd.read_hdf(MATERIALS_PATH) if MATERIALS_PATH.exists() else pd.DataFrame()
-    transport = pd.read_hdf(TRANSPORT_PATH) if TRANSPORT_PATH.exists() else pd.DataFrame()
+    materials = migrate_reference_source_signature_columns(MATERIALS_PATH)
+    transport = migrate_reference_source_signature_columns(TRANSPORT_PATH)
+
+    def export_labels(df: pd.DataFrame) -> pd.DataFrame:
+        return df.rename(columns={col: EXCEL_COLUMN_LABELS.get(col, col) for col in df.columns})
+
     with pd.ExcelWriter(REFERENCE_XLSX, engine="openpyxl") as writer:
-        solid_df.to_excel(writer, sheet_name="Consommables (masse)", index=False)
-        liquid_df.to_excel(writer, sheet_name="Liquides & Solvants", index=False)
-        materials.to_excel(writer, sheet_name="Matériaux", index=False)
-        transport.to_excel(writer, sheet_name="Transport", index=False)
+        export_labels(solid_df).to_excel(writer, sheet_name="Produits commerciaux", index=False)
+        export_labels(liquid_df).to_excel(writer, sheet_name="Facteurs liquides", index=False)
+        export_labels(materials).to_excel(writer, sheet_name="Facteurs matériaux", index=False)
+        export_labels(transport).to_excel(writer, sheet_name="Facteurs transport", index=False)
 
 
 def main() -> None:

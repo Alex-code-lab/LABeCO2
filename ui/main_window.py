@@ -556,6 +556,8 @@ class MainWindow(QMainWindow):
         self.manage_consumables_button.setMaximumWidth(230)
         self.add_consumable_button = QPushButton("Ajouter un consommable")
         self.add_consumable_button.setMaximumWidth(190)
+        self.add_emission_factor_button = QPushButton("Ajouter un facteur d'émission")
+        self.add_emission_factor_button.setMaximumWidth(230)
         # self.manage_consumables_button.setStyleSheet("""
         #     QPushButton {
         #         text-decoration: underline;
@@ -619,6 +621,7 @@ class MainWindow(QMainWindow):
         consumable_actions_layout.setSpacing(6)
         consumable_actions_layout.addWidget(self.manage_consumables_button)
         consumable_actions_layout.addWidget(self.add_consumable_button)
+        consumable_actions_layout.addWidget(self.add_emission_factor_button)
         consumable_actions_layout.addStretch()
         self.consumable_actions_widget = QWidget()
         self.consumable_actions_widget.setLayout(consumable_actions_layout)
@@ -1053,6 +1056,7 @@ class MainWindow(QMainWindow):
 
         self.manage_consumables_button.clicked.connect(self.open_data_mass_window)
         self.add_consumable_button.clicked.connect(self.open_data_mass_window_new)
+        self.add_emission_factor_button.clicked.connect(self.open_emission_factor_window)
 
         self.subsub_name_combo.currentIndexChanged.connect(self._update_field_indicators)
         self.conso_filtered_combo.currentIndexChanged.connect(self._update_field_indicators)
@@ -1252,6 +1256,7 @@ class MainWindow(QMainWindow):
             self.consumable_actions_widget,
             self.manage_consumables_button,
             self.add_consumable_button,
+            self.add_emission_factor_button,
         ):
             if widget is not None:
                 widget.setVisible(visible)
@@ -2162,11 +2167,11 @@ class MainWindow(QMainWindow):
             source_label = "catalogue IJM" if price_source else "base consommables"
             if condt_text and condt_text.lower() != "nan":
                 label_text = (
-                    f"ℹ  Prix par unité ({source_label}) : {prix:.4f} €  |  "
-                    f"Conditionnement : {condt_text}"
+                    f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €  |  "
+                    f"Conditionnement vendu : {condt_text}"
                 )
             else:
-                label_text = f"ℹ  Prix par unité ({source_label}) : {prix:.4f} €"
+                label_text = f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €"
             self.prix_unitaire_label.setText(label_text)
             self._current_prix_unitaire_info_text = self._format_prix_unitaire_tooltip(prix_info)
             self.prix_unitaire_label.setToolTip(self._current_prix_unitaire_info_text)
@@ -2254,10 +2259,10 @@ class MainWindow(QMainWindow):
             ("Désignation", prix_info.get("designation")),
             ("Code IJM", prix_info.get("code_ijm")),
             ("Marque", prix_info.get("marque")),
-            ("Prix HT conditionnement", prix_info.get("prix_ht")),
-            ("Conditionnement", prix_info.get("conditionnement")),
-            ("Nombre d'unités", prix_info.get("nb_unites")),
-            ("Prix par unité", prix_info.get("prix_unitaire")),
+            ("Prix HT du conditionnement vendu", prix_info.get("prix_ht")),
+            ("Conditionnement vendu", prix_info.get("conditionnement")),
+            ("Unités par conditionnement vendu", prix_info.get("nb_unites")),
+            ("Prix par unité vendue", prix_info.get("prix_unitaire")),
             ("Source catalogue", source_catalogue),
             ("Score de rapprochement", prix_info.get("score_match")),
         ]
@@ -2265,12 +2270,12 @@ class MainWindow(QMainWindow):
         for label, value in fields:
             value_text = str(value or "").strip()
             if value_text and value_text.lower() != "nan":
-                if label == "Prix par unité":
+                if label == "Prix par unité vendue":
                     try:
                         value_text = f"{float(value):.4f} €"
                     except (TypeError, ValueError):
                         pass
-                elif label == "Prix HT conditionnement":
+                elif label == "Prix HT du conditionnement vendu":
                     try:
                         value_text = f"{float(value):.2f} €"
                     except (TypeError, ValueError):
@@ -2501,8 +2506,8 @@ class MainWindow(QMainWindow):
             self.masse_manquante_label.setVisible(True)
             if is_volume_based and not has_container:
                 self.contenant_warning_label.setText(
-                    "⚠  Contenant (flacon) non renseigné. Cliquez sur « Enrichir » pour ajouter "
-                    "le matériau et la masse du flacon : cela peut modifier significativement le résultat."
+                    "⚠  Contenant/flacon non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                    "le matériau et la masse du contenant : cela peut modifier significativement le résultat."
                 )
                 self.contenant_warning_label.setStyleSheet(
                     "color: #92400e; background-color: #fffbeb; "
@@ -2566,8 +2571,8 @@ class MainWindow(QMainWindow):
             )
             if not has_container:
                 self.contenant_warning_label.setText(
-                    "⚠  Contenant (flacon) non renseigné. Cliquez sur « Enrichir » pour ajouter "
-                    "le matériau et la masse du flacon : cela peut modifier significativement le résultat."
+                    "⚠  Contenant/flacon non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                    "le matériau et la masse du contenant : cela peut modifier significativement le résultat."
                 )
                 self.contenant_warning_label.setStyleSheet(
                     "color: #92400e; background-color: #fffbeb; "
@@ -2603,8 +2608,8 @@ class MainWindow(QMainWindow):
         )
         if not has_packaging:
             self.contenant_warning_label.setText(
-                "⚠  Emballage non renseigné. Cliquez sur « Enrichir » pour ajouter "
-                "le matériau et la masse de l'emballage : cela peut modifier significativement le résultat."
+                "⚠  Emballage secondaire non renseigné. Cliquez sur « Enrichir » pour ajouter "
+                "le matériau et la masse de l'emballage secondaire : cela peut modifier significativement le résultat."
             )
             self.contenant_warning_label.setStyleSheet(
                 "color: #92400e; background-color: #fffbeb; "
@@ -2615,7 +2620,7 @@ class MainWindow(QMainWindow):
             self.contenant_warning_label.setVisible(False)
 
     def _liquid_conditionnement_quantity(self, row, unit):
-        """Quantité contenue dans une unité de conditionnement, exprimée dans l'unité de saisie."""
+        """Quantité contenue dans une unité vendue, exprimée dans l'unité de saisie."""
         unit_clean = clean_text(unit).casefold() or "ml"
         condt = clean_text(row.get("condt_ijm", "")).casefold().replace(",", ".")
 
@@ -2655,7 +2660,7 @@ class MainWindow(QMainWindow):
         """
         Remplit automatiquement le champ prix (input_field).
         - Solides : quantité (unités) × prix unitaire IJM
-        - Liquides : quantité / quantité du conditionnement × prix de l'unité IJM
+        - Liquides : quantité / quantité de l'unité vendue × prix de l'unité IJM
         """
         if self._current_prix_unitaire is None:
             return
@@ -2843,6 +2848,7 @@ class MainWindow(QMainWindow):
             data_materials=self.data_materials,
             base_path=self.data_manager.base_path,
             user_path=self.data_manager.user_path,
+            mode_filter="consumable",
             prefill_code=prefill_code,
             prefill_name=prefill_name,
             prefill_source=prefill_source,
@@ -2857,6 +2863,20 @@ class MainWindow(QMainWindow):
             data_materials=self.data_materials,
             base_path=self.data_manager.base_path,
             user_path=self.data_manager.user_path,
+            mode_filter="consumable",
+        )
+        self.data_mass_window.data_added.connect(self._reload_consumables_data)
+        self.data_mass_window.show()
+
+    def open_emission_factor_window(self):
+        """Ouvre la fenêtre dédiée aux facteurs d'émission matériaux/liquides."""
+        self.data_mass_window = DataMassWindow(
+            parent=self,
+            data_materials=self.data_materials,
+            base_path=self.data_manager.base_path,
+            user_path=self.data_manager.user_path,
+            mode_filter="factor",
+            initial_mode=DataMassWindow.MODE_SOLID_FACTOR,
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
@@ -2872,6 +2892,21 @@ class MainWindow(QMainWindow):
             else:
                 self.data_manager.data_liquides = pd.DataFrame()
             self.data_liquides = self.data_manager.get_data_liquides()
+            user_materials_path = os.path.join(
+                self.data_manager.user_path,
+                "data",
+                "mass_factors",
+                self.data_manager.DATA_MATERIALS_FILENAME,
+            )
+            materials_path = (
+                user_materials_path
+                if os.path.exists(user_materials_path) else
+                self.data_manager.data_materials_path
+            )
+            if os.path.exists(materials_path):
+                self.data_manager.data_materials_path = materials_path
+                self.data_manager.data_materials = pd.read_hdf(materials_path)
+                self.data_materials = self.data_manager.get_data_materials()
         except Exception as e:
             QMessageBox.warning(self, "Rechargement données",
                                 f"Impossible de recharger les consommables : {e}")
@@ -3288,8 +3323,8 @@ class MainWindow(QMainWindow):
                 ("Consommable", self.data_manager.MASSE_G_COL, self.data_manager.MATERIAU_COL, False),
                 ("Consommable 2", getattr(self.data_manager, "MASSE_G2_COL", ""), getattr(self.data_manager, "MATERIAU2_COL", ""), False),
                 ("Consommable 3", getattr(self.data_manager, "MASSE_G3_COL", ""), getattr(self.data_manager, "MATERIAU3_COL", ""), False),
-                ("Emballage", self.data_manager.MASSE_EMBALLAGE_COL, self.data_manager.MATERIAU_EMBALLAGE_COL, False),
-                ("Conditionnement", self.data_manager.MASSE_CONDITIONNEMENT_COL, self.data_manager.MATERIAU_CONDITIONNEMENT_COL, True),
+                ("Emballage secondaire", self.data_manager.MASSE_EMBALLAGE_COL, self.data_manager.MATERIAU_EMBALLAGE_COL, False),
+                ("Conditionnement primaire", self.data_manager.MASSE_CONDITIONNEMENT_COL, self.data_manager.MATERIAU_CONDITIONNEMENT_COL, True),
             ]
             lines = ["Détail masse :"]
             total_physical_kg = 0.0
@@ -4014,7 +4049,7 @@ PTFE, PC, papier, carton, verre) ;
 (nitrile, solvants courants).
 </p>
 <p>Formule : <i>quantité × masse unitaire (kg) × facteur matériau (kg CO₂e/kg)</i>,
-appliquée séparément au produit, à l'emballage et au conditionnement.</p>
+appliquée séparément au produit, à l'emballage secondaire et au conditionnement primaire.</p>
 
 <p><b>Correction transport (méthode masse)</b></p>
 <p>

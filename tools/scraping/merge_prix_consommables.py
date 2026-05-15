@@ -127,6 +127,30 @@ def infer_conditionnement_mass_g(row):
     return ""
 
 
+def clean(value):
+    text = str(value or "").strip()
+    return "" if text.lower() in {"", "nan", "none", "n/a"} else text
+
+
+def looks_like_documentary_source(value):
+    text = clean(value)
+    return bool(
+        text and re.search(r"https?://|www\.|doi\s*:|doi\.org|10\.\d{4,9}/", text, flags=re.IGNORECASE)
+    )
+
+
+def normalize_source_signature_fields(row):
+    """Ancienne base consommables: Source/Signature correspond à la signature."""
+    out = {k: v for k, v in row.items() if k != "Source/Signature"}
+    out.setdefault("Source", "")
+    out.setdefault("Signature", "")
+    if not clean(out.get("Signature")):
+        out["Signature"] = clean(row.get("Signature")) or clean(row.get("Source/Signature"))
+    if not clean(out.get("Source")) and looks_like_documentary_source(row.get("Lien / Note / Remarque")):
+        out["Source"] = clean(row.get("Lien / Note / Remarque"))
+    return out
+
+
 def best_match(consommable_name, candidates):
     """
     Parmi les candidats, cherche d'abord dans la même famille produit.
@@ -164,7 +188,15 @@ def merge():
     masses_rows, masses_fields = load_csv(MASSES_CSV)
     prix_rows, _               = load_csv(PRIX_CSV)
 
-    out_fields = list(masses_fields)
+    out_fields = []
+    for field in masses_fields:
+        if field == "Source/Signature":
+            if "Source" not in out_fields:
+                out_fields.append("Source")
+            if "Signature" not in out_fields:
+                out_fields.append("Signature")
+        elif field not in out_fields:
+            out_fields.append(field)
     for col in ["Prix du conditionnement", "Nbr par conditionnement"]:
         if col not in out_fields:
             out_fields.append(col)
@@ -178,6 +210,7 @@ def merge():
     results = []
 
     for row in masses_rows:
+        row = normalize_source_signature_fields(row)
         code_long   = row.get("Code NACRES", "").strip()
         code4       = extract_code4(code_long)
 
@@ -205,7 +238,7 @@ def merge():
         if code_ijm:
             seen_ijm_codes.add(code_ijm)
         code4 = row["code_nacres"].strip()[:4].upper()
-        masse_empty = {f: "" for f in masses_fields}
+        masse_empty = {f: "" for f in out_fields}
         page = row.get("page", "").strip()
         prix_extra  = {
             "code_nacres_court": code4,

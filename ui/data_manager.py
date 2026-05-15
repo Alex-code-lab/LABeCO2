@@ -89,8 +89,9 @@ class DataManager:
 
         # Données modifiables → user_path
         self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)
-        # Données en lecture seule → base_path
-        self.data_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
+        user_materials_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
+        base_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
+        self.data_materials_path = user_materials_path if os.path.exists(user_materials_path) else base_materials_path
 
         # Charger data_masse
         if not os.path.exists(self.data_masse_path):

@@ -1,19 +1,17 @@
-Produit,Type,Code NACRES,CAS,Référence,Unité,Densité (g/mL),Concentration (mg/mL),Facteur CO₂ (kg CO₂e/kg),Incertitude (%),Source/Signature,Note
-Acétone,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-64-1,,mL,0.79,,2.55,30,,
-Éthanol 96 %,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",64-17-5,,mL,0.789,,1.10,20,CarbonCloud,
-Toluène,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",108-88-3,,mL,0.867,,1.47,25,,
-Méthanol,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-56-1,,mL,0.791,,0.66,25,,
-API/anticorps,Biologie,NA45 Autres anticorps primaires couples,,,mg/mL,,1.0,1500,500,"Green House Gaz Protocol GHG Protocol Bessell et al., 2020",Valeur médiane avec une marge d'erreur ewtremment importante
-"Fetal Bovine Serum (FBS) – Sigma-Aldrich “Serum University”
-",Biologie,NA73 Milieux pour culture de petits organismes vivants,,,mL,1.05,,33.4,60,"Sérum de veau fœtal (FBS) et Smetana et al. (2015)  
-",
-"Gibco™ Fetal Bovine Serum, Value, 500 mL",Biologie,NA71 Serums et autres milieux pour culture de cellules animales,,A5256701,mL,1.05,,33.4,60,"Van der Valk, J., Brunner, D., De Smet, K. “Optimization of chemically defined cell culture media – replacing fetal bovine serum in mammalian in vitro methods.” Toxicology in Vitro 31 (2018): 35–43.",
-Gibco™ DMEM haute glucose sans phénol red,Biologie,NA73 Milieux pour culture de petits organismes vivants,,D6429,mL,1,,1.7,20,"Tuomisto, H.L. et al. “Life cycle assessment of culture media with alternative compositions for cultured meat production.” Int. J. Life Cycle Assess. (2024). lien",
-Gibco™ Milieu RPMI 1640,Biologie,,,21875034,mL,1,,1.5,60,,"Peu de données, supposé comme DME"
-"Gibco™ Pénicilline-streptomycine (10 000 U/ml), 100 mL",Biologie,NA76 Antibiotiques pour culture cellulaire,,15140122,mL,,10,30,100,Generic flowsheeting approach to generating first estimate material and energy balance data for Life Cycle Assessment (LCA) of Penicillin V production - ScienceDirect,
+Produit,Type,Code NACRES,CAS,Référence,Unité,Densité (g/mL),Concentration (mg/mL),Facteur CO₂ (kg CO₂e/kg),Incertitude (%),Source,Signature,Note
+Acétone,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-64-1,,mL,0.79,,2.55,30,,,
+Éthanol 96 %,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",64-17-5,,mL,0.789,,1.10,20,CarbonCloud,,
+Toluène,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",108-88-3,,mL,0.867,,1.47,25,,,
+Méthanol,Chimie,"NA21 Produits chimiques courants (acides, bases, sels...)",67-56-1,,mL,0.791,,0.66,25,,,
+API/anticorps,Biologie,NA45 Autres anticorps primaires couples,,,mg/mL,,1.0,1500,500,"Green House Gaz Protocol GHG Protocol Bessell et al., 2020",,Valeur médiane avec une marge d'erreur ewtremment importante
+Fetal Bovine Serum (FBS) – Sigma-Aldrich “Serum University”,Biologie,NA73 Milieux pour culture de petits organismes vivants,,,mL,1.05,,33.4,60,Sérum de veau fœtal (FBS) et Smetana et al. (2015),,
+"Gibco™ Fetal Bovine Serum, Value, 500 mL",Biologie,NA71 Serums et autres milieux pour culture de cellules animales,,A5256701,mL,1.05,,33.4,60,"Van der Valk, J., Brunner, D., De Smet, K. “Optimization of chemically defined cell culture media – replacing fetal bovine serum in mammalian in vitro methods.” Toxicology in Vitro 31 (2018): 35–43.",,
+Gibco™ DMEM haute glucose sans phénol red,Biologie,NA73 Milieux pour culture de petits organismes vivants,,D6429,mL,1,,1.7,20,"Tuomisto, H.L. et al. “Life cycle assessment of culture media with alternative compositions for cultured meat production.” Int. J. Life Cycle Assess. (2024). lien",,
+Gibco™ Milieu RPMI 1640,Biologie,,,21875034,mL,1,,1.5,60,,,"Peu de données, supposé comme DME"
+"Gibco™ Pénicilline-streptomycine (10 000 U/ml), 100 mL",Biologie,NA76 Antibiotiques pour culture cellulaire,,15140122,mL,,10,30,100,Generic flowsheeting approach to generating first estimate material and energy balance data for Life Cycle Assessment (LCA) of Penicillin V production - ScienceDirect,,
 "Gibco™ DPBS, sans calcium, sans magnésium, 500 mL
       ""                        ""                            ""              ,10x500 mL",Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",,"14190094
-14190169",mL,1,,0.4,100,Tuomisto et al. (2022),
-"Trypsine-EDTA 0,25 % (100 mL)",Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",,T4049-100ML,mL,1,2.5,1500,100,Santibáñez et al. (2017) – Environmental life cycle assessment of recombinant growth factor production,
-"STEMCELL Technologies Anti-Adherence Rinsing Solution, 100mL",Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",,7010,mL,,,,,,
-LDS Bolt™ Sample Buffer 4×,Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",151-21-3,B0007,,1.05,,15,100,https://www.thermofisher.com/order/catalog/product/B0007,Supposition
+14190169",mL,1,,0.4,100,Tuomisto et al. (2022),,
+"Trypsine-EDTA 0,25 % (100 mL)",Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",,T4049-100ML,mL,1,2.5,1500,100,Santibáñez et al. (2017) – Environmental life cycle assessment of recombinant growth factor production,,
+"STEMCELL Technologies Anti-Adherence Rinsing Solution, 100mL",Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",,7010,mL,,,,,,,
+LDS Bolt™ Sample Buffer 4×,Biologie,"NA25 Produits biochimiques courants (tampons, bsa, etc.)",151-21-3,B0007,,1.05,,15,100,https://www.thermofisher.com/order/catalog/product/B0007,,Supposition

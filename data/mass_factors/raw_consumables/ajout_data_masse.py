@@ -48,7 +48,8 @@ class MainWindow(QMainWindow):
             "Masse condionnement (g)",
             "Matériau conditionnement",
             "Nbr par conditionnement",
-            "Source/Signature",
+            "Source",
+            "Signature",
             "Lien / Note / Remarque"
         ]
 
@@ -74,6 +75,16 @@ class MainWindow(QMainWindow):
 
             # Lecture du HDF5
             df = pd.read_hdf(self.hdf5_data_path, key='data')
+            if "Source/Signature" in df.columns:
+                if "Signature" not in df.columns:
+                    df["Signature"] = df["Source/Signature"]
+                if "Source" not in df.columns:
+                    df["Source"] = ""
+                df = df.drop(columns=["Source/Signature"])
+            for col in self.columns:
+                if col not in df.columns:
+                    df[col] = ""
+            df = df.reindex(columns=self.columns)
             print("[INFO] Données chargées depuis", self.hdf5_data_path)
             print(df)  # Debug console : affiche le contenu
             return df
@@ -147,6 +158,7 @@ class MainWindow(QMainWindow):
         self.materiau_combo = QComboBox()
         self.materiau_combo.addItems(self.materials)
         self.source_input = QLineEdit()
+        self.signature_input = QLineEdit()
         self.nacre_combo = QComboBox()
         form_layout.addRow("Consommable :", self.nom_input)
         form_layout.addRow("Marque :", self.brand_input)
@@ -166,7 +178,8 @@ class MainWindow(QMainWindow):
 
         form_layout.addRow("Masse unitaire (g) :", self.masse_input)
         form_layout.addRow("Matériau :", self.materiau_combo)
-        form_layout.addRow("Source/Signature :", self.source_input)
+        form_layout.addRow("Source (article/lien) :", self.source_input)
+        form_layout.addRow("Signature (nom/équipe/labo) :", self.signature_input)
 
         main_layout.addLayout(form_layout)
 
@@ -210,13 +223,14 @@ class MainWindow(QMainWindow):
         masse_str = self.masse_input.text().replace(',', '.').strip()
         materiau = self.materiau_combo.currentText()
         source = self.source_input.text().strip()
+        signature = self.signature_input.text().strip()
         nacre = self.nacre_combo.currentData()
         if not nacre:
             QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un code NACRES.")
             return
 
         # Vérifications basiques
-        if not nom or not reference or not materiau or not source:
+        if not nom or not reference or not materiau or not signature:
             QMessageBox.warning(self, "Erreur", "Veuillez remplir tous les champs obligatoires.")
             return
 
@@ -244,7 +258,8 @@ class MainWindow(QMainWindow):
             "Masse condionnement (g)": "",
             "Matériau conditionnement": "",
             "Nbr par conditionnement": "",
-            "Source/Signature": source,
+            "Source": source,
+            "Signature": signature,
             "Lien / Note / Remarque": ""
         }
 
@@ -264,6 +279,7 @@ class MainWindow(QMainWindow):
         self.ref_input.clear()
         self.masse_input.clear()
         self.source_input.clear()
+        self.signature_input.clear()
         if self.materiau_combo.count() > 0:
             self.materiau_combo.setCurrentIndex(0)
         if self.nacre_combo.count() > 0:
