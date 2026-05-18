@@ -1,0 +1,37 @@
+[
+  {
+    "Materiau": "Polypropylène (PP)",
+    "Equivalent CO₂ (kg eCO₂/kg)": 3.0,
+    "uncertainty": "0.1",
+    "Source": "Base Empreinte® - ADEME",
+    "Signature": ""
+  },
+  {
+    "Materiau": "Polyéthylène (PE)",
+    "Equivalent CO₂ (kg eCO₂/kg)": 2.5,
+    "uncertainty": "0.1",
+    "Source": "Base Empreinte® - ADEME",
+    "Signature": ""
+  },
+  {
+    "Materiau": "Polystyrène (PS)",
+    "Equivalent CO₂ (kg eCO₂/kg)": 3.5,
+    "uncertainty": "0.1",
+    "Source": "Base Empreinte® - ADEME",
+    "Signature": ""
+  },
+  {
+    "Materiau": "Polyéthylène téréphtalate (PET)",
+    "Equivalent CO₂ (kg eCO₂/kg)": 4.0,
+    "uncertainty": "0.15",
+    "Source": "Base Empreinte® - ADEME",
+    "Signature": ""
+  },
+  {
+    "Materiau": "Polychlorure de vinyle (PVC)",
+    "Equivalent CO₂ (kg eCO₂/kg)": 2.7,
+    "uncertainty": "0.1",
+    "Source": "Base Empreinte® - ADEME",
+    "Signature": ""
+  }
+]

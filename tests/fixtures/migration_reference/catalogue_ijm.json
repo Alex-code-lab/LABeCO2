@@ -1,0 +1,57 @@
+[
+  {
+    "code_nacres": "HA04",
+    "designation": "GANTS de PROTECTION THERMIQUE KEVLAR/COTON Jusqu'à 350°C L310mm",
+    "code_ijm": "E033",
+    "prix_ht": 32.72,
+    "condt": "1",
+    "nb_unites": 1,
+    "prix_unitaire": 32.72,
+    "marque": null,
+    "page": 1
+  },
+  {
+    "code_nacres": "HA04",
+    "designation": "GANTS de PROTECTION THERMIQUE ETANCHE Jusqu'à 150°C",
+    "code_ijm": "E033A",
+    "prix_ht": 81.53,
+    "condt": "1",
+    "nb_unites": 1,
+    "prix_unitaire": 81.53,
+    "marque": "MAPA",
+    "page": 1
+  },
+  {
+    "code_nacres": "HA04",
+    "designation": "CRYOGANT en CUIR Etanche 38 cm Taille S",
+    "code_ijm": "E034",
+    "prix_ht": 69.92,
+    "condt": "1",
+    "nb_unites": 1,
+    "prix_unitaire": 69.92,
+    "marque": "CRYO-GLOVES",
+    "page": 1
+  },
+  {
+    "code_nacres": "HA04",
+    "designation": "CRYOGANT en CUIR Etanche 38 cm Taille M",
+    "code_ijm": "E035",
+    "prix_ht": 69.92,
+    "condt": "1",
+    "nb_unites": 1,
+    "prix_unitaire": 69.92,
+    "marque": "CRYO-GLOVES",
+    "page": 1
+  },
+  {
+    "code_nacres": "HA04",
+    "designation": "CRYOGANT en CUIR Etanche 38 cm Taille L",
+    "code_ijm": "E0351",
+    "prix_ht": 69.92,
+    "condt": "1",
+    "nb_unites": 1,
+    "prix_unitaire": 69.92,
+    "marque": "CRYO-GLOVES",
+    "page": 1
+  }
+]

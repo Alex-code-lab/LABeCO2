@@ -211,8 +211,9 @@ TABLE : emission_factors
 -------------------------------
   id              TEXT PRIMARY KEY
   name            TEXT NOT NULL
-  name_key        TEXT NOT NULL UNIQUE   -- normalisé : sans accent, minuscule
+  name_key        TEXT NOT NULL          -- normalisé : sans accent, minuscule
   factor_type     TEXT    -- material / liquid
+  code_nacres     TEXT    -- surtout utile pour les liquides/solvants
   co2_factor      REAL
   co2_unit        TEXT    -- kg CO2e/kg ou kg CO2e/L
   uncertainty     REAL
@@ -228,6 +229,7 @@ TABLE : emission_factors
   validated_by_id TEXT REFERENCES contributors(id)
   validated_at    TEXT
   deprecated_at   TEXT
+  UNIQUE(factor_type, name_key)
 
 -------------------------------
 TABLE : materials
@@ -266,7 +268,8 @@ TABLE : commercial_products
                   -- capacité informative d'un objet solide (boîte 300 mL,
                   -- sac 10 L, tube 2 mL). Ne déclenche pas un calcul liquide.
   emission_factor_id  TEXT REFERENCES emission_factors(id)
-                      -- obligatoire uniquement si product_type = liquid
+                      -- obligatoire pour calculer un product_type = liquid ;
+                      -- pendant l'import historique, nullable et listé dans le rapport
   ijm_catalogue_id    TEXT REFERENCES catalogue_ijm(id)
   source_id           TEXT REFERENCES sources(id)
   contributor_id      TEXT REFERENCES contributors(id)
@@ -421,6 +424,12 @@ Interface explicite (à définir d'abord) :
 DataManager hérite de cette interface ET reste l'implémentation HDF5.
 DataManagerSQLite hérite de la même interface, lit SQLite.
 
+Étape intermédiaire implémentée :
+  - ui/sqlite_legacy_adapter.py reconstruit les DataFrames historiques depuis
+    SQLite.
+  - DataManager peut charger SQLite via sqlite_path ou LABECO2_SQLITE_PATH,
+    tout en gardant HDF5 comme comportement par défaut.
+
 Pendant la transition, un flag de configuration choisit l'implémentation.
 Après validation, DataManager HDF5 est déprécié mais conservé pour import
 d'anciens fichiers.
@@ -537,7 +546,9 @@ PHASE 9 — VALIDATION QUALITÉ AUTOMATIQUE
 But : détecter les incohérences avant qu'elles n'atteignent les calculs.
 
 Contrôles à implémenter (peuvent tourner à l'import ou à la demande) :
-  - Produit liquide sans emission_factor_id → erreur bloquante.
+  - Produit liquide sans emission_factor_id → erreur bloquante pour le calcul ;
+    pendant la migration historique, l'import reste accepté mais la ligne est
+    listée nominativement dans le rapport.
   - Produit solide avec capacity_volume_ml mais sans emission_factor_id → OK
     (la capacité n'est pas un facteur liquide).
   - Facteur sans source → erreur bloquante.

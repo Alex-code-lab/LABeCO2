@@ -73,29 +73,53 @@ class DataManager:
     DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
     DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
     DATA_TRANSPORT_FILENAME = "data_transport_origins.hdf5"
+    SQLITE_ENV_VAR = "LABECO2_SQLITE_PATH"
     TRANSPORT_ORIGINE_COL = "Origine"
     TRANSPORT_FACTOR_COL = "Facteur transport (kg CO₂e/kg)"
     TRANSPORT_UNCERT_COL = "Incertitude"
     TRANSPORT_DEFAULT = "Inconnue (défaut)"
 
 
-    def __init__(self, base_path, user_path=None):
+    def __init__(self, base_path, user_path=None, sqlite_path=None):
         """
         :param base_path: Répertoire des données en lecture seule (bundlées).
         :param user_path: Répertoire des données modifiables (persistant).
                           Si None, identique à base_path (mode développement).
+        :param sqlite_path: Base SQLite migrée à lire à la place des HDF5.
         """
         self.base_path = base_path
         self.user_path = user_path if user_path is not None else base_path
-
-        # Charger la data principale
-        self.main_data = load_data()
+        self.sqlite_path = sqlite_path or os.environ.get(self.SQLITE_ENV_VAR)
 
         # Données modifiables → user_path
         self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)
         user_materials_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
         base_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
         self.data_materials_path = user_materials_path if os.path.exists(user_materials_path) else base_materials_path
+        self.liq_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_LIQUID_CONSOMMABLES)
+        transport_path = os.path.join(base_path, "data", "mass_factors", self.DATA_TRANSPORT_FILENAME)
+
+        if self.sqlite_path:
+            self._load_from_sqlite(self.sqlite_path)
+        else:
+            self._load_from_hdf5(transport_path)
+
+        # Charger les prix du catalogue IJM (optionnel)
+        self.data_prix_ijm = self._load_prix_ijm()
+
+    def _load_from_sqlite(self, sqlite_path):
+        from ui.sqlite_legacy_adapter import load_legacy_dataframes
+
+        frames = load_legacy_dataframes(sqlite_path)
+        self.main_data = frames["main_data"]
+        self.data_masse = frames["data_masse"]
+        self.data_materials = frames["data_materials"]
+        self.data_liquides = frames["data_liquides"]
+        self.data_transport = frames["data_transport"]
+
+    def _load_from_hdf5(self, transport_path):
+        # Charger la data principale
+        self.main_data = load_data()
 
         # Charger data_masse
         if not os.path.exists(self.data_masse_path):
@@ -112,21 +136,16 @@ class DataManager:
         self.data_materials = pd.read_hdf(self.data_materials_path)
 
         # Charger consommables liquides (produits chimiques / bioproduits)
-        self.liq_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_LIQUID_CONSOMMABLES)
         if os.path.exists(self.liq_path):
             self.data_liquides = pd.read_hdf(self.liq_path)
         else:
             self.data_liquides = pd.DataFrame()  # vide si absent
 
         # Charger les facteurs de transport par origine géographique
-        transport_path = os.path.join(base_path, "data", "mass_factors", self.DATA_TRANSPORT_FILENAME)
         if os.path.exists(transport_path):
             self.data_transport = pd.read_hdf(transport_path)
         else:
             self.data_transport = pd.DataFrame()
-
-        # Charger les prix du catalogue IJM (optionnel)
-        self.data_prix_ijm = self._load_prix_ijm()
 
     def get_main_data(self):
         """Retourne la DataFrame principale."""

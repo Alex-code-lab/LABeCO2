@@ -1,0 +1,52 @@
+[
+  {
+    "Origine": "Inconnue (défaut)",
+    "Distance (km)": 14000,
+    "Mode": "Maritime + camion",
+    "Facteur officiel (kg CO₂e/t.km)": 0.00554,
+    "Facteur transport (kg CO₂e/kg)": 0.265,
+    "Incertitude": 0.3,
+    "Source": "Estimation LABeCO₂ — moyenne USA/Asie maritime (14 000 km)",
+    "Signature": ""
+  },
+  {
+    "Origine": "France",
+    "Distance (km)": 500,
+    "Mode": "Camion",
+    "Facteur officiel (kg CO₂e/t.km)": 0.086,
+    "Facteur transport (kg CO₂e/kg)": 0.043,
+    "Incertitude": 0.15,
+    "Source": "ADEME Base Carbone® - transport routier marchandises",
+    "Signature": ""
+  },
+  {
+    "Origine": "Europe",
+    "Distance (km)": 1500,
+    "Mode": "Camion + ferroviaire",
+    "Facteur officiel (kg CO₂e/t.km)": 0.0798,
+    "Facteur transport (kg CO₂e/kg)": 0.12,
+    "Incertitude": 0.2,
+    "Source": "ADEME Base Carbone® - transport routier + ferroviaire",
+    "Signature": ""
+  },
+  {
+    "Origine": "USA",
+    "Distance (km)": 8000,
+    "Mode": "Maritime + camion",
+    "Facteur officiel (kg CO₂e/t.km)": 0.00554,
+    "Facteur transport (kg CO₂e/kg)": 0.18,
+    "Incertitude": 0.2,
+    "Source": "ADEME Base Carbone® - transport maritime",
+    "Signature": ""
+  },
+  {
+    "Origine": "Asie",
+    "Distance (km)": 20000,
+    "Mode": "Maritime + camion",
+    "Facteur officiel (kg CO₂e/t.km)": 0.00554,
+    "Facteur transport (kg CO₂e/kg)": 0.35,
+    "Incertitude": 0.2,
+    "Source": "ADEME Base Carbone® - transport maritime",
+    "Signature": ""
+  }
+]
