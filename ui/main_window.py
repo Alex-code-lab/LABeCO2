@@ -16,6 +16,7 @@ import sys
 import os
 import math
 import re
+import json
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
@@ -85,7 +86,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LABeCO₂ - Calculateur de Bilan Carbone")
 
         # 1) DataManager
-        init_user_data()  # copie les HDF5 modifiables au premier lancement compilé
+        init_user_data()  # initialise les données utilisateur au premier lancement compilé
         # base_path  : données en lecture seule (bundlées dans l'exécutable)
         # user_path  : données modifiables par l'utilisateur (persistantes entre sessions)
         if getattr(sys, 'frozen', False):
@@ -2993,39 +2994,10 @@ class MainWindow(QMainWindow):
     def _reload_consumables_data(self):
         """Recharge les DataFrames de consommables dans le DataManager après un ajout."""
         try:
-            if getattr(self.data_manager, "sqlite_path", None):
-                self.data_manager._load_from_sqlite(self.data_manager.sqlite_path)
-                self.data_masse = self.data_manager.get_data_masse()
-                self.data_liquides = self.data_manager.get_data_liquides()
-                self.data_materials = self.data_manager.get_data_materials()
-                if self.category_combo is not None:
-                    self.update_subsubcategory_names()
-                    self.update_nacres_visibility()
-                return
-
-            if os.path.exists(self.data_manager.data_masse_path):
-                self.data_manager.data_masse = pd.read_hdf(self.data_manager.data_masse_path)
-                self.data_masse = self.data_manager.get_data_masse()
-            if os.path.exists(self.data_manager.liq_path):
-                self.data_manager.data_liquides = pd.read_hdf(self.data_manager.liq_path)
-            else:
-                self.data_manager.data_liquides = pd.DataFrame()
+            self.data_manager.reload()
+            self.data_masse = self.data_manager.get_data_masse()
             self.data_liquides = self.data_manager.get_data_liquides()
-            user_materials_path = os.path.join(
-                self.data_manager.user_path,
-                "data",
-                "mass_factors",
-                self.data_manager.DATA_MATERIALS_FILENAME,
-            )
-            materials_path = (
-                user_materials_path
-                if os.path.exists(user_materials_path) else
-                self.data_manager.data_materials_path
-            )
-            if os.path.exists(materials_path):
-                self.data_manager.data_materials_path = materials_path
-                self.data_manager.data_materials = pd.read_hdf(materials_path)
-                self.data_materials = self.data_manager.get_data_materials()
+            self.data_materials = self.data_manager.get_data_materials()
             if self.category_combo is not None:
                 self.update_subsubcategory_names()
                 self.update_nacres_visibility()
@@ -3643,14 +3615,14 @@ class MainWindow(QMainWindow):
         """
         Exporte les données de l'historique des calculs vers un fichier.
 
-        Ouvre une boîte de dialogue pour permettre à l'utilisateur de choisir le format de fichier (CSV, Excel, HDF5),
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de choisir le format de fichier,
         puis enregistre les données de l'historique dans le fichier sélectionné. Affiche un message de confirmation ou d'erreur.
         """
         from PySide6.QtWidgets import QFileDialog
         import pandas as pd
         file_name, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer l'historique", "",
-            "Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5);;Tous les fichiers (*)"
+            self, "Enregistrer l'historique", "historique_labeco2.json",
+            "Fichier JSON (*.json);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Tous les fichiers (*)"
         )
         if not file_name:
             return
@@ -3669,16 +3641,27 @@ class MainWindow(QMainWindow):
         df = pd.DataFrame(rows)
         _, ext = os.path.splitext(file_name)
         ext = ext.lower()
+        if not ext:
+            file_name += ".json"
+            ext = ".json"
 
         try:
-            if ext == '.csv':
+            if ext == '.json':
+                payload = {
+                    "format": "LABeCO2 history",
+                    "version": 1,
+                    "items": rows,
+                }
+                with open(file_name, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+            elif ext == '.csv':
                 df.to_csv(file_name, index=False, sep=';')
             elif ext == '.xlsx':
                 df.to_excel(file_name, index=False)
-            elif ext == '.h5':
-                df.to_hdf(file_name, key='history', mode='w')
             else:
-                df.to_csv(file_name, index=False, sep=';')
+                file_name += ".json"
+                with open(file_name, "w", encoding="utf-8") as f:
+                    json.dump({"format": "LABeCO2 history", "version": 1, "items": rows}, f, ensure_ascii=False, indent=2)
             QMessageBox.information(self, "Export", f"Exporté avec succès dans {file_name}")
         except Exception as e:
             QMessageBox.warning(self, "Erreur Export", f"{e}")
@@ -3687,7 +3670,7 @@ class MainWindow(QMainWindow):
         """
         Importe des données dans l'historique des calculs à partir d'un fichier.
 
-        Ouvre une boîte de dialogue pour permettre à l'utilisateur de sélectionner un fichier (CSV, Excel, HDF5),
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de sélectionner un fichier,
         lit les données du fichier, convertit les colonnes attendues, et ajoute les éléments à l'historique.
         Affiche un message de confirmation ou d'erreur.
         """
@@ -3695,7 +3678,7 @@ class MainWindow(QMainWindow):
         import pandas as pd
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Importer l'historique", "",
-            "Tous les fichiers (*);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5 *.hdf5)"
+            "Tous les fichiers (*);;Fichier JSON (*.json);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx)"
         )
         if not file_name:
             return
@@ -3703,14 +3686,19 @@ class MainWindow(QMainWindow):
         _, ext = os.path.splitext(file_name)
         ext = ext.lower()
         try:
-            if ext == '.csv':
+            if ext == '.json':
+                with open(file_name, encoding="utf-8") as f:
+                    payload = json.load(f)
+                rows = payload.get("items", payload) if isinstance(payload, dict) else payload
+                if not isinstance(rows, list):
+                    raise ValueError("Le JSON ne contient pas de liste d'éléments.")
+                df = pd.DataFrame(rows)
+            elif ext == '.csv':
                 # keep_default_na=False : empêche pandas de convertir 'NA' en NaN
                 # (sinon astype(str) produit la chaîne 'nan')
                 df = pd.read_csv(file_name, sep=';', keep_default_na=False)
             elif ext == '.xlsx':
                 df = pd.read_excel(file_name)
-            elif ext == '.h5':
-                df = pd.read_hdf(file_name, key='history')
             else:
                 df = pd.read_csv(file_name, sep=';', keep_default_na=False)
         except Exception as e:

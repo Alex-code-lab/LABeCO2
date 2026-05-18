@@ -7,7 +7,6 @@
 
 import os
 import pandas as pd
-from utils.data_loader import SQLITE_PATH_ENV_VAR, load_data
 from ui.display_utils import (
     clean_text,
     looks_like_liquid_commercial_product,
@@ -68,12 +67,7 @@ class DataManager:
     MARQUE_IJM_COL = "marque_ijm"
     SCORE_MATCH_COL = "score_match"
 
-    # Chemins par défaut
-    DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
-    DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
-    DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
-    DATA_TRANSPORT_FILENAME = "data_transport_origins.hdf5"
-    SQLITE_ENV_VAR = SQLITE_PATH_ENV_VAR
+    SQLITE_ENV_VAR = "LABECO2_SQLITE_PATH"
     TRANSPORT_ORIGINE_COL = "Origine"
     TRANSPORT_FACTOR_COL = "Facteur transport (kg CO₂e/kg)"
     TRANSPORT_UNCERT_COL = "Incertitude"
@@ -85,7 +79,7 @@ class DataManager:
         :param base_path: Répertoire des données en lecture seule (bundlées).
         :param user_path: Répertoire des données modifiables (persistant).
                           Si None, identique à base_path (mode développement).
-        :param sqlite_path: Base SQLite migrée à lire à la place des HDF5.
+        :param sqlite_path: Base SQLite à lire.
         """
         self.base_path = base_path
         self.user_path = user_path if user_path is not None else base_path
@@ -94,19 +88,9 @@ class DataManager:
             if sqlite_path is not None else
             os.environ.get(self.SQLITE_ENV_VAR)
         )
-
-        # Données modifiables → user_path
-        self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)
-        user_materials_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
-        base_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
-        self.data_materials_path = user_materials_path if os.path.exists(user_materials_path) else base_materials_path
-        self.liq_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_LIQUID_CONSOMMABLES)
-        transport_path = os.path.join(base_path, "data", "mass_factors", self.DATA_TRANSPORT_FILENAME)
-
-        if self.sqlite_path:
-            self._load_from_sqlite(self.sqlite_path)
-        else:
-            self._load_from_hdf5(transport_path)
+        if not self.sqlite_path:
+            raise ValueError("DataManager nécessite un chemin SQLite.")
+        self._load_from_sqlite(self.sqlite_path)
 
         # Charger les prix du catalogue IJM (optionnel)
         self.data_prix_ijm = self._load_prix_ijm()
@@ -121,35 +105,12 @@ class DataManager:
         self.data_liquides = frames["data_liquides"]
         self.data_transport = frames["data_transport"]
 
-    def _load_from_hdf5(self, transport_path):
-        # Charger la data principale
-        self.main_data = load_data()
-
-        # Charger data_masse
-        if not os.path.exists(self.data_masse_path):
-            raise FileNotFoundError(f"Fichier {self.data_masse_path} introuvable.")
-        self.data_masse = pd.read_hdf(self.data_masse_path)
-        if self.CODE_NACRES_COL not in self.data_masse.columns:
-            raise KeyError(f"La colonne '{self.CODE_NACRES_COL}' est introuvable dans data_masse.")
-        # Nettoyage rapide du DataFrame pour supprimer les lignes vides
-        self.data_masse.dropna(subset=[self.CONSOMMABLE_COL], inplace=True)
-
-        # Charger data_materials
-        if not os.path.exists(self.data_materials_path):
-            raise FileNotFoundError(f"Fichier {self.data_materials_path} introuvable.")
-        self.data_materials = pd.read_hdf(self.data_materials_path)
-
-        # Charger consommables liquides (produits chimiques / bioproduits)
-        if os.path.exists(self.liq_path):
-            self.data_liquides = pd.read_hdf(self.liq_path)
-        else:
-            self.data_liquides = pd.DataFrame()  # vide si absent
-
-        # Charger les facteurs de transport par origine géographique
-        if os.path.exists(transport_path):
-            self.data_transport = pd.read_hdf(transport_path)
-        else:
-            self.data_transport = pd.DataFrame()
+    def reload(self):
+        """Recharge les DataFrames depuis la base SQLite active."""
+        if not self.sqlite_path:
+            raise ValueError("Aucune base SQLite active pour recharger les données.")
+        self._load_from_sqlite(self.sqlite_path)
+        self.data_prix_ijm = self._load_prix_ijm()
 
     def get_main_data(self):
         """Retourne la DataFrame principale."""
@@ -451,8 +412,8 @@ class DataManager:
         commercial stocké dans la base consommables mais lié à un facteur de
         la base Liquides & Solvants.
 
-        En mode SQLite, résolution par emission_factor_id (stable au renommage).
-        Fallback par nom texte pour la rétrocompatibilité HDF5.
+        Résolution principale par emission_factor_id (stable au renommage),
+        puis fallback par nom texte si l'identifiant est absent.
         """
         product_row = self.get_consumable_row(code_nacres, consommable_name)
         if product_row is None:
@@ -467,7 +428,7 @@ class DataManager:
                 if not match.empty:
                     return product_row, match.iloc[0]
 
-        # Fallback par nom texte (HDF5 ou facteur_id absent)
+        # Fallback par nom texte si factor_id est absent.
         factor_name = self._clean_cell(product_row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, ""))
         if not factor_name:
             return product_row, None

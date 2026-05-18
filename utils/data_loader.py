@@ -8,7 +8,6 @@
 import sys
 import os
 import shutil
-import pandas as pd
 from PySide6.QtGui import QPixmap
 
 SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
@@ -63,9 +62,8 @@ def _bootstrap_sqlite(base_path, sqlite_path):
 
 def init_user_data():
     """
-    Lors du premier lancement en mode compilé, copie les fichiers HDF5 modifiables
-    depuis sys._MEIPASS vers le dossier utilisateur persistant.
-    Les fichiers en lecture seule (base GES, matériaux) restent dans _MEIPASS.
+    Lors du premier lancement en mode compilé, copie les fichiers utilisateur
+    encore nécessaires depuis sys._MEIPASS vers le dossier persistant.
     """
     if not getattr(sys, 'frozen', False):
         return  # Rien à faire en développement
@@ -73,10 +71,7 @@ def init_user_data():
     user_path = get_user_data_path()
     bundle_path = sys._MEIPASS
 
-    # Fichiers écrits par l'utilisateur → doivent être dans user_path
     writable_files = [
-        os.path.join("data", "mass_factors", "data_eCO2_masse_consommable.hdf5"),
-        os.path.join("data", "mass_factors", "data_eCO2_liquides_consommable.hdf5"),
         os.path.join("scenarios", "manips_type.sqlite"),
     ]
 
@@ -107,17 +102,3 @@ def load_logo():
     
     pixmap = QPixmap(image_path)
     return pixmap
-
-
-def load_data():
-    data_file = resource_path('data/ges1point5/data_base_GES1point5.hdf5')
-    try:
-        df = pd.read_hdf(data_file, key='purchases_factors')
-    except (KeyError, ValueError):
-        # Fallback : lire la première clé disponible
-        with pd.HDFStore(data_file, mode='r') as store:
-            keys = store.keys()
-        if not keys:
-            raise ValueError(f"Le fichier HDF5 '{data_file}' ne contient aucune table.")
-        df = pd.read_hdf(data_file, key=keys[0])
-    return df

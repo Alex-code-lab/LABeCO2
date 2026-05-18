@@ -9,6 +9,7 @@ import sys
 import html
 import re
 import logging
+import sqlite3
 from datetime import date
 import pandas as pd
 from PySide6.QtWidgets import (
@@ -26,9 +27,9 @@ from ui.sqlite_writer import (
     upsert_liquid_factor,
     upsert_material_factor,
 )
-from utils.data_loader import SQLITE_PATH_ENV_VAR
 
 logger = logging.getLogger(__name__)
+SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
 
 
 def clean_sqlite_id(value):
@@ -106,18 +107,14 @@ class DataMassWindow(QMainWindow):
             else:
                 base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-        # user_path : dossier persistant pour les HDF5 modifiables
         if user_path is None:
             user_path = base_path
         self._user_path = user_path
         self.sqlite_path = sqlite_path or os.environ.get(SQLITE_PATH_ENV_VAR)
+        if not self.sqlite_path:
+            raise ValueError("DataMassWindow nécessite un chemin SQLite.")
 
-        self.nacres_hdf5_file = os.path.join(base_path, "data", "mass_factors", "nacres_2022.h5")
         self._all_nacres = []  # Will store (code, description)
-
-        # HDF5 modifiable → user_path
-        self.hdf5_file = os.path.join(user_path, "data", "mass_factors", "data_eCO2_masse_consommable.hdf5")
-        self.hdf5_materials = os.path.join(user_path, "data", "mass_factors", "empreinte_carbone_materiaux.h5")
 
         self.columns = [
             "Consommable",
@@ -179,9 +176,6 @@ class DataMassWindow(QMainWindow):
             "Signature",
         ]
 
-        # Fichier pour les consommables liquides (modifiable → user_path)
-        self.hdf5_liquids = os.path.join(user_path, "data", "mass_factors", "data_eCO2_liquides_consommable.hdf5")
-
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
         self.prefill_row_index = None
@@ -203,45 +197,7 @@ class DataMassWindow(QMainWindow):
         if self._uses_sqlite():
             return self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
 
-        if os.path.exists(self.hdf5_file):
-            try:
-                df = pd.read_hdf(self.hdf5_file)
-            except Exception as e:
-                QMessageBox.warning(self, "Erreur", f"Impossible de charger le fichier HDF5 : {e}")
-                df = pd.DataFrame(columns=self.columns)
-        else:
-            df = pd.DataFrame([{
-                "Consommable": "Tube Falcon 15ml",
-                "Marque": "N/A",
-                "Référence": "N/A",
-                "Code CAS": "",
-                "Catégorie": "Consommable",
-                "Code NACRES": "NB13",
-                "Masse unitaire (g)": 6.7,
-                "Matériau consommable": "Polypropylène (PP)",
-                "Masse unitaire deuxieme materiaux (g)": "N/A",
-                "Matériau deuxieme materiaux": "N/A",
-                "Masse unitaire troisième materiaux (g)": "",
-                "Matériau troisième materiaux": "",
-                "Masse emballage unitaire (g)": "N/A",
-                "Matériau emballage": "N/A",
-                "Masse condionnement (g)": "N/A",
-                "Matériau conditionnement": "N/A",
-                "Nbr par conditionnement": "N/A",
-                "Prix du conditionnement": "",
-                "date d'ajout": "",
-                "Source": "",
-                "Signature": "Alexandre Souchaud",
-                "Source catalogue IJM": "",
-                "Lien / Note / Remarque": "",
-                "condt_ijm": "",
-                "designation_ijm": "",
-                "code_ijm": "",
-                "marque_ijm": "",
-                "score_match": "",
-            }], columns=self.columns)
-            self.sauvegarder_donnees(df)
-        # --- Harmoniser les colonnes manquantes ---
+        df = pd.DataFrame(columns=self.columns)
         data = self.migrate_source_signature_columns(df, mode="solid")
         for col in self.columns:
             if col not in data.columns:
@@ -253,23 +209,67 @@ class DataMassWindow(QMainWindow):
             df = self.data
 
         if self._uses_sqlite():
-            for _, row in df.iterrows():
-                upsert_commercial_product(
-                    self.sqlite_path,
-                    row.to_dict(),
-                    existing_id=self._sqlite_row_id(row),
-                )
             self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
             return
 
-        directory = os.path.dirname(self.hdf5_file)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        data = self.migrate_source_signature_columns(df, mode="solid")
+        for col in self.columns:
+            if col not in data.columns:
+                data[col] = ""
+        self.data = data.reindex(columns=self.columns)
+        return
 
-        try:
-            df.to_hdf(self.hdf5_file, key='data', mode='w')
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Impossible de sauvegarder le fichier HDF5 : {e}")
+    def _upsert_commercial_product(self, row_dict, existing_id=None):
+        if not self._uses_sqlite():
+            self.data = self.ajouter_objet_df(self.data, row_dict)
+            return None
+        product_id = upsert_commercial_product(
+            self.sqlite_path,
+            row_dict,
+            existing_id=existing_id,
+        )
+        self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+        return product_id
+
+    def _current_dataframe_and_columns(self):
+        mode = self.current_mode()
+        if mode == self.MODE_LIQUID_FACTOR:
+            return self.data_liquids, self.columns_liquids
+        if mode == self.MODE_SOLID_FACTOR:
+            return self.data_materials, self.columns_materials
+        return self.data, self.columns
+
+    def _normalise_import_columns(self, df):
+        reverse_labels = {label: col for col, label in self.COLUMN_DISPLAY_LABELS.items()}
+        renamed = df.rename(columns={col: reverse_labels.get(col, col) for col in df.columns})
+        return renamed
+
+    def _import_rows_from_dataframe(self, df):
+        mode = self.current_mode()
+        imported = 0
+        if mode == self.MODE_SOLID_FACTOR:
+            for _, row in df.iterrows():
+                if str(row.get("Materiau", "")).strip():
+                    upsert_material_factor(self.sqlite_path, row.to_dict())
+                    imported += 1
+            self.data_materials = self.load_material_df()
+        elif mode == self.MODE_LIQUID_FACTOR:
+            for _, row in df.iterrows():
+                if str(row.get("Produit", "")).strip():
+                    upsert_liquid_factor(self.sqlite_path, row.to_dict())
+                    imported += 1
+            self.data_liquids = self.load_liquid_df()
+        else:
+            for _, row in df.iterrows():
+                if str(row.get("Consommable", "")).strip():
+                    upsert_commercial_product(
+                        self.sqlite_path,
+                        row.to_dict(),
+                        existing_id=self._sqlite_row_id(row),
+                    )
+                    imported += 1
+            self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+        return imported
 
     def _uses_sqlite(self):
         return bool(getattr(self, "sqlite_path", None))
@@ -785,29 +785,30 @@ class DataMassWindow(QMainWindow):
         self.afficher_donnees()                   # recharge la table avec le bon DF
 
     def load_nacres_list(self):
-        if not os.path.exists(self.nacres_hdf5_file):
-            logger.info("Fichier NACRES introuvable : %s", self.nacres_hdf5_file)
+        if not self._uses_sqlite():
+            self._all_nacres = []
             return
 
         try:
-            df_nacres = pd.read_hdf(self.nacres_hdf5_file)
-            self._all_nacres = []
-            for _, row in df_nacres.iterrows():
-                code = str(row.iloc[0])
-                desc = str(row.iloc[1])
-                self._all_nacres.append((code, desc))
+            with sqlite3.connect(self.sqlite_path) as conn:
+                rows = conn.execute(
+                    """
+                    SELECT code, COALESCE(label, '') AS label
+                    FROM nacres_codes
+                    ORDER BY code
+                    """
+                ).fetchall()
+            self._all_nacres = [(str(code), str(label)) for code, label in rows]
             self.filter_nacres_list()
         except Exception as e:
-            logger.exception("Impossible de charger la liste NACRES : %s", e)
+            self._all_nacres = []
+            logger.exception("Impossible de charger la liste NACRES depuis SQLite : %s", e)
 
     def load_liquid_df(self):
         if self._uses_sqlite():
             return self._load_sqlite_frame("data_liquides", self.columns_liquids)
 
-        if os.path.exists(self.hdf5_liquids):
-            df_liq = pd.read_hdf(self.hdf5_liquids)
-        else:
-            df_liq = pd.DataFrame(columns=self.columns_liquids)
+        df_liq = pd.DataFrame(columns=self.columns_liquids)
         df_liq = self.migrate_source_signature_columns(df_liq, mode="liquid")
         for col in self.columns_liquids:
             if col not in df_liq.columns:
@@ -818,9 +819,7 @@ class DataMassWindow(QMainWindow):
         if self._uses_sqlite():
             return self._load_sqlite_frame("data_materials", self.columns_materials)
 
-        if os.path.exists(self.hdf5_materials):
-            df_mat = pd.read_hdf(self.hdf5_materials)
-        elif initial_df is not None:
+        if initial_df is not None:
             df_mat = initial_df.copy()
         else:
             df_mat = pd.DataFrame(columns=self.columns_materials)
@@ -849,10 +848,6 @@ class DataMassWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le matériau dans SQLite : {e}")
                 return False
 
-        directory = os.path.dirname(self.hdf5_materials)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
         df_mat = self.load_material_df(self.data_materials)
         material_name = str(obj_dict.get("Materiau", "")).strip()
         mask = df_mat["Materiau"].astype(str).str.strip() == material_name
@@ -867,7 +862,6 @@ class DataMassWindow(QMainWindow):
             df_mat = pd.concat([df_mat, new_line], ignore_index=True)
 
         df_mat = df_mat.reindex(columns=self.columns_materials)
-        df_mat.to_hdf(self.hdf5_materials, key="data", mode="w")
         self.data_materials = df_mat
         if self.current_mode() == self.MODE_SOLID_FACTOR:
             self.afficher_donnees()
@@ -1475,12 +1469,7 @@ class DataMassWindow(QMainWindow):
                 if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
                     existing_id = self._sqlite_row_id(self.data.loc[self.prefill_row_index])
                 try:
-                    upsert_commercial_product(
-                        self.sqlite_path,
-                        nouvel_objet,
-                        existing_id=existing_id,
-                    )
-                    self.data = self.charger_ou_initialiser_donnees()
+                    self._upsert_commercial_product(nouvel_objet, existing_id=existing_id)
                 except Exception as e:
                     QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le consommable dans SQLite : {e}")
                     return
@@ -1489,7 +1478,8 @@ class DataMassWindow(QMainWindow):
                     self.data.at[self.prefill_row_index, col] = nouvel_objet.get(col, "")
             else:
                 self.data = self.ajouter_objet_df(self.data, nouvel_objet)
-            self.sauvegarder_donnees()
+            if not self._uses_sqlite():
+                self.sauvegarder_donnees()
 
         # Efface les champs
         self.nom_input.clear()
@@ -1535,7 +1525,7 @@ class DataMassWindow(QMainWindow):
         self.afficher_donnees()
 
     def save_liquid(self, obj_dict):
-        """Ajoute une ligne au fichier HDF5 des liquides."""
+        """Ajoute ou met à jour un facteur liquide."""
         if self._uses_sqlite():
             try:
                 factor_uuid = upsert_liquid_factor(self.sqlite_path, obj_dict)
@@ -1548,24 +1538,7 @@ class DataMassWindow(QMainWindow):
                 QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le liquide dans SQLite : {e}")
                 return False
 
-        # Charger ou créer DF
-        if os.path.exists(self.hdf5_liquids):
-            try:
-                df_liq = pd.read_hdf(self.hdf5_liquids)
-            except Exception:
-                df_liq = pd.DataFrame(columns=self.columns_liquids)
-        else:
-            df_liq = pd.DataFrame(columns=self.columns_liquids)
-
-        df_liq = self.migrate_source_signature_columns(df_liq, mode="liquid")
-
-        # Assurer toutes les colonnes
-        for col in self.columns_liquids:
-            if col not in df_liq.columns:
-                df_liq[col] = ""
-        df_liq = df_liq.reindex(columns=self.columns_liquids)
-
-        # Mise à jour si enrichissement ou facteur du même nom déjà existant.
+        df_liq = self.load_liquid_df()
         target_name = getattr(self, '_prefill_liq_produit', None) or str(obj_dict.get("Produit", "")).strip()
         if target_name:
             mask = df_liq["Produit"].astype(str).str.strip() == target_name
@@ -1576,7 +1549,6 @@ class DataMassWindow(QMainWindow):
                         df_liq[col] = ""
                     df_liq.at[idx, col] = val
                 self._prefill_liq_produit = None
-                df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
                 self.data_liquids = df_liq
                 if self.current_mode() == self.MODE_LIQUID_FACTOR:
                     self.afficher_donnees()
@@ -1584,7 +1556,6 @@ class DataMassWindow(QMainWindow):
 
         new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
         df_liq = pd.concat([df_liq, new_line], ignore_index=True)
-        df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
         self.data_liquids = df_liq
         if self.current_mode() == self.MODE_LIQUID_FACTOR:
             self.afficher_donnees()
@@ -1743,89 +1714,83 @@ class DataMassWindow(QMainWindow):
 
     def export_database(self):
         """
-        Exporte la base de données consommables vers un fichier HDF5 ou CSV
-        choisi par l'utilisateur.
+        Exporte la table affichée vers un CSV réimportable.
         """
+        df, _cols = self._current_dataframe_and_columns()
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Exporter la base de données",
-            "base_consommables_LABeCO2.hdf5",
-            "HDF5 (*.hdf5 *.h5);;CSV (*.csv)"
+            "base_labeco2.csv",
+            "CSV (*.csv)"
         )
         if not path:
             return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
         try:
-            if path.lower().endswith(".csv"):
-                self.data.rename(columns=self.COLUMN_DISPLAY_LABELS).to_csv(path, index=False, encoding="utf-8")
-            else:
-                self.data.to_hdf(path, key="data", mode="w", complevel=5)
+            df.to_csv(path, index=False, encoding="utf-8")
             QMessageBox.information(
                 self, "Export réussi",
-                f"{len(self.data)} consommables exportés vers :\n{path}"
+                f"{len(df)} ligne(s) exportée(s) vers :\n{path}"
             )
         except Exception as e:
             QMessageBox.critical(self, "Erreur export", f"Impossible d'exporter :\n{e}")
 
     def import_database(self):
         """
-        Importe une base de données mise à jour (HDF5) pour remplacer la base locale.
-        Un backup automatique est créé avant le remplacement.
+        Importe un CSV dans la base SQLite en respectant le mode affiché.
         """
+        if not self._uses_sqlite():
+            QMessageBox.warning(self, "SQLite requis", "L'import nécessite une base SQLite active.")
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Charger une mise à jour de la base de données",
             "",
-            "HDF5 (*.hdf5 *.h5)"
+            "CSV (*.csv)"
         )
         if not path:
             return
 
         try:
-            new_df = pd.read_hdf(path)
+            new_df = pd.read_csv(path)
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de lire le fichier :\n{e}")
             return
+        new_df = self._normalise_import_columns(new_df)
         new_df = self.migrate_source_signature_columns(new_df, mode="solid")
 
-        # Vérification minimale : la colonne Consommable doit exister
-        if "Consommable" not in new_df.columns and "Code NACRES" not in new_df.columns:
+        mode = self.current_mode()
+        required_by_mode = {
+            self.MODE_SOLID_FACTOR: "Materiau",
+            self.MODE_LIQUID_FACTOR: "Produit",
+            self.MODE_SOLID_CONSUMABLE: "Consommable",
+            self.MODE_LIQUID_CONSUMABLE: "Consommable",
+        }
+        required_col = required_by_mode.get(mode, "Consommable")
+        if required_col not in new_df.columns:
             QMessageBox.warning(
                 self, "Format invalide",
-                "Le fichier ne semble pas être une base de consommables LABeCO2 valide."
+                f"Le CSV doit contenir la colonne '{required_col}' pour le mode affiché."
             )
             return
 
         confirm = QMessageBox.question(
             self, "Confirmer la mise à jour",
-            f"Remplacer la base actuelle ({len(self.data)} entrées) "
-            f"par le nouveau fichier ({len(new_df)} entrées) ?\n\n"
-            f"Un backup sera créé automatiquement.",
+            f"Importer {len(new_df)} ligne(s) dans la base SQLite active ?",
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
             return
 
         try:
-            import shutil
-            backup_path = self.hdf5_file + ".backup"
-            if os.path.exists(self.hdf5_file):
-                shutil.copy2(self.hdf5_file, backup_path)
-
-            new_df.to_hdf(self.hdf5_file, key="data", mode="w", complevel=5)
-            self.data = new_df
-            # Harmoniser les colonnes manquantes
-            for col in self.columns:
-                if col not in self.data.columns:
-                    self.data[col] = ""
-            self.data = self.data.reindex(columns=self.columns)
-
+            imported = self._import_rows_from_dataframe(new_df)
             self.afficher_donnees()
-            self.data_added.emit()  # recharge dans la fenêtre principale
+            self.data_added.emit()
 
             QMessageBox.information(
                 self, "Mise à jour réussie",
-                f"Base mise à jour : {len(new_df)} consommables chargés.\n"
-                f"Backup sauvegardé : {backup_path}"
+                f"{imported} ligne(s) importée(s) dans SQLite."
             )
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de mettre à jour la base :\n{e}")
@@ -1939,7 +1904,7 @@ class DataMassWindow(QMainWindow):
         if idx != -1:
             self.nacres_combo.setCurrentIndex(idx)
 
-        # ── Données existantes dans le HDF5 ───────────────────────────────────
+        # ── Données existantes dans la base chargée ───────────────────────────
         mask = (
             (self.data["Code NACRES"].astype(str).str.strip().str.upper() == code4) &
             (self.data["Consommable"].astype(str).str.strip() == consommable_name.strip())
@@ -2016,7 +1981,7 @@ class DataMassWindow(QMainWindow):
         else:
             # Consommable IJM-only : pré-remplir ce qu'on sait depuis data_masse étendu
             # (marque dans la colonne Marque si dispo)
-            full_data = self.data  # data déjà chargée depuis HDF5 complet
+            full_data = self.data
             mask2 = full_data["Code NACRES"].astype(str).str.strip().str.upper() == code4
             ijm_rows = full_data[mask2]
             name_match = ijm_rows[

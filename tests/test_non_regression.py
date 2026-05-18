@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de non-régression — valeurs CO₂ chiffrées sur données réelles (Phase 1a).
 
-Ces tests utilisent le vrai DataManager (SQLite ou HDF5).
+Ces tests utilisent le vrai DataManager SQLite.
 Les valeurs numériques ont été capturées le 2026-05-18 et servent de référence :
 toute modification qui change ces résultats de plus de 0.01 % doit être intentionnelle.
 """
@@ -15,7 +15,6 @@ sys.path.insert(0, ROOT_DIR)
 
 # D'autres fichiers de test mockent PySide6 au niveau du module.
 # On retire ces mocks avant d'importer les vraies dépendances.
-# On ne touche pas à `tables` : pandas le garde en cache interne.
 for _mod in list(sys.modules):
     if _mod.startswith('PySide6'):
         sys.modules.pop(_mod, None)
