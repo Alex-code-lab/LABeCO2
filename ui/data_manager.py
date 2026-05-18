@@ -450,10 +450,24 @@ class DataManager:
         Retourne (ligne consommable, ligne facteur liquide) pour un produit
         commercial stocké dans la base consommables mais lié à un facteur de
         la base Liquides & Solvants.
+
+        En mode SQLite, résolution par emission_factor_id (stable au renommage).
+        Fallback par nom texte pour la rétrocompatibilité HDF5.
         """
         product_row = self.get_consumable_row(code_nacres, consommable_name)
         if product_row is None:
             return None, None
+
+        # Résolution par ID (SQLite) — insensible aux renommages
+        factor_id = self._clean_cell(product_row.get("emission_factor_id", ""))
+        if factor_id:
+            df_liq = self.data_liquides
+            if "factor_id" in df_liq.columns:
+                match = df_liq[df_liq["factor_id"].astype(str) == factor_id]
+                if not match.empty:
+                    return product_row, match.iloc[0]
+
+        # Fallback par nom texte (HDF5 ou facteur_id absent)
         factor_name = self._clean_cell(product_row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, ""))
         if not factor_name:
             return product_row, None

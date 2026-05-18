@@ -147,6 +147,7 @@ def load_materials(conn: sqlite3.Connection) -> pd.DataFrame:
 def load_liquid_factors(conn: sqlite3.Connection) -> pd.DataFrame:
     query = """
         SELECT
+            ef.id AS "factor_id",
             ef.name AS "Produit",
             ef.factor_type AS "Type",
             ef.code_nacres AS "Code NACRES",
@@ -168,7 +169,12 @@ def load_liquid_factors(conn: sqlite3.Connection) -> pd.DataFrame:
         ORDER BY ef.rowid
     """
     df = _read_sql(conn, query)
-    return df.reindex(columns=LIQUID_FACTOR_COLUMNS) if not df.empty else _empty_frame(LIQUID_FACTOR_COLUMNS)
+    extra = ["factor_id"]
+    return (
+        df.reindex(columns=LIQUID_FACTOR_COLUMNS + extra)
+        if not df.empty
+        else _empty_frame(LIQUID_FACTOR_COLUMNS + extra)
+    )
 
 
 def load_transport_factors(conn: sqlite3.Connection) -> pd.DataFrame:
@@ -202,6 +208,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             cp.price_sold_packaging,
             cp.sold_unit_volume_ml,
             cp.capacity_volume_ml,
+            cp.emission_factor_id,
             ef.name AS factor_name,
             cp.created_at,
             s.title AS source_title,
@@ -252,6 +259,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         row["Nbr par conditionnement"] = product["units_per_sold_packaging"]
         row["Prix du conditionnement"] = product["price_sold_packaging"]
         row["Facteur liquide source"] = _clean(product["factor_name"])
+        row["emission_factor_id"] = _clean(product["emission_factor_id"])
         row["date d'ajout"] = _clean(product["created_at"])
         row["Source"] = _clean(product["source_title"])
         row["Signature"] = _clean(product["contributor_name"])
@@ -268,7 +276,9 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         _fill_component_columns(row, components_by_product.get(product["id"], []))
         rows.append(row)
 
-    return pd.DataFrame(rows).reindex(columns=COMMERCIAL_PRODUCT_COLUMNS + [SQLITE_ID_COL])
+    return pd.DataFrame(rows).reindex(
+        columns=COMMERCIAL_PRODUCT_COLUMNS + [SQLITE_ID_COL, "emission_factor_id"]
+    )
 
 
 def _fill_component_columns(row: dict[str, Any], components: list[dict[str, Any]]) -> None:
