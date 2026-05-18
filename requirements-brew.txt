@@ -3,5 +3,4 @@ matplotlib
 pandas
 pyinstaller
 adjustText
-tables
 pyside6

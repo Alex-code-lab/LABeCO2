@@ -7,17 +7,8 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        # --- Base de données GES1point5 ---
-        ('data\\ges1point5\\data_base_GES1point5.hdf5',  'data\\ges1point5'),
-
-        # --- Base de données masse / consommables ---
-        ('data\\mass_factors\\data_eCO2_masse_consommable.hdf5',   'data\\mass_factors'),
-        ('data\\mass_factors\\data_eCO2_liquides_consommable.hdf5', 'data\\mass_factors'),
-        ('data\\mass_factors\\data_transport_origins.hdf5',         'data\\mass_factors'),
-        ('data\\mass_factors\\empreinte_carbone_materiaux.h5',      'data\\mass_factors'),
-        ('data\\mass_factors\\empreinte_carbone_solvants.h5',       'data\\mass_factors'),
-        ('data\\mass_factors\\materiaux_labo.h5',                   'data\\mass_factors'),
-        ('data\\mass_factors\\nacres_2022.h5',                      'data\\mass_factors'),
+        # --- Base SQLite de référence ---
+        ('data\\labeco2_reference.sqlite', 'data'),
 
         # --- Base SQLite types de manips ---
         ('scenarios\\manips_type.sqlite', 'scenarios'),
@@ -28,21 +19,6 @@ a = Analysis(
         ('assets\\icon.ico',    'assets'),
     ],
     hiddenimports=[
-        # PyTables / HDF5
-        'tables',
-        'tables.flavor',
-        'tables.leaf',
-        'tables.array',
-        'tables.carray',
-        'tables.earray',
-        'tables.vlarray',
-        'tables.group',
-        'tables.table',
-        'tables.indexes',
-        'tables.nodes.filenode',
-        'numexpr',
-        'numexpr.necompiler',
-        'blosc2',
         # NumPy 2.x — numpy.core est réorganisé en numpy._core
         'numpy.core',
         'numpy.core.multiarray',
@@ -57,8 +33,7 @@ a = Analysis(
         'pandas._libs.tslibs.nattype',
         'pandas._libs.tslibs.np_datetime',
         'pandas._libs.tslibs.timestamps',
-        # Migration SQLite au premier lancement
-        'tools.migrate_hdf5_to_sqlite',
+        # SQLite
         'ui.sqlite_legacy_adapter',
         'ui.sqlite_writer',
         # Matplotlib backend Qt
