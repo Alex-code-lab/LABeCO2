@@ -57,6 +57,10 @@ a = Analysis(
         'pandas._libs.tslibs.nattype',
         'pandas._libs.tslibs.np_datetime',
         'pandas._libs.tslibs.timestamps',
+        # Migration SQLite au premier lancement
+        'tools.migrate_hdf5_to_sqlite',
+        'ui.sqlite_legacy_adapter',
+        'ui.sqlite_writer',
         # Matplotlib backend Qt
         'matplotlib.backends.backend_qtagg',
         'matplotlib.backends.backend_qt5agg',

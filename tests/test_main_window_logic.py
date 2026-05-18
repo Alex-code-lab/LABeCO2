@@ -499,8 +499,11 @@ class TestUpdateQuantityLabel(unittest.TestCase):
         mw.fe_massique_label.setVisible.assert_called_with(True)
         mw.fe_massique_input.setVisible.assert_called_with(True)
 
-    def test_solid_vrac_masse_affiche_grammes_et_masse_stockee(self):
-        """Produit vrac (masse sans matériau) → label 'g', masse mémorisée."""
+    def test_solid_masse_sans_materiau_affiche_unites_et_cache_fe(self):
+        """Solide avec masse mais sans matériau → 'unités', FE masqué.
+        Sans matériau connu, on ne peut pas calculer le CO₂ par la masse ;
+        on traite toujours comme objet discret pour éviter un label trompeur.
+        """
         sel = {'code_nacres': 'AA01', 'consommable': 'Poudre', 'source': 'solid'}
         mw = _make_mw(selected=sel)
         mw._find_consumable_mass_row = MagicMock(return_value=None)
@@ -508,8 +511,10 @@ class TestUpdateQuantityLabel(unittest.TestCase):
         mw._get_masse_unitaire_g       = MagicMock(return_value=50.0)
         mw._update_quantity_label(sel)
         text = mw.quantity_label.setText.call_args[0][0]
-        self.assertIn('g', text)
-        self.assertEqual(mw._current_masse_unitaire_g, 50.0)
+        self.assertIn('unités', text)
+        self.assertIsNone(mw._current_masse_unitaire_g)
+        mw.fe_massique_label.setVisible.assert_called_with(False)
+        mw.fe_massique_input.setVisible.assert_called_with(False)
 
     def test_solid_discret_affiche_unites_et_cache_fe(self):
         """Produit discret (matériau défini, pas vrac) → 'unités', FE masqué."""

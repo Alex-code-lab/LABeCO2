@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
+from ui.data_manager import DataManager
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -73,6 +74,16 @@ def test_migration_creates_schema_and_core_tables(tmp_path):
             "transport_factors",
         }.issubset(tables)
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_migration_ignores_sqlite_runtime_env_var(tmp_path, monkeypatch):
+    monkeypatch.setenv(DataManager.SQLITE_ENV_VAR, str(tmp_path / "missing.sqlite"))
+
+    db_path = tmp_path / "labeco2.sqlite"
+    report = migrate_project_to_sqlite(ROOT_DIR, db_path)
+
+    assert db_path.exists()
+    assert report.counts["commercial_products"] > 900
 
 
 def test_migration_keeps_capacity_objects_as_solid(tmp_path):

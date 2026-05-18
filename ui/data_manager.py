@@ -7,7 +7,7 @@
 
 import os
 import pandas as pd
-from utils.data_loader import load_data  # Ajuster si nécessaire selon ta structure
+from utils.data_loader import SQLITE_PATH_ENV_VAR, load_data
 from ui.display_utils import (
     clean_text,
     looks_like_liquid_commercial_product,
@@ -73,7 +73,7 @@ class DataManager:
     DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
     DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
     DATA_TRANSPORT_FILENAME = "data_transport_origins.hdf5"
-    SQLITE_ENV_VAR = "LABECO2_SQLITE_PATH"
+    SQLITE_ENV_VAR = SQLITE_PATH_ENV_VAR
     TRANSPORT_ORIGINE_COL = "Origine"
     TRANSPORT_FACTOR_COL = "Facteur transport (kg CO₂e/kg)"
     TRANSPORT_UNCERT_COL = "Incertitude"
@@ -89,7 +89,11 @@ class DataManager:
         """
         self.base_path = base_path
         self.user_path = user_path if user_path is not None else base_path
-        self.sqlite_path = sqlite_path or os.environ.get(self.SQLITE_ENV_VAR)
+        self.sqlite_path = (
+            sqlite_path
+            if sqlite_path is not None else
+            os.environ.get(self.SQLITE_ENV_VAR)
+        )
 
         # Données modifiables → user_path
         self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)

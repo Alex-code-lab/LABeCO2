@@ -77,6 +77,8 @@ TRANSPORT_COLUMNS = [
     "Incertitude",
 ]
 
+SQLITE_ID_COL = "_sqlite_id"
+
 
 def _clean(value: Any) -> str:
     if value is None:
@@ -241,6 +243,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
     rows = []
     for product in products.to_dict("records"):
         row = {column: "" for column in COMMERCIAL_PRODUCT_COLUMNS}
+        row[SQLITE_ID_COL] = _clean(product["id"])
         row["Consommable"] = _clean(product["name"])
         row["Marque"] = _clean(product["brand"])
         row["Référence"] = _clean(product["reference"])
@@ -265,7 +268,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         _fill_component_columns(row, components_by_product.get(product["id"], []))
         rows.append(row)
 
-    return pd.DataFrame(rows, columns=COMMERCIAL_PRODUCT_COLUMNS)
+    return pd.DataFrame(rows).reindex(columns=COMMERCIAL_PRODUCT_COLUMNS + [SQLITE_ID_COL])
 
 
 def _fill_component_columns(row: dict[str, Any], components: list[dict[str, Any]]) -> None:

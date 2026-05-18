@@ -42,7 +42,12 @@ from ui.display_utils import (
     safe_float,
 )
 
-from utils.data_loader import load_logo, get_user_data_path, init_user_data
+from utils.data_loader import (
+    get_user_data_path,
+    init_user_data,
+    load_logo,
+    resolve_sqlite_path,
+)
 from utils.color_utils import CATEGORY_COLORS
 from scenarios.manip_type_db import ManipsTypeDB
 from ui.charts.pie_chart import PieChartWindow
@@ -95,7 +100,12 @@ class MainWindow(QMainWindow):
         self.manips_db = ManipsTypeDB(db_path=db_path)
 
         try:
-            self.data_manager = DataManager(base_path, user_path=user_path)
+            sqlite_path = resolve_sqlite_path(base_path, user_path)
+            self.data_manager = DataManager(
+                base_path,
+                user_path=user_path,
+                sqlite_path=sqlite_path,
+            )
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger les données : {e}")
             sys.exit(1)
@@ -2861,18 +2871,10 @@ class MainWindow(QMainWindow):
                 self.fe_massique_label.setVisible(not has_factor)
                 self.fe_massique_input.setVisible(not has_factor)
                 return
-            masse_g = self._get_masse_unitaire_g(selected)
-            if masse_g > 0:
-                self._current_masse_unitaire_g = masse_g
-                self.quantity_label.setText("Quantité (g) :")
-                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/kg) :")
-                self.fe_massique_label.setVisible(True)
-                self.fe_massique_input.setVisible(True)
-            else:
-                self._current_masse_unitaire_g = None
-                self.quantity_label.setText("Quantité (unités) :")
-                self.fe_massique_label.setVisible(False)
-                self.fe_massique_input.setVisible(False)
+            self._current_masse_unitaire_g = None
+            self.quantity_label.setText("Quantité (unités) :")
+            self.fe_massique_label.setVisible(False)
+            self.fe_massique_input.setVisible(False)
 
     def update_quantity_visibility(self):
         """
@@ -2928,6 +2930,7 @@ class MainWindow(QMainWindow):
             prefill_code=prefill_code,
             prefill_name=prefill_name,
             prefill_source=prefill_source,
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
@@ -2940,6 +2943,7 @@ class MainWindow(QMainWindow):
             base_path=self.data_manager.base_path,
             user_path=self.data_manager.user_path,
             mode_filter="consumable",
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
@@ -2953,6 +2957,7 @@ class MainWindow(QMainWindow):
             user_path=self.data_manager.user_path,
             mode_filter="factor",
             initial_mode=DataMassWindow.MODE_SOLID_FACTOR,
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
@@ -2960,6 +2965,16 @@ class MainWindow(QMainWindow):
     def _reload_consumables_data(self):
         """Recharge les DataFrames de consommables dans le DataManager après un ajout."""
         try:
+            if getattr(self.data_manager, "sqlite_path", None):
+                self.data_manager._load_from_sqlite(self.data_manager.sqlite_path)
+                self.data_masse = self.data_manager.get_data_masse()
+                self.data_liquides = self.data_manager.get_data_liquides()
+                self.data_materials = self.data_manager.get_data_materials()
+                if self.category_combo is not None:
+                    self.update_subsubcategory_names()
+                    self.update_nacres_visibility()
+                return
+
             if os.path.exists(self.data_manager.data_masse_path):
                 self.data_manager.data_masse = pd.read_hdf(self.data_manager.data_masse_path)
                 self.data_masse = self.data_manager.get_data_masse()

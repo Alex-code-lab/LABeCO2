@@ -428,14 +428,18 @@ DataManagerSQLite hérite de la même interface, lit SQLite.
   - ui/sqlite_legacy_adapter.py reconstruit les DataFrames historiques depuis
     SQLite.
   - DataManager peut charger SQLite via sqlite_path ou LABECO2_SQLITE_PATH,
-    tout en gardant HDF5 comme comportement par défaut.
+    tout en gardant HDF5 disponible.
+  - Au démarrage, resolve_sqlite_path crée/utilise désormais la base SQLite
+    par défaut (private/labeco2.sqlite en développement, dossier utilisateur
+    en version compilée).
+  - LABECO2_USE_HDF5=1 ou LABECO2_DISABLE_SQLITE=1 force l'ancien mode HDF5.
 
 Pendant la transition, un flag de configuration choisit l'implémentation.
 Après validation, DataManager HDF5 est déprécié mais conservé pour import
 d'anciens fichiers.
 
 Critère de réussite :
-  Tous les tests existants (159 tests) passent sans modification.
+  Tous les tests existants passent sans modification.
   Coverage est disponible pour mesurer la couverture, sans seuil global imposé
   au départ car l'application est encore très UI-heavy.
   Les fixtures de Phase 1b donnent des résultats identiques avec les deux
@@ -492,6 +496,14 @@ Pour l'ajout d'un facteur :
   - Source obligatoire (sélection dans la liste ou création).
   - Contributeur obligatoire.
   - Statut initial : draft.
+
+Étape intermédiaire implémentée :
+  - ui/sqlite_writer.py écrit les consommables, facteurs liquides et facteurs
+    matériaux dans SQLite.
+  - DataMassWindow écrit dans SQLite quand sqlite_path est actif, sinon conserve
+    l'écriture HDF5.
+  - MainWindow transmet sqlite_path aux fenêtres et recharge les DataFrames
+    depuis SQLite après ajout.
 
 ===============================================================================
 PHASE 7 — METTRE EN PLACE LE SYSTÈME DE CONTRIBUTION

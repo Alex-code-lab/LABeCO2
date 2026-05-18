@@ -11,6 +11,15 @@ import shutil
 import pandas as pd
 from PySide6.QtGui import QPixmap
 
+SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
+SQLITE_USE_HDF5_ENV_VAR = "LABECO2_USE_HDF5"
+SQLITE_DISABLE_ENV_VAR = "LABECO2_DISABLE_SQLITE"
+
+
+def _env_truthy(value):
+    return str(value or "").strip().casefold() in {"1", "true", "yes", "on", "oui"}
+
+
 def get_user_data_path():
     """
     Retourne le répertoire de données utilisateur, persistant entre sessions.
@@ -31,6 +40,45 @@ def get_user_data_path():
         return base
     else:
         return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def get_default_sqlite_path(user_path=None):
+    """Retourne le chemin SQLite canonique de l'application."""
+    if user_path is None:
+        user_path = get_user_data_path()
+    if getattr(sys, 'frozen', False):
+        return os.path.join(user_path, "data", "labeco2.sqlite")
+    return os.path.join(user_path, "private", "labeco2.sqlite")
+
+
+def resolve_sqlite_path(base_path, user_path=None):
+    """
+    Résout la base SQLite à utiliser au démarrage.
+
+    Par défaut, SQLite devient la source applicative. Pour forcer l'ancien mode
+    HDF5, définir LABECO2_USE_HDF5=1 ou LABECO2_DISABLE_SQLITE=1.
+    """
+    force_hdf5 = (
+        _env_truthy(os.environ.get(SQLITE_USE_HDF5_ENV_VAR))
+        or _env_truthy(os.environ.get(SQLITE_DISABLE_ENV_VAR))
+    )
+    if force_hdf5:
+        return None
+
+    user_path = user_path if user_path is not None else get_user_data_path()
+    sqlite_path = os.environ.get(SQLITE_PATH_ENV_VAR) or get_default_sqlite_path(user_path)
+    if not os.path.exists(sqlite_path):
+        create_sqlite_from_hdf5(base_path, user_path, sqlite_path)
+    return sqlite_path
+
+
+def create_sqlite_from_hdf5(base_path, user_path, sqlite_path):
+    """Crée une base SQLite initiale depuis les HDF5 historiques."""
+    from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
+
+    os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
+    migrate_project_to_sqlite(base_path, sqlite_path, user_path=user_path)
+    return sqlite_path
 
 
 def init_user_data():
@@ -93,4 +141,3 @@ def load_data():
             raise ValueError(f"Le fichier HDF5 '{data_file}' ne contient aucune table.")
         df = pd.read_hdf(data_file, key=keys[0])
     return df
-

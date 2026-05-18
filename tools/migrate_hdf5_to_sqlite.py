@@ -744,13 +744,18 @@ def migrate_transport_factors(ctx: MigrationContext, df: pd.DataFrame, dm: DataM
         ctx.report.inc("transport_factors")
 
 
-def migrate_project_to_sqlite(base_path: str | Path, output_path: str | Path) -> MigrationReport:
+def migrate_project_to_sqlite(
+    base_path: str | Path,
+    output_path: str | Path,
+    user_path: str | Path | None = None,
+) -> MigrationReport:
     base_path = Path(base_path)
+    user_path = Path(user_path) if user_path is not None else base_path
     output_path = Path(output_path)
     if output_path.exists():
         output_path.unlink()
 
-    dm = DataManager(str(base_path), user_path=str(base_path))
+    dm = DataManager(str(base_path), user_path=str(user_path), sqlite_path="")
     report = MigrationReport()
     conn = connect_sqlite(output_path)
     try:
