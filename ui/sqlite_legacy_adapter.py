@@ -156,7 +156,7 @@ def load_liquid_factors(conn: sqlite3.Connection) -> pd.DataFrame:
             ef.density_g_ml AS "Densité (g/mL)",
             ef.concentration_mg_ml AS "Concentration (mg/mL)",
             ef.co2_factor AS "Facteur CO₂ (kg CO₂e/kg)",
-            ef.uncertainty AS "Incertitude (%)",
+            ef.uncertainty * 100.0 AS "Incertitude (%)",
             s.title AS "Source",
             c.name AS "Signature",
             ef.created_at AS "date d'ajout",

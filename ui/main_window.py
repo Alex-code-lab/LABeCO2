@@ -2249,14 +2249,17 @@ class MainWindow(QMainWindow):
         if prix_info and prix_info.get("prix_unitaire") is not None:
             prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
-            condt = prix_info.get("conditionnement", "")
-            condt_text = str(condt or "").strip()
             price_source = str(prix_info.get("source_catalogue") or "").strip()
             source_label = "catalogue IJM" if price_source else "base consommables"
-            if condt_text and condt_text.lower() != "nan":
+            nb_unites = prix_info.get("nb_unites", "")
+            try:
+                nb_val = int(float(nb_unites)) if nb_unites not in ("", None) else None
+            except (ValueError, TypeError):
+                nb_val = None
+            if nb_val and nb_val > 1:
                 label_text = (
                     f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €  |  "
-                    f"Conditionnement vendu : {condt_text}"
+                    f"Conditionnement : {nb_val} unités"
                 )
             else:
                 label_text = f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €"
