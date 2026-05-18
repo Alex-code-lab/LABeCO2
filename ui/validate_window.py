@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from ui.validation_details import format_entry_detail
+from ui.validation_ops import now_iso as _now, reject_entry, validate_entry
 
 _BLACK = QColor(0, 0, 0)
 
@@ -33,10 +33,6 @@ _COLOR_WARN      = QColor(255, 243, 180)   # jaune  : draft sans source
 _COLOR_OK        = QColor(210, 240, 210)   # vert   : draft avec source
 _COLOR_VALIDATED = QColor(200, 225, 255)   # bleu   : validé
 _COLOR_DEPRECATED = QColor(220, 220, 220)  # gris   : déprécié
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _item(text: str, bg: QColor | None = None) -> QTableWidgetItem:
@@ -61,11 +57,18 @@ TABLES_META = {
         "label": "Facteurs d'émission",
         "alias": "ef",
         "query_tpl": """
-            SELECT ef.id, ef.status AS "Statut", ef.name AS "Nom", ef.factor_type AS "Type",
-                   ef.co2_factor AS "CO₂", ef.uncertainty AS "Incert.",
-                   s.title AS "Source",
-                   c.name AS "Ajouté par", v.name AS "Validé par",
-                   ef.created_at AS "Créé le"
+            SELECT ef.id, ef.id AS "ID", ef.status AS "Statut",
+                   ef.name AS "Nom", ef.name_key AS "Clé nom",
+                   ef.factor_type AS "Type", ef.code_nacres AS "NACRES",
+                   ef.co2_factor AS "CO₂", ef.co2_unit AS "Unité CO₂",
+                   ef.uncertainty AS "Incert.", ef.density_g_ml AS "Densité",
+                   ef.concentration_mg_ml AS "Concentration",
+                   s.title AS "Source", ef.source_id AS "Source ID",
+                   c.name AS "Ajouté par", ef.contributor_id AS "Contributeur ID",
+                   v.name AS "Validé par", ef.validated_by_id AS "Validateur ID",
+                   ef.created_at AS "Créé le", ef.updated_at AS "Mis à jour",
+                   ef.validated_at AS "Validé le", ef.deprecated_at AS "Déprécié le",
+                   ef.contribution_id AS "Contribution", ef.revision_of_id AS "Révision de"
             FROM emission_factors ef
             LEFT JOIN sources s ON s.id = ef.source_id
             LEFT JOIN contributors c ON c.id = ef.contributor_id
@@ -87,10 +90,16 @@ TABLES_META = {
         "label": "Matériaux",
         "alias": "m",
         "query_tpl": """
-            SELECT m.id, m.status AS "Statut", m.name AS "Nom", ef.co2_factor AS "CO₂",
-                   s.title AS "Source",
-                   c.name AS "Ajouté par", v.name AS "Validé par",
-                   m.created_at AS "Créé le"
+            SELECT m.id, m.id AS "ID", m.status AS "Statut",
+                   m.name AS "Nom", m.name_key AS "Clé nom",
+                   ef.name AS "FE matériau", m.emission_factor_id AS "FE ID",
+                   ef.co2_factor AS "CO₂", ef.co2_unit AS "Unité CO₂",
+                   s.title AS "Source", m.source_id AS "Source ID",
+                   c.name AS "Ajouté par", m.contributor_id AS "Contributeur ID",
+                   v.name AS "Validé par", m.validated_by_id AS "Validateur ID",
+                   m.created_at AS "Créé le", m.updated_at AS "Mis à jour",
+                   m.validated_at AS "Validé le", m.deprecated_at AS "Déprécié le",
+                   m.contribution_id AS "Contribution", m.revision_of_id AS "Révision de"
             FROM materials m
             LEFT JOIN emission_factors ef ON ef.id = m.emission_factor_id
             LEFT JOIN sources s ON s.id = m.source_id
@@ -115,17 +124,28 @@ TABLES_META = {
         # Facteur direct = emission_factor_id (liquides uniquement).
         # Composants = nb de matériaux liés via product_components (solides).
         "query_tpl": """
-            SELECT cp.id, cp.status AS "Statut", cp.name AS "Nom", cp.code_nacres AS "NACRES",
-                   cp.product_type AS "Type", cp.price_sold_packaging AS "Prix (€)",
+            SELECT cp.id, cp.id AS "ID", cp.status AS "Statut",
+                   cp.name AS "Nom", cp.brand AS "Marque", cp.reference AS "Référence",
+                   cp.code_nacres AS "NACRES", cp.product_type AS "Type",
+                   cp.sold_packaging_label AS "Conditionnement",
+                   cp.price_sold_packaging AS "Prix (€)",
+                   cp.units_per_sold_packaging AS "Nbr cond.",
+                   cp.sold_unit_volume_ml AS "Volume vendu (mL)",
+                   cp.capacity_volume_ml AS "Capacité (mL)",
                    CASE WHEN cp.product_type = 'liquid'
                         THEN COALESCE(ef.name, 'À relier')
                         ELSE ''
-                   END AS "Facteur liquide",
+                   END AS "FE liquide",
+                   cp.emission_factor_id AS "FE liquide ID",
                    (SELECT COUNT(*) FROM product_components pc
                     WHERE pc.product_id = cp.id AND pc.mass_g IS NOT NULL) AS "Composants",
-                   s.title AS "Source",
-                   c.name AS "Ajouté par", v.name AS "Validé par",
-                   cp.created_at AS "Créé le"
+                   cp.ijm_catalogue_id AS "Catalogue IJM",
+                   s.title AS "Source", cp.source_id AS "Source ID",
+                   c.name AS "Ajouté par", cp.contributor_id AS "Contributeur ID",
+                   v.name AS "Validé par", cp.validated_by_id AS "Validateur ID",
+                   cp.created_at AS "Créé le", cp.updated_at AS "Mis à jour",
+                   cp.validated_at AS "Validé le", cp.deprecated_at AS "Déprécié le",
+                   cp.contribution_id AS "Contribution", cp.revision_of_id AS "Révision de"
             FROM commercial_products cp
             LEFT JOIN emission_factors ef ON ef.id = cp.emission_factor_id
             LEFT JOIN sources s ON s.id = cp.source_id
@@ -148,11 +168,16 @@ TABLES_META = {
         "label": "Facteurs transport",
         "alias": "tf",
         "query_tpl": """
-            SELECT tf.id, tf.status AS "Statut", tf.origin AS "Origine", tf.mode AS "Mode",
+            SELECT tf.id, tf.id AS "ID", tf.status AS "Statut",
+                   tf.origin AS "Origine", tf.distance_km AS "Distance (km)",
+                   tf.mode AS "Mode",
                    tf.factor_kgco2e_per_kg AS "Facteur", tf.uncertainty AS "Incert.",
-                   s.title AS "Source",
-                   c.name AS "Ajouté par", v.name AS "Validé par",
-                   tf.created_at AS "Créé le"
+                   s.title AS "Source", tf.source_id AS "Source ID",
+                   c.name AS "Ajouté par", tf.contributor_id AS "Contributeur ID",
+                   v.name AS "Validé par", tf.validated_by_id AS "Validateur ID",
+                   tf.created_at AS "Créé le", tf.updated_at AS "Mis à jour",
+                   tf.validated_at AS "Validé le", tf.deprecated_at AS "Déprécié le",
+                   tf.contribution_id AS "Contribution", tf.revision_of_id AS "Révision de"
             FROM transport_factors tf
             LEFT JOIN sources s ON s.id = tf.source_id
             LEFT JOIN contributors c ON c.id = tf.contributor_id
@@ -444,6 +469,13 @@ class ValidateWidget(QWidget):
             0, QHeaderView.ResizeMode.Fixed
         )
         self.table_widget.setColumnWidth(0, 28)
+        for header, width in (("Nbr cond.", 80), ("FE liquide", 150)):
+            if header in display_headers:
+                col = 1 + display_headers.index(header)
+                self.table_widget.horizontalHeader().setSectionResizeMode(
+                    col, QHeaderView.ResizeMode.Interactive
+                )
+                self.table_widget.setColumnWidth(col, width)
 
         # Index des colonnes "Statut" et "Source" dans les valeurs affichées
         try:
@@ -605,13 +637,8 @@ class ValidateWidget(QWidget):
             return
         try:
             conn = sqlite3.connect(self.sqlite_path)
-            now = _now()
             for db_table, row_id in entries:
-                conn.execute(
-                    f"UPDATE {db_table} SET status='validated',"
-                    f" validated_by_id=?, validated_at=?, updated_at=? WHERE id=?",
-                    (validator_id, now, now, row_id),
-                )
+                validate_entry(conn, db_table, row_id, validator_id)
             conn.commit()
             conn.close()
         except Exception as e:
@@ -634,13 +661,8 @@ class ValidateWidget(QWidget):
             return
         try:
             conn = sqlite3.connect(self.sqlite_path)
-            now = _now()
             for db_table, row_id in entries:
-                conn.execute(
-                    f"UPDATE {db_table} SET status='deprecated',"
-                    f" deprecated_at=?, updated_at=? WHERE id=?",
-                    (now, now, row_id),
-                )
+                reject_entry(conn, db_table, row_id)
             conn.commit()
             conn.close()
         except Exception as e:

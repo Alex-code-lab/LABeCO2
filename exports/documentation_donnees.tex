@@ -1,584 +1,84 @@
-% SPDX-License-Identifier: GPL-3.0-or-later
-% Documentation des fichiers de données LABeCO2
-\documentclass[a4paper,11pt]{article}
-
-% ── Encodage & langue ──────────────────────────────────────────────────────
-\usepackage[T1]{fontenc}
+\documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[french]{babel}
-
-% ── Mise en page ───────────────────────────────────────────────────────────
-\usepackage[top=2.2cm,bottom=2.2cm,left=2.4cm,right=2.4cm]{geometry}
-\usepackage{microtype}
-\usepackage{parskip}
-\setlength{\parskip}{5pt}
-
-% ── Polices ────────────────────────────────────────────────────────────────
-\usepackage{lmodern}
-\usepackage{helvet}
-
-% ── Couleurs & boîtes ──────────────────────────────────────────────────────
-\usepackage[dvipsnames,svgnames,table]{xcolor}
-\definecolor{labgreen}{RGB}{22,101,52}
-\definecolor{labgreenlight}{RGB}{220,252,231}
-\definecolor{labblue}{RGB}{30,64,175}
-\definecolor{labbluelight}{RGB}{239,246,255}
-\definecolor{labbrown}{RGB}{146,64,14}
-\definecolor{labbrownlight}{RGB}{255,251,235}
-\definecolor{labgray}{RGB}{75,85,99}
-\definecolor{labgraylight}{RGB}{243,244,246}
-\definecolor{rowalt}{RGB}{248,250,252}
-
-\usepackage{tcolorbox}
-\tcbuselibrary{skins,breakable}
-
-% ── Tableaux ───────────────────────────────────────────────────────────────
+\usepackage{geometry}
 \usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{array}
-\usepackage{multirow}
-\renewcommand{\arraystretch}{1.35}
-\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
-\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+\usepackage{hyperref}
 
-% ── TikZ pour le diagramme ─────────────────────────────────────────────────
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc,bending}
+\geometry{margin=2.2cm}
 
-% ── Liens ──────────────────────────────────────────────────────────────────
-\usepackage[colorlinks=true,linkcolor=labblue,urlcolor=labblue]{hyperref}
+\title{LABeCO2 -- Documentation des donnees}
+\author{LABeCO2}
+\date{Mise a jour : 2026-05-18}
 
-% ── En-tête / pied de page ─────────────────────────────────────────────────
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-\renewcommand{\headrulewidth}{0.4pt}
-\fancyhead[L]{\small\color{labgray}\textbf{LABeCO2} — Documentation des données}
-\fancyhead[R]{\small\color{labgray}Version mai 2026}
-\fancyfoot[C]{\small\color{labgray}\thepage}
-
-% ── Utilitaires ────────────────────────────────────────────────────────────
-\usepackage{enumitem}
-\usepackage{pifont}
-\usepackage{amssymb}
-\setlist[itemize]{leftmargin=1.4em,itemsep=2pt,topsep=3pt}
-\usepackage{fontawesome5}
-\usepackage{eurosym}
-
-% ══════════════════════════════════════════════════════════════════════════
 \begin{document}
+\maketitle
 
-% ── Page de titre ──────────────────────────────────────────────────────────
-\begin{titlepage}
-  \pagecolor{labgreenlight}
-  \vspace*{3cm}
-  \begin{center}
-    {\fontsize{32}{38}\selectfont\bfseries\color{labgreen} LABeCO2}\\[0.4cm]
-    {\large\color{labgray} Calculateur d'empreinte carbone pour laboratoires}\\[2cm]
-    \begin{tcolorbox}[
-      colback=white, colframe=labgreen, arc=6pt,
-      boxrule=1.5pt, width=0.8\textwidth,
-      halign=center
-    ]
-      {\LARGE\bfseries\color{labblue} Documentation des fichiers de données}\\[0.3cm]
-      {\normalsize\color{labgray}
-        Structure, contenu et interactions des bases HDF5}
-    \end{tcolorbox}
-    \vfill
-    {\color{labgray} Mai 2026 \quad|\quad GNU GPL v3}
-  \end{center}
-\end{titlepage}
-\nopagecolor
+\section{Source de verite}
 
-% ── Table des matières ─────────────────────────────────────────────────────
-\tableofcontents
-\newpage
+LABeCO2 utilise SQLite comme source de verite pour les facteurs, les
+consommables, les codes NACRES, les sources et les contributions.
 
-% ══════════════════════════════════════════════════════════════════════════
-\section{Vue d'ensemble}
-
-LABeCO2 repose sur \textbf{cinq sources de données} stockées dans le répertoire
-\texttt{data/} (sous-dossiers \texttt{mass\_factors/} et \texttt{ges1point5/}) :
-
-\begin{center}
-\begin{tcolorbox}[
-  colback=labgraylight, colframe=labgray, arc=4pt,
-  boxrule=0.8pt, width=\textwidth
-]
-\footnotesize
-\begin{tabular}{llrr}
-\toprule
-\textbf{Fichier} & \textbf{Rôle} & \textbf{Lignes} & \textbf{Colonnes}\\
-\midrule
-\texttt{data\_eCO2\_masse\_consommable.hdf5}    & Produits commerciaux catalogue IJM  & 986 & 31\\
-\texttt{data\_eCO2\_liquides\_consommable.hdf5} & Facteurs CO\textsubscript{2} liquides/solvants & 32 & 14\\
-\texttt{empreinte\_carbone\_materiaux.h5}       & Facteurs CO\textsubscript{2} par matériau      & 14 & 5 \\
-\texttt{data\_transport\_origins.hdf5}          & Facteurs de transport géographique  & 10 & 8 \\
-\texttt{data\_base\_GES1point5.hdf5}             & Facteurs ADEME/GES1.5 (calcul prix)  & 1\,640 & 25 \\
-\bottomrule
-\end{tabular}
-\end{tcolorbox}
-\end{center}
-
-Deux modes de calcul coexistent dans l'application :
 \begin{itemize}
-  \item \textbf{Calcul monétaire} (\textit{ep}) : valeur en euros $\times$ facteur d'émission
-    ADEME/GES1.5 — s'applique à toutes les catégories (Véhicules, Activités, Achats…).
-  \item \textbf{Calcul massique} (\textit{em}) : masse physique du consommable $\times$ facteur
-    CO\textsubscript{2} par kg — s'applique aux Achats pour lesquels les données de masse
-    sont renseignées. Ce chemin est plus précis.
+  \item \texttt{data/labeco2\_reference.sqlite} : base de reference livree avec l'application.
+  \item \texttt{private/labeco2.sqlite} : base de travail locale en mode developpement.
+  \item \texttt{scenarios/manips\_type.sqlite} : base des manipulations types.
 \end{itemize}
 
-\newpage
+Au lancement, l'application resout le chemin SQLite de travail. Si cette base
+n'existe pas, elle est initialisee par copie de
+\texttt{data/labeco2\_reference.sqlite}.
 
-% ══════════════════════════════════════════════════════════════════════════
-\section{Diagramme d'interactions}
+\section{Tables principales}
 
-\begin{center}
-\begin{tikzpicture}[
-  font=\small,
-  box/.style = {
-    rounded corners=5pt, draw, thick,
-    minimum height=1.1cm, align=center, inner sep=6pt
-  },
-  file/.style  = {box, fill=labbluelight,  draw=labblue,  text=labblue,  text width=2.9cm},
-  calc/.style  = {box, fill=labgreenlight, draw=labgreen, text=labgreen, text width=3.5cm},
-  result/.style= {box, fill=labbrownlight, draw=labbrown, text=labbrown, text width=2.4cm},
-  user/.style  = {box, fill=labgraylight,  draw=labgray,  text=labgray,  text width=3.2cm},
-  arr/.style   = {-Stealth, thick},
-  int/.style   = {-Stealth, thick, draw=labbrown, dashed},
-  lbl/.style   = {font=\scriptsize\itshape, text=labgray, fill=white, inner sep=1pt, align=center}
-]
-
-% ── Nœuds (coordonnées absolues en cm) ───────────────────────────────────
-\node[user]   (user)  at (5.5, 9.2)  {Saisie utilisateur\\(code NACRES, valeur \texteuro,\\quantité, origine)};
-\node[file]   (ges)   at (0.5, 6.2)  {\textbf{data\_base\_GES1point5}\\1\,640 entrées\\Facteurs ADEME/GES1.5};
-\node[file]   (masse) at (5.5, 6.2)  {\textbf{data\_masse}\\986 produits\\catalogue IJM};
-\node[file]   (trans) at (10.5, 6.2) {\textbf{data\_transport}\\10 origines\\géographiques};
-\node[file]   (liq)   at (1.5, 3.2)  {\textbf{data\_liquides}\\32 facteurs\\liquides/solvants};
-\node[file]   (mat)   at (9.5, 3.2)  {\textbf{data\_matériaux}\\14 matériaux\\(PP, verre, acier…)};
-\node[calc]   (calc)  at (5.5, 0.8)  {\textbf{CarbonCalculator}\\compute\_emission\_data()};
-\node[result] (res)   at (10.5, 0.8) {\textbf{Résultat}\\ep, em\\(kg CO\textsubscript{2}e)};
-
-% ── Utilisateur → fichiers ───────────────────────────────────────────────
-\draw[arr] (user.west) to[bend right=22]
-  node[lbl, pos=0.38, left=2pt]{code NACRES\\valeur \texteuro} (ges.north);
-\draw[arr] (user.south) --
-  node[lbl, right=2pt]{code NACRES\\consommable} (masse.north);
-\draw[arr, dashed] (user.east) to[bend left=22]
-  node[lbl, pos=0.38, right=2pt]{origine\\(optionnel)} (trans.north);
-
-% ── Liens internes : data_masse → data_liquides / data_matériaux ─────────
-\draw[int] (masse.south west) to[bend right=22]
-  node[lbl, pos=0.48, below=2pt]{\textit{Facteur liquide source}} (liq.north east);
-\draw[int] (masse.south east) to[bend left=22]
-  node[lbl, pos=0.48, below=2pt]{\textit{Matériau consommable}} (mat.north west);
-
-% ── Fichiers → CarbonCalculator ──────────────────────────────────────────
-\draw[arr] (ges.south east) to[bend right=15]
-  node[lbl, pos=0.45, left=2pt]{$f_{\mathrm{ADEME}}$ [kg CO\textsubscript{2}e/\texteuro]} (calc.west);
-\draw[arr] (masse.south) --
-  node[lbl, right=2pt]{masse, vol.~flacon, prix} (calc.north);
-\draw[arr] (liq.south east) to[bend right=25]
-  node[lbl, pos=0.55, below=1pt]{densité, $f_{\mathrm{CO_2}}$/kg} (calc.south west);
-\draw[arr] (mat.south west) to[bend left=25]
-  node[lbl, pos=0.55, below=1pt]{$f_{\mathrm{CO_2}}$/kg mat.} (calc.south east);
-\draw[arr] (trans.south west) to[bend left=15]
-  node[lbl, pos=0.45, right=2pt]{$f_{\mathrm{transport}}$} (calc.east);
-
-% ── Résultat ──────────────────────────────────────────────────────────────
-\draw[arr, very thick, color=labgreen] (calc.east) -- (res.west);
-
-% ── Légende ───────────────────────────────────────────────────────────────
-\begin{scope}[shift={(0.2,-1.5)}]
-  \node[file,   minimum height=0.55cm, text width=2.5cm, inner sep=3pt, font=\scriptsize] at (0,0)   {Fichier HDF5};
-  \node[calc,   minimum height=0.55cm, text width=2.5cm, inner sep=3pt, font=\scriptsize] at (3.6,0) {Module Python};
-  \node[result, minimum height=0.55cm, text width=2.5cm, inner sep=3pt, font=\scriptsize] at (7.2,0) {Sortie calcul};
-  \draw[int] (9.6,-0.02) -- (11.0,-0.02);
-  \node[font=\scriptsize\itshape, text=labbrown, anchor=west] at (11.1,-0.02) {Lien interne};
-\end{scope}
-
-\end{tikzpicture}
-\end{center}
-
-\vspace{0.3cm}
-\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
-  \item Flèches \textbf{pleines} : flux de données principal — l'utilisateur
-    sélectionne un produit, chaque fichier fournit un facteur au \textbf{CarbonCalculator}.
-  \item Flèche \textbf{pointillée grise} : l'origine de transport est optionnelle ;
-    la valeur \og{}Inconnue\fg{} est appliquée par défaut si rien n'est sélectionné.
-  \item Flèches \textbf{pointillées \textcolor{labbrown}{marron}} : liens internes dans
-    \texttt{data\_masse} — \texttt{Facteur liquide source} pointe vers
-    \texttt{data\_liquides.Produit} (66 solvants commerciaux) ;
-    \texttt{Matériau consommable} pointe vers
-    \texttt{data\_matériaux.Materiau} (23 objets solides).
-\end{itemize}
-
-\newpage
-
-% ══════════════════════════════════════════════════════════════════════════
-\section{Détail des fichiers}
-
-% ── 3.1 data_masse ─────────────────────────────────────────────────────────
-\begin{tcolorbox}[
-  title={\faDatabase\quad \texttt{data\_eCO2\_masse\_consommable.hdf5} — Produits commerciaux},
-  colback=labbluelight, colbacktitle=labblue,
-  coltitle=white, colframe=labblue,
-  arc=5pt, breakable
-]
-\textbf{986 lignes × 31 colonnes.}
-Base principale de l'onglet \og{}Achats\fg{} de l'interface.
-Elle contient l'ensemble des consommables du catalogue IJM utilisés en labo.
-
-\medskip
-\begin{tabularx}{\linewidth}{L{3.2cm} L{4.0cm} X}
+\begin{tabular}{lll}
 \toprule
-\textbf{Groupe} & \textbf{Colonnes principales} & \textbf{Rôle}\\
+Table & Role & Remarques \\
 \midrule
-Identité &
-  \texttt{Consommable}, \texttt{Marque},
-  \texttt{Code CAS}, \texttt{Code NACRES} &
-  Identification et classification NACRES\\
-\rowcolor{rowalt}
-Masse solide &
-  \texttt{Masse unitaire (g)},
-  \texttt{Matériau consommable},
-  (+ 2\textsuperscript{e}, 3\textsuperscript{e} matériaux) &
-  Calcul CO\textsubscript{2} par masse pour objets discrets
-  (tubes, pipettes, flacons…)\\
-Emballage &
-  \texttt{Masse emballage}, \texttt{Matériau emballage} &
-  CO\textsubscript{2} de l'emballage secondaire inclus\\
-\rowcolor{rowalt}
-Conditionnement &
-  \texttt{Masse conditionnement},
-  \texttt{Matériau conditionnement},
-  \texttt{Nbr par conditionnement} &
-  CO\textsubscript{2} du conditionnement primaire proraté\\
-Prix &
-  \texttt{Prix du conditionnement},
-  \texttt{code\_ijm}, \texttt{marque\_ijm} &
-  Affichage du prix et auto-remplissage du champ €\\
-\rowcolor{rowalt}
-\textbf{Lien liquide} &
-  \texttt{Facteur liquide source},
-  \texttt{Unité liquide},
-  \texttt{Volume flacon (mL)} &
-  Pointe vers \texttt{data\_liquides.Produit}
-  pour 66 produits commerciaux liquides\\
-Traçabilité &
-  \texttt{date d'ajout}, \texttt{Source},
-  \texttt{Signature} &
-  Auditabilité des données\\
+\texttt{purchase\_factors} & Facteurs achats/prix & Facteurs historiques GES/Labo1point5 consolides \\
+\texttt{commercial\_products} & Produits commerciaux & Solides et liquides commerciaux \\
+\texttt{product\_components} & Composants materiaux & Composants calculables avec masse renseignee \\
+\texttt{materials} & Materiaux & Reliens aux facteurs d'emission materiaux \\
+\texttt{emission\_factors} & Facteurs CO2e & Facteurs liquides et materiaux \\
+\texttt{nacres\_codes} & Codes NACRES & Alimente les listes de selection de l'IHM \\
+\texttt{transport\_factors} & Facteurs transport & Origine, distance et facteur par kg \\
+\texttt{sources} & Sources documentaires & Traçabilite des ajouts et validations \\
+\texttt{contributors} & Contributeurs & Auteurs des donnees \\
 \bottomrule
-\end{tabularx}
+\end{tabular}
 
-\medskip
-\textbf{Quatre types de produits coexistent :}
+\section{Validation et revisions}
+
+Les tables metier portent un statut : \texttt{draft}, \texttt{validated} ou
+\texttt{deprecated}. Lorsqu'une entree validee est modifiee, une revision est
+creee et l'ancienne entree est conservee comme depreciee. L'outil
+\texttt{tools/lab\_admin.py} permet de valider, fusionner et auditer les
+contributions SQLite.
+
+\section{Exports et contributions}
+
+Les contributions peuvent etre exportees et importees via les outils :
+
 \begin{itemize}
-  \item \textbf{66} produits commerciaux liquides — ont un \texttt{Facteur liquide source}
-    non vide → calcul CO\textsubscript{2} via \texttt{data\_liquides}
-  \item \textbf{23} objets discrets solides — ont un matériau défini → calcul via
-    \texttt{data\_matériaux}
-  \item \textbf{75} produits vrac (poudres, réactifs en vrac) — masse renseignée sans
-    matériau → facteur d'émission saisi manuellement par l'utilisateur
-  \item \textbf{822} produits sans donnée masse — calcul monétaire uniquement (facteur
-    ADEME/GES1.5 par code NACRES)
+  \item \texttt{tools/export\_contribution.py}
+  \item \texttt{tools/import\_contribution.py}
+  \item \texttt{tools/export\_excel.py}
 \end{itemize}
-\end{tcolorbox}
 
-\vspace{0.5cm}
+L'historique utilisateur de l'application est exporte en JSON, CSV ou Excel.
+Les scenarios de calcul sont stockes hors des bases de reference afin de
+separer les donnees metier validees des sessions utilisateur.
 
-% ── 3.2 data_liquides ──────────────────────────────────────────────────────
-\begin{tcolorbox}[
-  title={\faFlask\quad \texttt{data\_eCO2\_liquides\_consommable.hdf5} — Facteurs liquides},
-  colback=labbrownlight, colbacktitle=labbrown,
-  coltitle=white, colframe=labbrown,
-  arc=5pt, breakable
-]
-\textbf{32 lignes × 14 colonnes.}
-Table de référence des \textbf{facteurs CO\textsubscript{2} génériques} par substance liquide.
-Ce ne sont \emph{pas} des produits commerciaux mais des facteurs scientifiques
-issus de la littérature (Capello \textit{et al.} 2009, Nicholson \textit{et al.} 2023,
-DOI:10.1371/journal.pstr.0000080).
+\section{Controles de coherence}
 
-\medskip
-\begin{tabularx}{\linewidth}{L{3.8cm} X}
-\toprule
-\textbf{Colonne} & \textbf{Rôle}\\
-\midrule
-\texttt{Produit}, \texttt{Type}, \texttt{Code NACRES}, \texttt{CAS} & Identification de la substance\\
-\rowcolor{rowalt}
-\texttt{Unité} & \texttt{mL} (volume), \texttt{mg/mL} (concentration), \texttt{kg} (masse directe)\\
-\texttt{Densité (g/mL)} & Conversion volume $\rightarrow$ masse (renseignée pour 29/32)\\
-\rowcolor{rowalt}
-\texttt{Concentration (mg/mL)} & Fallback si pas de densité (ex. anticorps dilués)\\
-\texttt{Facteur CO\textsubscript{2} (kg CO\textsubscript{2}e/kg)} & Empreinte carbone par kg de substance (renseigné pour 31/32)\\
-\rowcolor{rowalt}
-\texttt{Incertitude (\%)} & Propagée dans le calcul d'incertitude final\\
-\texttt{Source}, \texttt{Signature} & Traçabilité scientifique\\
-\bottomrule
-\end{tabularx}
+Les controles recommandes avant diffusion sont :
 
-\medskip
-\textbf{Répartition :} 22 substances de chimie (solvants organiques, acides, bases),
-10 de biologie (sérums, milieux de culture, antibiotiques, anticorps).
-
-\medskip
-\textbf{Logique de calcul :}
-$m_\mathrm{kg} = \rho \times V_\mathrm{mL} / 1000$, puis $e = m_\mathrm{kg} \times f_\mathrm{CO_2}$.
-\end{tcolorbox}
-
-\vspace{0.5cm}
-
-% ── 3.3 data_matériaux ─────────────────────────────────────────────────────
-\begin{tcolorbox}[
-  title={\faCubes\quad \texttt{empreinte\_carbone\_materiaux.h5} — Facteurs matériaux},
-  colback=labgraylight, colbacktitle=labgray,
-  coltitle=white, colframe=labgray,
-  arc=5pt
-]
-\textbf{14 lignes × 5 colonnes.}
-Facteurs d'émission CO\textsubscript{2} par matériau (kg eCO\textsubscript{2}/kg de matière).
-Utilisé pour tous les produits solides dont le matériau est renseigné dans \texttt{data\_masse}.
-
-\medskip
-\begin{center}
-\begin{tabular}{L{4.5cm}rrl}
-\toprule
-\textbf{Matériau} & \textbf{kg eCO\textsubscript{2}/kg} & \textbf{Incertitude} & \textbf{Usages typiques}\\
-\midrule
-Polypropylène (PP)   & 3,0  & ±10\,\% & Tubes, flacons, embouts\\
-Polyéthylène (PE)    & 2,5  & ±10\,\% & Sachets, films\\
-Polystyrène (PS)     & 3,5  & ±10\,\% & Boîtes de Pétri, flasks\\
-PET                  & 4,0  & ±15\,\% & Bouteilles\\
-PVC                  & 2,7  & ±10\,\% & Tuyaux souples\\
-PTFE                 & 6,5  & ±20\,\% & Septums, joints\\
-Polycarbonate (PC)   & 5,0  & ±15\,\% & Couvercles, visières\\
-PMMA                 & 3,75 & ±15\,\% & Cuves optiques\\
-\rowcolor{rowalt}
-Acier inoxydable     & 6,5  & ±15\,\% & Instruments, supports\\
-\rowcolor{rowalt}
-Aluminium            & 11,0 & ±20\,\% & Emballages, barquettes\\
-Papier               & 1,05 & ±5\,\%  & Sachets, filtres\\
-Carton               & 0,95 & ±5\,\%  & Boîtes d'emballage\\
-Verre                & 0,8  & ±10\,\% & Pipettes, ampoules\\
-Nitrile              & 6,4  & ±20\,\% & Gants\\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{tcolorbox}
-
-\vspace{0.5cm}
-
-% ── 3.4 data_transport ─────────────────────────────────────────────────────
-\begin{tcolorbox}[
-  title={\faTruck\quad \texttt{data\_transport\_origins.hdf5} — Facteurs de transport},
-  colback=labgreenlight, colbacktitle=labgreen,
-  coltitle=white, colframe=labgreen,
-  arc=5pt
-]
-\textbf{10 lignes × 8 colonnes.}
-Facteurs CO\textsubscript{2} du transport selon l'origine géographique du produit.
-Ajouté \emph{systématiquement} aux émissions massiques
-($em_\mathrm{total} = em_\mathrm{produit} + m_\mathrm{kg} \times f_\mathrm{transport}$).
-
-\medskip
-\begin{center}
-\begin{tabular}{L{3.8cm}rL{2.5cm}rl}
-\toprule
-\textbf{Origine} & \textbf{Distance} & \textbf{Mode} & \textbf{kg CO\textsubscript{2}e/kg} & \textbf{Incertitude}\\
-\midrule
-Inconnue (défaut) & 14\,000 km & Maritime + camion & 0,265 & ±30\,\%\\
-France            &    500 km  & Camion            & 0,043 & ±15\,\%\\
-Europe            &  1\,500 km & Camion + ferroviaire& 0,120 & ±20\,\%\\
-USA               &  8\,000 km & Maritime + camion  & 0,180 & ±20\,\%\\
-Asie              & 20\,000 km & Maritime + camion  & 0,350 & ±20\,\%\\
-Afrique           & 10\,000 km & Maritime + routier & 0,200 & ±20\,\%\\
-\rowcolor{rowalt}
-Europe (avion)    &  1\,500 km & Avion cargo        & 2,850 & ±15\,\%\\
-\rowcolor{rowalt}
-USA (avion)       &  8\,000 km & Avion cargo        &15,200 & ±15\,\%\\
-\rowcolor{rowalt}
-Asie (avion)      & 20\,000 km & Avion cargo        &38,000 & ±15\,\%\\
-\rowcolor{rowalt}
-Afrique (avion)   & 10\,000 km & Avion cargo        &19,000 & ±15\,\%\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\medskip
-La valeur \og{}Inconnue (défaut)\fg{} est appliquée automatiquement si l'utilisateur
-ne sélectionne pas d'origine. L'avion cargo est \textbf{100 à 140×} plus émissif
-que le transport maritime.
-\end{tcolorbox}
-
-% ── 3.5 data_base_GES1point5 ───────────────────────────────────────────────
-\vspace{0.5cm}
-\begin{tcolorbox}[
-  title={\faDatabase\quad \texttt{data\_base\_GES1point5.hdf5} — Facteurs ADEME / GES1.5},
-  colback=labbluelight, colbacktitle=labblue,
-  coltitle=white, colframe=labblue,
-  arc=5pt, breakable
-]
-\textbf{1\,640 lignes × 25 colonnes.}
-Base des facteurs d'émission du projet \textbf{GES1.5} (Labos 1point5),
-compatible méthodologie ADEME.
-Stocké dans \texttt{data/ges1point5/data\_base\_GES1point5.hdf5},
-chargé au démarrage par \texttt{utils/data\_loader.py : load\_data()}.
-
-\medskip
-\begin{tabularx}{\linewidth}{L{4.0cm} L{3.2cm} X}
-\toprule
-\textbf{Colonne} & \textbf{Type / Unité} & \textbf{Rôle}\\
-\midrule
-\texttt{category} & texte & Grande catégorie (Achats, Véhicules, Électricité…)\\
-\rowcolor{rowalt}
-\texttt{subcategory} & texte & Sous-catégorie NACRES ou type de véhicule\\
-\texttt{unit} & \texttt{euro}, \texttt{km}, \texttt{kWh}… & Unité du facteur d'émission\\
-\rowcolor{rowalt}
-\texttt{total} & kg CO\textsubscript{2}e / unité & Facteur d'émission global (GES agrégés)\\
-\texttt{co2}, \texttt{ch4}, \texttt{n2o}, \texttt{other} & kg eCO\textsubscript{2}/unité & Détail par gaz à effet de serre\\
-\rowcolor{rowalt}
-\texttt{uncertainty} & fraction & Incertitude relative (ex. 0{,}20 = ±20\,\%)\\
-\texttt{meso.ef.kg.co2e.per.euro} & kg CO\textsubscript{2}e / \texteuro & Facteur monétaire utilisé pour \textit{ep} (Achats)\\
-\rowcolor{rowalt}
-\texttt{nacres.description.en} & texte & Description anglaise de la sous-catégorie NACRES\\
-\bottomrule
-\end{tabularx}
-
-\medskip
-\textbf{Répartition des 1\,640 entrées par catégorie :}
 \begin{itemize}
-  \item \textbf{Achats} (1\,466) — une ligne par sous-catégorie NACRES ;
-    le facteur \texttt{meso.ef.kg.co2e.per.euro} est utilisé pour calculer \textit{ep}
-    (émission monétaire = valeur \texteuro{} × ce facteur)
-  \item \textbf{Infra.\ de recherche} (93) — équipements scientifiques partagés
-  \item \textbf{Activités agricoles} (28) — élevage, culture, engrais
-  \item \textbf{Véhicules} (22) — voitures thermiques/électriques en km ;
-    facteur \texttt{total} (kg CO\textsubscript{2}e/km)
-  \item \textbf{Transports} (16) — avion, train, bateau
-  \item \textbf{Électricité} (15) — par pays et région (kWh)
+  \item \texttt{pytest -q}
+  \item \texttt{PRAGMA quick\_check}
+  \item \texttt{PRAGMA foreign\_key\_check}
+  \item audit via \texttt{tools/lab\_admin.py}
 \end{itemize}
-
-\medskip
-\textbf{Utilisation dans le code :}
-\texttt{DataManager.get\_emission\_factor(category, subcategory, subsubcategory, name)}
-filtre ce fichier et retourne le couple (\texttt{total}, \texttt{uncertainty}).
-Pour les \textit{Achats}, le \texttt{Code NACRES} saisi par l'utilisateur est mis en
-correspondance avec la colonne \texttt{subcategory}.
-Ce fichier est en \textbf{lecture seule} — il n'est jamais modifié par l'interface.
-\end{tcolorbox}
-
-\newpage
-
-% ══════════════════════════════════════════════════════════════════════════
-\section{Tableau des interactions inter-fichiers}
-
-\begin{center}
-\begin{tabularx}{\linewidth}{L{3.5cm} L{3.5cm} L{3.0cm} X}
-\toprule
-\textbf{Source} & \textbf{Cible} & \textbf{Colonne clé} & \textbf{Nature du lien}\\
-\midrule
-\texttt{data\_masse} &
-  \texttt{data\_liquides} &
-  \texttt{Facteur liquide source} = \texttt{Produit} &
-  N:1 — plusieurs produits commerciaux partagent le même facteur générique\\
-\rowcolor{rowalt}
-\texttt{data\_masse} &
-  \texttt{data\_matériaux} &
-  \texttt{Matériau consommable /\,emballage /\,conditionnement} = \texttt{Materiau} &
-  N:1 — jusqu'à 5 liens matériaux par produit (consommable, 2\textsuperscript{e} mat., 3\textsuperscript{e} mat., emballage, conditionnement)\\
-\texttt{data\_liquides} &
-  \texttt{data\_matériaux} &
-  \texttt{Matériau contenant /\,emballage} = \texttt{Materiau} &
-  N:1 — optionnel, renseigné si le contenant est connu\\
-\rowcolor{rowalt}
-Tout calcul massique &
-  \texttt{data\_transport} &
-  Origine sélectionnée par l'utilisateur &
-  N:1 — ajouté à toute émission massique\\
-\texttt{data\_masse} &
-  \texttt{data\_base\_GES1point5} &
-  \texttt{Code NACRES} $\rightarrow$ \texttt{subcategory} &
-  N:1 — calcul monétaire via facteur ADEME/GES1.5 par code NACRES\\
-\bottomrule
-\end{tabularx}
-\end{center}
-
-\vspace{0.8cm}
-
-% ══════════════════════════════════════════════════════════════════════════
-\section{Chemins de calcul CO\textsubscript{2}}
-
-Les quatre chemins possibles pour un produit de la catégorie \og{}Achats\fg{} :
-
-\begin{enumerate}[leftmargin=1.5em,itemsep=8pt]
-
-  \item \textbf{Produit commercial liquide}
-    (\texttt{Facteur liquide source} renseigné dans \texttt{data\_masse})\\
-    $em = \underbrace{\rho \times V}_{\mathrm{masse\;kg}} \times f_{\mathrm{CO_2}}^{\mathrm{liq}}
-         + \underbrace{\frac{V}{V_{\mathrm{flacon}}} \times m_{\mathrm{cont.}} \times f_{\mathrm{mat}}}_{\mathrm{contenant\;(si\;renseign\acute{e})}}
-         + \underbrace{m_{\mathrm{kg}} \times f_{\mathrm{transport}}}_{\mathrm{transport}}$
-
-  \item \textbf{Objet discret solide}
-    (matériau défini dans \texttt{data\_masse})\\
-    $em = \sum_i \left( Q \times m_i\,[\mathrm{g}] / 1000 \right) \times f_{\mathrm{CO_2}}^{\mathrm{mat}_i}
-         + m_{\mathrm{total}} \times f_{\mathrm{transport}}$\\
-    La somme porte sur : consommable principal, 2\textsuperscript{e} et 3\textsuperscript{e}
-    matériaux, emballage, conditionnement (proraté).
-
-  \item \textbf{Produit vrac}
-    (masse renseignée, matériau absent)\\
-    $em = Q\,[\mathrm{g}] / 1000 \times f_{\mathrm{custom}}\,[\mathrm{kg\;CO_2/kg}]
-         + m_{\mathrm{kg}} \times f_{\mathrm{transport}}$\\
-    Le facteur $f_{\mathrm{custom}}$ est saisi manuellement par l'utilisateur.
-
-  \item \textbf{Calcul monétaire seul}
-    (aucune donnée masse)\\
-    $ep = V\,[\euro] \times f_{\mathrm{ADEME}}\,[\mathrm{kg\;CO_2/\euro}]$\\
-    Seule l'émission prix \textit{ep} est calculée ; l'émission massique \textit{em} vaut 0.
-
-\end{enumerate}
-
-\vspace{0.6cm}
-\begin{tcolorbox}[
-  colback=labbrownlight, colframe=labbrown, arc=4pt, boxrule=0.8pt
-]
-\faExclamationCircle\quad
-\textbf{Nota :} L'incertitude est propagée quadratiquement sur \textit{em} :
-$\sigma_{em} = \sqrt{\sigma_{e_\mathrm{produit}}^2 + \sigma_{e_\mathrm{transport}}^2}$.
-Elle n'est pas encore propagée sur \textit{ep}.
-\end{tcolorbox}
-
-\vspace{0.6cm}
-
-% ══════════════════════════════════════════════════════════════════════════
-\section{Enrichissement des données}
-
-La fenêtre \og{}Enrichir\fg{} de l'interface permet d'ajouter ou modifier des entrées
-dans \texttt{data\_masse} et \texttt{data\_liquides}.
-Les fichiers de référence \texttt{data\_matériaux} et \texttt{data\_transport}
-sont en \textbf{lecture seule} depuis l'interface.
-
-\begin{center}
-\begin{tabular}{L{5cm}cc}
-\toprule
-\textbf{Fichier} & \textbf{Lecture} & \textbf{Écriture via l'UI}\\
-\midrule
-\texttt{data\_masse}    & \checkmark & \checkmark (onglet Solide)\\
-\texttt{data\_liquides} & \checkmark & \checkmark (onglet Liquide/Facteur)\\
-\texttt{data\_matériaux}& \checkmark & \ding{55}\\
-\texttt{data\_transport}& \checkmark & \ding{55}\\
-\texttt{data\_base\_GES1point5} & \checkmark & \ding{55}\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\vspace{0.4cm}
-Le fichier de référence \texttt{exports/données\_LABeCO2\_reference.xlsx} est une
-\textbf{export lecture seule} des quatre HDF5, régénéré manuellement.
-Il ne participe pas au calcul.
 
 \end{document}

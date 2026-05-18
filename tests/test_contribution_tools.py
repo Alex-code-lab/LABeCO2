@@ -235,6 +235,40 @@ def test_upsert_row_dry_run_does_not_insert(tmp_path):
     conn.close()
 
 
+def test_upsert_row_product_component_without_updated_at_column(tmp_path):
+    db_path = _migrated_db(tmp_path)
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO emission_factors(id, name, name_key, factor_type, status)"
+        " VALUES('ef-component-test','Facteur composant','facteur composant','solid','draft')"
+    )
+    conn.execute(
+        "INSERT INTO materials(id, name, name_key, emission_factor_id, status)"
+        " VALUES('mat-component-test','Matière composant','matiere composant','ef-component-test','draft')"
+    )
+    conn.execute(
+        "INSERT INTO commercial_products(id, name, code_nacres, product_type, status)"
+        " VALUES('prod-component-test','Produit composant','AA01','solid','draft')"
+    )
+    data = {
+        "id": "pc-component-test",
+        "product_id": "prod-component-test",
+        "component_type": "product",
+        "material_id": "mat-component-test",
+        "mass_g": 12.5,
+        "units_divisor": 1,
+    }
+    result = upsert_row(conn, "product_components", data, validate=False, dry_run=False)
+    conn.commit()
+    assert result == "new"
+    row = conn.execute(
+        "SELECT mass_g FROM product_components WHERE id='pc-component-test'"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == 12.5
+    conn.close()
+
+
 def test_import_dependencies_inserts_missing_contributor(tmp_path):
     db_path = _migrated_db(tmp_path)
     conn = sqlite3.connect(db_path)

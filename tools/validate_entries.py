@@ -23,13 +23,13 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from ui.quality_check import check_database, errors as quality_errors
+from ui.validation_ops import reject_entry, reject_liquid_orphans, validate_entry
 
 TABLES = ["emission_factors", "materials", "commercial_products", "transport_factors"]
 
@@ -82,10 +82,6 @@ DETAIL_QUERIES = {
 }
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
 def resolve_contributor(conn: sqlite3.Connection, selector: str) -> dict | None:
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
@@ -130,39 +126,6 @@ def print_detail(conn: sqlite3.Connection, table: str, entry_id: str) -> None:
     for k, v in dict(row).items():
         if v is not None and str(v).strip():
             print(f"    {k}: {v}")
-
-
-def validate_entry(
-    conn: sqlite3.Connection,
-    table: str,
-    entry_id: str,
-    validator_id: str,
-    dry_run: bool,
-) -> None:
-    if dry_run:
-        return
-    conn.execute(
-        f"""UPDATE {table}
-            SET status = 'validated', validated_by_id = ?, validated_at = ?, updated_at = ?
-            WHERE id = ?""",
-        (validator_id, now_iso(), now_iso(), entry_id),
-    )
-
-
-def reject_entry(
-    conn: sqlite3.Connection,
-    table: str,
-    entry_id: str,
-    dry_run: bool,
-) -> None:
-    if dry_run:
-        return
-    conn.execute(
-        f"""UPDATE {table}
-            SET status = 'deprecated', deprecated_at = ?, updated_at = ?
-            WHERE id = ?""",
-        (now_iso(), now_iso(), entry_id),
-    )
 
 
 def main() -> None:
@@ -246,21 +209,11 @@ def main() -> None:
 
     # Traiter les orphelins si demandé
     if args.reject_orphans:
-        orphans = conn.execute("""
-            SELECT id, name FROM commercial_products
-            WHERE product_type = 'liquid'
-              AND (emission_factor_id IS NULL OR emission_factor_id = '')
-              AND status != 'deprecated'
-        """).fetchall()
+        orphans = reject_liquid_orphans(conn, dry_run=args.dry_run)
         if orphans:
             print(f"\n[ORPHELINS] {len(orphans)} produit(s) liquide(s) sans facteur :")
-            for row in orphans:
-                print(f"  {row[1]}")
-                if not args.dry_run:
-                    conn.execute(
-                        "UPDATE commercial_products SET status='deprecated', deprecated_at=? WHERE id=?",
-                        (now_iso(), row[0]),
-                    )
+            for _, name in orphans:
+                print(f"  {name}")
                 stats["rejected"] += 1
 
     print(
