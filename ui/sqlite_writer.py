@@ -482,7 +482,7 @@ def replace_product_components(conn: sqlite3.Connection, product_id: str, row: d
     for component_type, material_col, mass_col, units_divisor in specs:
         material_name = clean_text(row.get(material_col))
         mass_g = float_or_none(row.get(mass_col))
-        if not material_name and mass_g is None:
+        if mass_g is None:
             continue
         material_id = find_material_id(conn, material_name)
         component_id = stable_id(

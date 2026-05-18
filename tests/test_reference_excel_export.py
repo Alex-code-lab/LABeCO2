@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from tools.scraping import migrate_ijm_price_schema as migration
+from tools.migration.scraping import migrate_ijm_price_schema as migration
 
 
 def test_reference_excel_separates_commercial_products_and_emission_factors(tmp_path):

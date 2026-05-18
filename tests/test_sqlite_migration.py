@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
+from tools.migration.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
 from ui.data_manager import DataManager
 
 
@@ -130,6 +130,24 @@ def test_migration_links_true_liquid_product_to_factor(tmp_path):
     assert row["sold_unit_volume_ml"] == 1000.0
     assert row["capacity_volume_ml"] is None
     assert row["emission_factor_id"]
+
+
+def test_migration_skips_massless_duplicate_product_components(tmp_path):
+    db_path = tmp_path / "labeco2.sqlite"
+    migrate_project_to_sqlite(ROOT_DIR, db_path)
+
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT pc.component_type, pc.mass_g
+            FROM commercial_products cp
+            JOIN product_components pc ON pc.product_id = cp.id
+            WHERE cp.name = 'T-25 Tissue Culture Flask, green plug seal cap'
+            ORDER BY pc.rowid
+            """
+        ).fetchall()
+
+    assert [(row["component_type"], row["mass_g"]) for row in rows] == [("product", 20.9)]
 
 
 def test_migration_reports_known_data_quality_issues(tmp_path):

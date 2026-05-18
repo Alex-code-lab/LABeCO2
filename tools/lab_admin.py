@@ -583,7 +583,7 @@ def main() -> None:
     db_path = Path(args.db)
     if not db_path.exists():
         print(f"Base introuvable : {db_path}", file=sys.stderr)
-        print("Créez d'abord la base avec : python tools/migrate_hdf5_to_sqlite.py", file=sys.stderr)
+        print("Créez d'abord la base avec : python tools/migration/migrate_hdf5_to_sqlite.py", file=sys.stderr)
         sys.exit(1)
 
     app = QApplication.instance() or QApplication(sys.argv)

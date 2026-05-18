@@ -551,7 +551,7 @@ def migrate_materials(ctx: MigrationContext, df: pd.DataFrame, dm: DataManager) 
 
 
 def migrate_catalogue_ijm(ctx: MigrationContext, base_path: Path) -> None:
-    path = base_path / "tools" / "scraping" / "output" / "prix_ijm_2025.csv"
+    path = base_path / "tools" / "migration" / "scraping" / "output" / "prix_ijm_2025.csv"
     if not path.exists():
         return
     df = pd.read_csv(path, dtype=str)
@@ -612,6 +612,14 @@ def migrate_product_components(
         mass_g = float_or_none(row.get(mass_col))
         if not material_name and mass_g is None:
             continue
+        if mass_g is None:
+            ctx.report.incomplete_components.append({
+                "product": clean_text(row.get(dm.CONSOMMABLE_COL, "")),
+                "material": material_name,
+                "mass_g": clean_text(row.get(mass_col, "")),
+                "component_type": component_type,
+            })
+            continue
         material_id = ctx.materials_by_key.get(normalize_key(material_name))
         if material_name and material_id is None:
             ctx.report.unresolved_materials.append({
@@ -619,7 +627,7 @@ def migrate_product_components(
                 "material": material_name,
                 "component_type": component_type,
             })
-        if material_id is None or mass_g is None:
+        if material_id is None:
             ctx.report.incomplete_components.append({
                 "product": clean_text(row.get(dm.CONSOMMABLE_COL, "")),
                 "material": material_name,

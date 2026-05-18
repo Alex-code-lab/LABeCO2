@@ -21,9 +21,11 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
+from ui.validation_details import format_entry_detail
 
 _BLACK = QColor(0, 0, 0)
 
@@ -116,11 +118,11 @@ TABLES_META = {
             SELECT cp.id, cp.status AS "Statut", cp.name AS "Nom", cp.code_nacres AS "NACRES",
                    cp.product_type AS "Type", cp.price_sold_packaging AS "Prix (€)",
                    CASE WHEN cp.product_type = 'liquid'
-                        THEN COALESCE(ef.name, '⚠ manquant')
-                        ELSE NULL
-                   END AS "Facteur direct",
+                        THEN COALESCE(ef.name, 'À relier')
+                        ELSE ''
+                   END AS "Facteur liquide",
                    (SELECT COUNT(*) FROM product_components pc
-                    WHERE pc.product_id = cp.id) AS "Composants",
+                    WHERE pc.product_id = cp.id AND pc.mass_g IS NOT NULL) AS "Composants",
                    s.title AS "Source",
                    c.name AS "Ajouté par", v.name AS "Validé par",
                    cp.created_at AS "Créé le"
@@ -239,7 +241,15 @@ class ValidateWidget(QWidget):
             QHeaderView.ResizeMode.ResizeToContents
         )
         self.table_widget.horizontalHeader().setStretchLastSection(True)
+        self.table_widget.itemSelectionChanged.connect(self._show_selected_detail)
         root.addWidget(self.table_widget)
+
+        self.detail_view = QTextEdit()
+        self.detail_view.setReadOnly(True)
+        self.detail_view.setMaximumHeight(180)
+        self.detail_view.setPlaceholderText("Sélectionnez une ligne pour voir le détail.")
+        self.detail_view.setFont(QFont("Courier", 10))
+        root.addWidget(self.detail_view)
 
         # Sélection
         sel_bar = QHBoxLayout()
@@ -357,6 +367,7 @@ class ValidateWidget(QWidget):
             self._load_single(conn, selected_key)
 
         conn.close()
+        self.detail_view.clear()
         self.table_widget.itemChanged.connect(self._on_item_changed)
         self._filter_rows(self.search_edit.text())
         self._update_sel_count()
@@ -514,6 +525,24 @@ class ValidateWidget(QWidget):
             if item and item.checkState() == Qt.CheckState.Checked:
                 result.append(item.data(Qt.ItemDataRole.UserRole))
         return result
+
+    def _show_selected_detail(self) -> None:
+        current_row = self.table_widget.currentRow()
+        if current_row < 0:
+            self.detail_view.clear()
+            return
+        item = self.table_widget.item(current_row, 0)
+        if not item:
+            self.detail_view.clear()
+            return
+        table, entry_id = item.data(Qt.ItemDataRole.UserRole)
+        try:
+            conn = sqlite3.connect(self.sqlite_path)
+            detail = format_entry_detail(conn, table, entry_id)
+            conn.close()
+        except Exception as e:
+            detail = f"Impossible de charger le détail : {e}"
+        self.detail_view.setPlainText(detail)
 
     # ------------------------------------------------------------------
     # Résolution du validateur (existant ou création à la volée)

@@ -239,6 +239,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             m.name AS material_name
         FROM product_components pc
         LEFT JOIN materials m ON m.id = pc.material_id
+        WHERE pc.mass_g IS NOT NULL
         ORDER BY pc.rowid
         """,
     )

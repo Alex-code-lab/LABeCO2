@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from utils.data_loader import (
     SQLITE_PATH_ENV_VAR,
-    SQLITE_USE_HDF5_ENV_VAR,
     resolve_sqlite_path,
 )
 
@@ -29,10 +28,3 @@ def test_resolve_sqlite_path_creates_missing_explicit_database(tmp_path, monkeyp
     with sqlite3.connect(sqlite_path) as conn:
         count = conn.execute("SELECT COUNT(*) FROM commercial_products").fetchone()[0]
     assert count > 900
-
-
-def test_resolve_sqlite_path_can_force_hdf5_mode(tmp_path, monkeypatch):
-    monkeypatch.setenv(SQLITE_PATH_ENV_VAR, str(tmp_path / "startup.sqlite"))
-    monkeypatch.setenv(SQLITE_USE_HDF5_ENV_VAR, "1")
-
-    assert resolve_sqlite_path(ROOT_DIR, ROOT_DIR) is None

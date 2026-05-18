@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du mécanisme de révision : _prepare_revision + upsert sur entrée validée."""
 
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
@@ -8,8 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
 from ui.sqlite_writer import _prepare_revision, upsert_liquid_factor, upsert_material_factor
+
+_REFERENCE_DB = ROOT / "data" / "labeco2_reference.sqlite"
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +38,7 @@ def _minimal_db() -> sqlite3.Connection:
 
 def _migrated_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "labeco2.sqlite"
-    migrate_project_to_sqlite(ROOT, db_path)
+    shutil.copy(_REFERENCE_DB, db_path)
     return db_path
 
 

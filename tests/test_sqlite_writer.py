@@ -2,13 +2,13 @@
 """Tests des écritures SQLite utilisées par les formulaires."""
 
 import os
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
 from ui.data_manager import DataManager
 from ui.sqlite_writer import (
     upsert_commercial_product,
@@ -18,11 +18,12 @@ from ui.sqlite_writer import (
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+_REFERENCE_DB = ROOT_DIR / "data" / "labeco2_reference.sqlite"
 
 
 def _migrated_db(tmp_path):
     db_path = tmp_path / "labeco2.sqlite"
-    migrate_project_to_sqlite(ROOT_DIR, db_path)
+    shutil.copy(_REFERENCE_DB, db_path)
     return db_path
 
 
@@ -112,6 +113,35 @@ def test_sqlite_writer_updates_existing_product_without_duplicate(tmp_path):
     assert statuses[product_id] == "deprecated"
     assert statuses[new_id] == "draft"
     assert prices[new_id] == 55
+
+
+def test_sqlite_writer_skips_components_without_mass(tmp_path):
+    db_path = _migrated_db(tmp_path)
+    product_id = upsert_commercial_product(
+        db_path,
+        {
+            "Consommable": "Produit sans masse composant",
+            "Marque": "Marque test",
+            "Référence": "REF-SQL-NOMASS",
+            "Catégorie": "Consommable",
+            "Code NACRES": "AA01",
+            "Matériau consommable": "Polypropylène (PP)",
+            "Matériau conditionnement": "Papier",
+            "Nbr par conditionnement": 50,
+            "Prix du conditionnement": 12,
+            "Source": "Source test",
+            "Signature": "Equipe test",
+            "date d'ajout": "2026-05-18",
+        },
+    )
+
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM product_components WHERE product_id = ?",
+            (product_id,),
+        ).fetchone()[0]
+
+    assert count == 0
 
 
 def test_sqlite_writer_adds_material_factor(tmp_path):

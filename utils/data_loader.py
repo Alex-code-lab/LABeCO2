@@ -12,12 +12,6 @@ import pandas as pd
 from PySide6.QtGui import QPixmap
 
 SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
-SQLITE_USE_HDF5_ENV_VAR = "LABECO2_USE_HDF5"
-SQLITE_DISABLE_ENV_VAR = "LABECO2_DISABLE_SQLITE"
-
-
-def _env_truthy(value):
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on", "oui"}
 
 
 def get_user_data_path():
@@ -52,33 +46,19 @@ def get_default_sqlite_path(user_path=None):
 
 
 def resolve_sqlite_path(base_path, user_path=None):
-    """
-    Résout la base SQLite à utiliser au démarrage.
-
-    Par défaut, SQLite devient la source applicative. Pour forcer l'ancien mode
-    HDF5, définir LABECO2_USE_HDF5=1 ou LABECO2_DISABLE_SQLITE=1.
-    """
-    force_hdf5 = (
-        _env_truthy(os.environ.get(SQLITE_USE_HDF5_ENV_VAR))
-        or _env_truthy(os.environ.get(SQLITE_DISABLE_ENV_VAR))
-    )
-    if force_hdf5:
-        return None
-
+    """Résout la base SQLite à utiliser au démarrage."""
     user_path = user_path if user_path is not None else get_user_data_path()
     sqlite_path = os.environ.get(SQLITE_PATH_ENV_VAR) or get_default_sqlite_path(user_path)
     if not os.path.exists(sqlite_path):
-        create_sqlite_from_hdf5(base_path, user_path, sqlite_path)
+        _bootstrap_sqlite(base_path, sqlite_path)
     return sqlite_path
 
 
-def create_sqlite_from_hdf5(base_path, user_path, sqlite_path):
-    """Crée une base SQLite initiale depuis les HDF5 historiques."""
-    from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
-
+def _bootstrap_sqlite(base_path, sqlite_path):
+    """Copie la base de référence pour initialiser une nouvelle installation."""
+    reference = os.path.join(base_path, "data", "labeco2_reference.sqlite")
     os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
-    migrate_project_to_sqlite(base_path, sqlite_path, user_path=user_path)
-    return sqlite_path
+    shutil.copy(reference, sqlite_path)
 
 
 def init_user_data():

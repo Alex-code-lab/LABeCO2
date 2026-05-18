@@ -2,21 +2,22 @@
 """Tests de lecture applicative depuis la base SQLite migrée."""
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
 from ui.data_manager import DataManager
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+_REFERENCE_DB = ROOT_DIR / "data" / "labeco2_reference.sqlite"
 
 
 def _sqlite_data_manager(tmp_path):
     db_path = tmp_path / "labeco2.sqlite"
-    migrate_project_to_sqlite(ROOT_DIR, db_path)
+    shutil.copy(_REFERENCE_DB, db_path)
     return DataManager(str(ROOT_DIR), user_path=str(ROOT_DIR), sqlite_path=db_path)
 
 
@@ -32,7 +33,7 @@ def test_data_manager_can_load_legacy_frames_from_sqlite(tmp_path):
 
 def test_data_manager_can_use_sqlite_env_var(tmp_path, monkeypatch):
     db_path = tmp_path / "labeco2.sqlite"
-    migrate_project_to_sqlite(ROOT_DIR, db_path)
+    shutil.copy(_REFERENCE_DB, db_path)
     monkeypatch.setenv(DataManager.SQLITE_ENV_VAR, str(db_path))
 
     dm = DataManager(str(ROOT_DIR), user_path=str(ROOT_DIR))

@@ -1026,6 +1026,7 @@ class MainWindow(QMainWindow):
         self.conso_search_field.textChanged.connect(
             lambda text: self.update_conso_filtered_combo(filter_text=text)
         )
+        self.conso_search_field.textChanged.connect(self.update_subsubcategory_names)
         self.search_field.textChanged.connect(self.on_search_text_changed)
         self.reset_search_button.clicked.connect(self.reset_search_fields)
         self.subsub_name_combo.currentIndexChanged.connect(self.update_years)
@@ -1159,8 +1160,12 @@ class MainWindow(QMainWindow):
         subsubcategory, _ = self.split_subsub_name(subsub_name)
         return normalize_nacres_prefix(subsubcategory or subsub_name)
 
-    def _consumable_code_prefixes(self):
-        """Codes NACRES pour lesquels la base consommables contient au moins un produit."""
+    def _consumable_code_prefixes(self, filter_text: str | None = None) -> set:
+        """Codes NACRES pour lesquels la base consommables contient au moins un produit.
+
+        Si filter_text est fourni, seuls les codes dont au moins un consommable
+        correspond au filtre sont inclus.
+        """
         prefixes = set()
         df = self.data_masse
         if df is None or df.empty:
@@ -1171,11 +1176,17 @@ class MainWindow(QMainWindow):
         ):
             return prefixes
 
+        norm_filter = normalize_search(filter_text) if filter_text else None
         for _, row in df.iterrows():
             consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
             prefix = normalize_nacres_prefix(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            if consommable and prefix:
-                prefixes.add(prefix)
+            if not consommable or not prefix:
+                continue
+            if norm_filter:
+                haystack = normalize_search(f"{prefix} {consommable}")
+                if norm_filter not in haystack:
+                    continue
+            prefixes.add(prefix)
         return prefixes
 
     def _nacres_prefix_has_consumables(self, code_nacres):
@@ -1858,7 +1869,14 @@ class MainWindow(QMainWindow):
                 for _, _, data in entries
                 if normalize_nacres_prefix(data["subsubcategory"])
             }
-            for prefix in sorted(self._consumable_code_prefixes() - existing_prefixes):
+            conso_filter = (
+                self.conso_search_field.text()
+                if self.conso_search_field is not None else None
+            )
+            available_prefixes = self._consumable_code_prefixes(
+                filter_text=conso_filter or None
+            )
+            for prefix in sorted(available_prefixes - existing_prefixes):
                 row = self._purchase_factor_row_for_nacres(prefix)
                 if row is not None:
                     add_subsub_entry(row)
@@ -2118,6 +2136,13 @@ class MainWindow(QMainWindow):
         du code NACRES, et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
         Affiche la barre "Quantité" si un consommable valide est sélectionné.
         """
+        # Réinitialiser les champs de valeur à chaque changement de consommable
+        for field in (self.input_field, self.quantity_input):
+            if field is not None:
+                field.blockSignals(True)
+                field.clear()
+                field.blockSignals(False)
+
         selected = self._selected_consumable_data()
         if not selected:
             has_nacres_code = bool(self._selected_nacres_prefix())

@@ -2,14 +2,15 @@
 """Tests des outils export/import de contribution JSON."""
 
 import json
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+_REFERENCE_DB = ROOT / "data" / "labeco2_reference.sqlite"
 
-from tools.migrate_hdf5_to_sqlite import migrate_project_to_sqlite
 from tools.export_contribution import (
     collect_dependencies,
     collect_product_components,
@@ -29,7 +30,7 @@ from tools.import_contribution import (
 
 def _migrated_db(tmp_path: Path) -> Path:
     db_path = tmp_path / "labeco2.sqlite"
-    migrate_project_to_sqlite(ROOT, db_path)
+    shutil.copy(_REFERENCE_DB, db_path)
     return db_path
 
 
@@ -285,7 +286,7 @@ def test_roundtrip_export_import(tmp_path):
     """Export des emission_factors d'une base, import dans une base vide."""
     src_db = _migrated_db(tmp_path)
     dst_db = tmp_path / "dst.sqlite"
-    migrate_project_to_sqlite(ROOT, dst_db)
+    shutil.copy(_REFERENCE_DB, dst_db)
 
     with _open(src_db) as conn:
         rows = export_table(conn, "emission_factors", "", [], "IN ('draft', 'validated')")

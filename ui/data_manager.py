@@ -263,7 +263,7 @@ class DataManager:
         Retourne un DataFrame vide si absent.
         """
         candidates = [
-            os.path.join(self.base_path, "tools", "scraping", "output", "prix_ijm_2025.csv"),
+            os.path.join(self.base_path, "tools", "migration", "scraping", "output", "prix_ijm_2025.csv"),
             os.path.join(self.base_path, "data_prix", "prix_ijm_2025.csv"),
         ]
         for path in candidates:
