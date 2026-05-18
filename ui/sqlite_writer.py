@@ -17,6 +17,13 @@ from ui.display_utils import (
     looks_like_liquid_commercial_product,
     normalize_nacres_prefix,
 )
+from ui.quality_check import (
+    check_commercial_product,
+    check_liquid_factor,
+    check_material_factor,
+    errors as quality_errors,
+    format_issues,
+)
 from ui.sqlite_legacy_adapter import SQLITE_ID_COL
 
 
@@ -168,6 +175,9 @@ def upsert_material_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -
     name = clean_text(row.get("Materiau"))
     if not name:
         raise ValueError("Nom du matériau manquant.")
+    errs = quality_errors(check_material_factor(row))
+    if errs:
+        raise ValueError(format_issues(errs))
     name_key = normalize_key(name)
     factor_id = stable_id("emission_factors", "material", name_key)
     material_id = stable_id("materials", name_key)
@@ -233,6 +243,9 @@ def upsert_liquid_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -> 
     name = clean_text(row.get("Produit"))
     if not name:
         raise ValueError("Nom du liquide / solvant manquant.")
+    errs = quality_errors(check_liquid_factor(row))
+    if errs:
+        raise ValueError(format_issues(errs))
     name_key = normalize_key(name)
     code = normalize_nacres_prefix(row.get("Code NACRES"))
     factor_id = stable_id("emission_factors", "liquid", name_key)
@@ -301,6 +314,9 @@ def upsert_commercial_product_conn(
     name = clean_text(row.get("Consommable"))
     if not name:
         raise ValueError("Nom du consommable manquant.")
+    errs = quality_errors(check_commercial_product(row))
+    if errs:
+        raise ValueError(format_issues(errs))
     code = normalize_nacres_prefix(row.get("Code NACRES"))
     reference = text_or_none(row.get("Référence"))
     product_id = existing_id or clean_text(row.get(SQLITE_ID_COL)) or find_existing_product_id(conn, row)

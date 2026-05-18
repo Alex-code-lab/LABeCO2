@@ -21,6 +21,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from ui.quality_check import check_database, errors as quality_errors, format_issues
 
 TABLES_ORDER = [
     "contributors",
@@ -221,6 +224,19 @@ def main() -> None:
     if args.dry_run:
         conn.close()
         return
+
+    # Rapport qualité sur les nouvelles entrées avant commit
+    db_issues = quality_errors(check_database(conn))
+    if db_issues:
+        print(f"\n[QUALITÉ] {len(db_issues)} erreur(s) bloquante(s) détectée(s) après import :")
+        print(format_issues(db_issues))
+        if not args.yes:
+            answer = input("\nCes erreurs sont présentes. Annuler l'import ? [O/n] ").strip().lower()
+            if answer not in ("n", "non", "no"):
+                conn.rollback()
+                conn.close()
+                print("Annulé.")
+                return
 
     if not args.yes:
         answer = input("\nAppliquer ces modifications ? [o/N] ").strip().lower()

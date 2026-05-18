@@ -20,6 +20,9 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from ui.quality_check import check_database, QualityIssue
 DEFAULT_DB = ROOT / "private" / "labeco2.sqlite"
 DEFAULT_OUT = ROOT / "exports" / "données_LABeCO2_reference.xlsx"
 
@@ -183,111 +186,24 @@ def sheet_catalogue_ijm(conn: sqlite3.Connection) -> pd.DataFrame:
     """)
 
 
+_SEVERITY_FR = {"ERROR": "ERREUR", "WARNING": "AVERTISSEMENT", "INFO": "INFO"}
+
+
 def sheet_quality(conn: sqlite3.Connection) -> pd.DataFrame:
-    """Feuille de contrôles qualité : anomalies détectées dans la base."""
-    rows = []
-
-    # Produits liquides sans facteur d'émission
-    df = query(conn, """
-        SELECT name, code_nacres, status
-        FROM commercial_products
-        WHERE product_type = 'liquid' AND (emission_factor_id IS NULL OR emission_factor_id = '')
-        ORDER BY code_nacres, name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "ERREUR",
-            "Table": "commercial_products",
-            "Problème": "Produit liquide sans facteur d'émission",
-            "Entrée": r["name"],
-            "Code NACRES": r.get("code_nacres", ""),
-            "Statut": r.get("status", ""),
-        })
-
-    # Produits commerciaux en draft
-    df = query(conn, """
-        SELECT name, code_nacres FROM commercial_products WHERE status = 'draft'
-        ORDER BY code_nacres, name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "INFO",
-            "Table": "commercial_products",
-            "Problème": "Entrée en statut draft (non validée)",
-            "Entrée": r["name"],
-            "Code NACRES": r.get("code_nacres", ""),
-            "Statut": "draft",
-        })
-
-    # Facteurs d'émission en draft
-    df = query(conn, """
-        SELECT name, factor_type FROM emission_factors WHERE status = 'draft'
-        ORDER BY factor_type, name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "INFO",
-            "Table": "emission_factors",
-            "Problème": "Facteur en statut draft (non validé)",
-            "Entrée": r["name"],
-            "Code NACRES": "",
-            "Statut": "draft",
-        })
-
-    # Facteurs sans source
-    df = query(conn, """
-        SELECT name, factor_type FROM emission_factors
-        WHERE source_id IS NULL OR source_id = ''
-        ORDER BY name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "AVERTISSEMENT",
-            "Table": "emission_factors",
-            "Problème": "Facteur sans source documentée",
-            "Entrée": r["name"],
-            "Code NACRES": "",
-            "Statut": "",
-        })
-
-    # Doublons suspects (même name_key + code_nacres pour les produits commerciaux)
-    df = query(conn, """
-        SELECT name, code_nacres, COUNT(*) AS n
-        FROM commercial_products
-        GROUP BY lower(trim(name)), code_nacres
-        HAVING n > 1
-        ORDER BY n DESC, name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "AVERTISSEMENT",
-            "Table": "commercial_products",
-            "Problème": f"Doublon probable ({int(r['n'])} occurrences)",
-            "Entrée": r["name"],
-            "Code NACRES": r.get("code_nacres", ""),
-            "Statut": "",
-        })
-
-    # Facteur CO2 aberrant (< 0 ou > 100)
-    df = query(conn, """
-        SELECT name, factor_type, co2_factor FROM emission_factors
-        WHERE co2_factor IS NOT NULL AND (co2_factor < 0 OR co2_factor > 100)
-        ORDER BY name
-    """)
-    for _, r in df.iterrows():
-        rows.append({
-            "Sévérité": "AVERTISSEMENT",
-            "Table": "emission_factors",
-            "Problème": f"Facteur CO₂ aberrant : {r['co2_factor']} kg CO₂e/kg",
-            "Entrée": r["name"],
-            "Code NACRES": "",
-            "Statut": "",
-        })
-
-    cols = ["Sévérité", "Table", "Problème", "Entrée", "Code NACRES", "Statut"]
-    if not rows:
-        return pd.DataFrame(columns=cols)
-    return pd.DataFrame(rows)[cols]
+    """Feuille de contrôles qualité générée depuis ui.quality_check."""
+    issues = check_database(conn)
+    rows = [
+        {
+            "Sévérité": _SEVERITY_FR.get(i.severity, i.severity),
+            "Table": i.table,
+            "Problème": i.message,
+            "Entrée": i.entry,
+            "Détail": i.detail,
+        }
+        for i in issues
+    ]
+    cols = ["Sévérité", "Table", "Problème", "Entrée", "Détail"]
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
 
 
 def main() -> None:
