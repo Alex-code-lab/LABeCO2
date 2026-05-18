@@ -624,7 +624,7 @@ def migrate_reference_source_signature_columns(path: Path) -> pd.DataFrame:
         changed = True
     if changed:
         backup_before_source_signature_split(path)
-        df.to_hdf(path, key="data", mode="w", complevel=5)
+        df.to_hdf(path, key="data", mode="w")
     return df
 
 

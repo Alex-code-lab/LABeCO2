@@ -77,6 +77,8 @@ def test_sqlite_writer_adds_liquid_factor_and_linked_commercial_product(tmp_path
 
 
 def test_sqlite_writer_updates_existing_product_without_duplicate(tmp_path):
+    """Modifier un produit validé crée une révision draft + déprécie l'original.
+    Le résultat attendu : 2 lignes (1 deprecated + 1 draft avec le nouveau prix)."""
     db_path = _migrated_db(tmp_path)
     row = {
         "Consommable": "Produit solide test SQLite",
@@ -96,19 +98,20 @@ def test_sqlite_writer_updates_existing_product_without_duplicate(tmp_path):
     product_id = upsert_commercial_product(db_path, row)
     updated = dict(row)
     updated["Prix du conditionnement"] = 55
-    upsert_commercial_product(db_path, updated, existing_id=product_id)
+    new_id = upsert_commercial_product(db_path, updated, existing_id=product_id)
 
     with sqlite3.connect(db_path) as conn:
-        count, price = conn.execute(
-            """
-            SELECT COUNT(*), MAX(price_sold_packaging)
-            FROM commercial_products
-            WHERE reference = 'REF-SQL-SOLID'
-            """
-        ).fetchone()
+        rows = conn.execute(
+            "SELECT id, status, price_sold_packaging FROM commercial_products"
+            " WHERE reference = 'REF-SQL-SOLID'"
+        ).fetchall()
 
-    assert count == 1
-    assert price == 55
+    assert len(rows) == 2, "Attendu : 1 deprecated + 1 draft (révision)"
+    statuses = {r[0]: r[1] for r in rows}
+    prices = {r[0]: r[2] for r in rows}
+    assert statuses[product_id] == "deprecated"
+    assert statuses[new_id] == "draft"
+    assert prices[new_id] == 55
 
 
 def test_sqlite_writer_adds_material_factor(tmp_path):
