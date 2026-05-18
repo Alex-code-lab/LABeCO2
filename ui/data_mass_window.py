@@ -599,8 +599,11 @@ class DataMassWindow(QMainWindow):
             for _, row in self.data_liquids.iterrows():
                 name = str(row.get("Produit", "") or "").strip()
                 code = str(row.get("Code NACRES", "") or "").strip()[:4]
+                factor_id = str(row.get("factor_id", "") or "").strip()
                 if name:
-                    self.liquid_factor_combo.addItem(f"{name} ({code})", name)
+                    self.liquid_factor_combo.addItem(
+                        f"{name} ({code})", {"factor_id": factor_id, "name": name}
+                    )
         self.liquid_factor_combo.currentIndexChanged.connect(self.on_commercial_liquid_factor_selected)
         self.manual_liquid_factor_name_input = QLineEdit()
         self.manual_liquid_factor_name_input.setPlaceholderText("ex: Acétone, Éthanol, DMEM...")
@@ -1212,11 +1215,17 @@ class DataMassWindow(QMainWindow):
         nbr_cond     = self.nbr_cond_input.text().strip()
         price_text   = self.price_input.text().strip()
         liquid_factor_source = ""
+        liquid_factor_id = ""
         liquid_volume = ""
         manual_liquid_factor = self.is_manual_liquid_factor_selected()
         manual_liquid_factor_name = self.manual_liquid_factor_name_input.text().strip()
         if is_liquid_consumable:
-            liquid_factor_source = self.liquid_factor_combo.currentData() or ""
+            combo_data = self.liquid_factor_combo.currentData()
+            if isinstance(combo_data, dict):
+                liquid_factor_source = combo_data.get("name", "") or ""
+                liquid_factor_id = combo_data.get("factor_id", "") or ""
+            else:
+                liquid_factor_source = combo_data or ""
             liquid_volume = self.solid_liquid_volume_input.text().strip().replace(',', '.')
         lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
@@ -1411,9 +1420,12 @@ class DataMassWindow(QMainWindow):
                     "date d'ajout": date.today().isoformat(),
                     "Note": lien_note,
                 }
-                if self.save_liquid(manual_factor_row) is False:
+                saved_factor_id = self.save_liquid(manual_factor_row)
+                if saved_factor_id is False:
                     return
                 liquid_factor_source = manual_liquid_factor_name
+                if saved_factor_id and saved_factor_id is not True:
+                    liquid_factor_id = str(saved_factor_id)
 
             nouvel_objet = {col: "" for col in self.columns}
             if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
@@ -1441,6 +1453,7 @@ class DataMassWindow(QMainWindow):
                 "Unité liquide": "mL" if is_liquid_consumable else "",
                 "Volume flacon (mL)": liquid_volume,
                 "Facteur liquide source": liquid_factor_source,
+                "emission_factor_id": liquid_factor_id,
                 "date d'ajout": date.today().isoformat(),
                 "Lien / Note / Remarque": lien_note,
                 "Source": source,
@@ -1525,12 +1538,12 @@ class DataMassWindow(QMainWindow):
         """Ajoute une ligne au fichier HDF5 des liquides."""
         if self._uses_sqlite():
             try:
-                upsert_liquid_factor(self.sqlite_path, obj_dict)
+                factor_uuid = upsert_liquid_factor(self.sqlite_path, obj_dict)
                 self._prefill_liq_produit = None
                 self.data_liquids = self.load_liquid_df()
                 if self.current_mode() == self.MODE_LIQUID_FACTOR:
                     self.afficher_donnees()
-                return True
+                return factor_uuid
             except Exception as e:
                 QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le liquide dans SQLite : {e}")
                 return False

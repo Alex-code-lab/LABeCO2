@@ -312,10 +312,12 @@ def upsert_commercial_product_conn(
     volume_ml = float_or_none(row.get("Volume flacon (mL)"))
     sold_unit_volume_ml = volume_ml if is_liquid else None
     capacity_volume_ml = volume_ml if not is_liquid else None
-    factor_id = (
-        find_liquid_factor_id(conn, row.get("Facteur liquide source"), code)
-        if is_liquid else None
-    )
+    if is_liquid:
+        factor_id = text_or_none(row.get("emission_factor_id")) or find_liquid_factor_id(
+            conn, row.get("Facteur liquide source"), code
+        )
+    else:
+        factor_id = None
     contributor_id, source_id = contributor_and_source(conn, row)
     catalogue_id = find_catalogue_id(conn, row.get("code_ijm"))
     conn.execute(
