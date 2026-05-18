@@ -8,6 +8,7 @@ import os
 import sys
 import html
 import re
+import logging
 from datetime import date
 import pandas as pd
 from PySide6.QtWidgets import (
@@ -18,6 +19,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QDoubleValidator, QIntValidator
+from ui.display_utils import looks_like_liquid_commercial_product
+
+logger = logging.getLogger(__name__)
+
 
 class DataMassWindow(QMainWindow):
     data_added = Signal()
@@ -715,7 +720,7 @@ class DataMassWindow(QMainWindow):
 
     def load_nacres_list(self):
         if not os.path.exists(self.nacres_hdf5_file):
-            print(f"[INFO] Fichier '{self.nacres_hdf5_file}' introuvable.")
+            logger.info("Fichier NACRES introuvable : %s", self.nacres_hdf5_file)
             return
 
         try:
@@ -727,7 +732,7 @@ class DataMassWindow(QMainWindow):
                 self._all_nacres.append((code, desc))
             self.filter_nacres_list()
         except Exception as e:
-            print(f"[ERROR] Impossible de charger la liste NACRES: {e}")
+            logger.exception("Impossible de charger la liste NACRES : %s", e)
 
     def load_liquid_df(self):
         if os.path.exists(self.hdf5_liquids):
@@ -1819,11 +1824,7 @@ class DataMassWindow(QMainWindow):
 
         if not rows.empty:
             row = rows.iloc[0]
-            is_liquid_product = bool(
-                _clean_value(row.get("Facteur liquide source", "")) or
-                _clean_value(row.get("Unité liquide", "")) or
-                _clean_value(row.get("Volume flacon (mL)", ""))
-            )
+            is_liquid_product = looks_like_liquid_commercial_product(row)
             if is_liquid_product:
                 _set_mode(self.MODE_LIQUID_CONSUMABLE)
             self.prefill_row_index = rows.index[0]

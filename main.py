@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-late
+# SPDX-License-Identifier: GPL-3.0-or-later
 # main.py, LABeCO2 ©
 # Copyright (c), 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
 # Auteur : Alexandre Souchaud — labeco2.contact@gmail.com
@@ -15,6 +15,7 @@ import sys
 import os
 import traceback
 import multiprocessing
+import logging
 
 from PySide6.QtWidgets import QApplication, QSplashScreen
 from PySide6.QtGui import QIcon, QPixmap
@@ -23,12 +24,15 @@ from PySide6.QtCore import Qt
 from ui.main_window import MainWindow
 from utils.data_loader import resource_path
 
+logger = logging.getLogger(__name__)
+
 
 def main():
-    print("\n===== Démarrage de l'application LABeCO2 =====")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+    logger.info("Démarrage de l'application LABeCO2")
     try:
         app = QApplication(sys.argv)
-        print("QApplication créée")
+        logger.info("QApplication créée")
 
         # Splash screen
         splash = None
@@ -39,57 +43,54 @@ def main():
             splash.showMessage("Chargement de LABeCO2...", Qt.AlignBottom | Qt.AlignCenter, Qt.white)
             splash.show()
             app.processEvents()
-            print("SplashScreen affiché")
+            logger.info("SplashScreen affiché")
         except Exception as e:
-            print("Erreur lors du splashscreen :", e)
+            logger.warning("Erreur lors du splashscreen : %s", e)
 
         # Appliquer le style QSS
         try:
             qss_path = resource_path(os.path.join("styles", "styles.qss"))
             if os.path.exists(qss_path):
-                with open(qss_path, "r") as f:
+                with open(qss_path, "r", encoding="utf-8") as f:
                     app.setStyleSheet(f.read())
-                print("QSS appliqué")
+                logger.info("QSS appliqué")
         except Exception as e:
-            print("Erreur QSS :", e)
+            logger.warning("Erreur QSS : %s", e)
 
         # Appliquer l'icône
         try:
             icon_path = resource_path(os.path.join("assets", "icon.icns"))
             if os.path.exists(icon_path):
                 app.setWindowIcon(QIcon(icon_path))
-                print("Icône appliquée")
+                logger.info("Icône appliquée")
         except Exception as e:
-            print("Erreur icône :", e)
+            logger.warning("Erreur icône : %s", e)
 
         # Créer la fenêtre principale
         try:
-            print("Création de MainWindow…")
+            logger.info("Création de MainWindow")
             window = MainWindow()
             window.show()
             if splash:
                 splash.finish(window)
             window.raise_()
             window.activateWindow()
-            print("MainWindow affichée")
-            sys.exit(app.exec())
+            logger.info("MainWindow affichée")
+            return app.exec()
         except Exception as e:
-            print("Erreur dans MainWindow :", e)
-            traceback.print_exc()
-            input("Appuyez sur Entrée pour quitter...")
-            sys.exit(1)
+            logger.exception("Erreur dans MainWindow : %s", e)
+            return 1
 
     except Exception as e:
-        print("Erreur globale :", e)
+        logger.exception("Erreur globale : %s", e)
         traceback.print_exc()
-        input("Appuyez sur Entrée pour quitter...")
+        return 1
 
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     try:
-        main()
+        sys.exit(main())
     except Exception:
-        print("\nErreur globale :")
-        traceback.print_exc()
-        input("Appuyez sur Entrée pour quitter…")
+        logger.exception("Erreur globale non interceptée")
+        sys.exit(1)

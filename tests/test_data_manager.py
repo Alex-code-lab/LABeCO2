@@ -232,8 +232,10 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
 
 class TestIsLiquidCommercialRow(unittest.TestCase):
 
-    def _row(self, facteur='', unite='', volume=0):
+    def _row(self, facteur='', unite='', volume=0, code='', nom=''):
         return pd.Series({
+            DataManager.CODE_NACRES_COL: code,
+            DataManager.CONSOMMABLE_COL: nom,
             DataManager.FACTEUR_LIQUIDE_SOURCE_COL: facteur,
             DataManager.UNITE_LIQUIDE_COL:          unite,
             DataManager.VOLUME_FLACON_COL:          volume,
@@ -243,9 +245,21 @@ class TestIsLiquidCommercialRow(unittest.TestCase):
         dm = _make_dm()
         self.assertFalse(dm.is_liquid_commercial_row(None))
 
-    def test_volume_positif_retourne_true(self):
+    def test_volume_positif_seul_retourne_false(self):
         dm = _make_dm()
-        self.assertTrue(dm.is_liquid_commercial_row(self._row(volume=500)))
+        self.assertFalse(dm.is_liquid_commercial_row(self._row(volume=500)))
+
+    def test_volume_positif_code_na_retourne_true(self):
+        dm = _make_dm()
+        self.assertTrue(dm.is_liquid_commercial_row(
+            self._row(unite='mL', volume=500, code='NA21', nom='Solution test 500ml')
+        ))
+
+    def test_objet_solide_avec_capacite_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(
+            self._row(unite='mL', volume=300, code='HA11', nom='BOITE à DÉCHETS 300ml')
+        ))
 
     def test_volume_zero_retourne_false(self):
         """Régression : Volume flacon = 0 ne doit pas classifier comme liquide."""
@@ -262,7 +276,9 @@ class TestIsLiquidCommercialRow(unittest.TestCase):
 
     def test_unite_renseignee_retourne_true(self):
         dm = _make_dm()
-        self.assertTrue(dm.is_liquid_commercial_row(self._row(unite='mL')))
+        self.assertTrue(dm.is_liquid_commercial_row(
+            self._row(unite='mL', code='NB22', nom='Acrylamide solution 500ml')
+        ))
 
     def test_tous_vides_retourne_false(self):
         dm = _make_dm()

@@ -220,12 +220,28 @@ class TestIsSolidLiquidProduct(unittest.TestCase):
 
     def test_unite_liquide_renseignée_retourne_true(self):
         row = pd.Series({'Facteur liquide source': '',
-                         'Unité liquide': 'mL', 'Volume flacon (mL)': 0})
+                         'Unité liquide': 'mL', 'Volume flacon (mL)': 0,
+                         'Code NACRES': 'NB22',
+                         'Consommable': 'Acrylamide solution 500ml'})
         self.assertTrue(self.mw._is_solid_liquid_product(row))
 
-    def test_volume_flacon_positif_retourne_true(self):
+    def test_volume_flacon_positif_seul_retourne_false(self):
         row = pd.Series({'Facteur liquide source': '',
                          'Unité liquide': '', 'Volume flacon (mL)': 500})
+        self.assertFalse(self.mw._is_solid_liquid_product(row))
+
+    def test_objet_solide_avec_capacite_retourne_false(self):
+        row = pd.Series({'Facteur liquide source': '',
+                         'Unité liquide': 'mL', 'Volume flacon (mL)': 300,
+                         'Code NACRES': 'HA11',
+                         'Consommable': 'BOITE à DÉCHETS 300ml'})
+        self.assertFalse(self.mw._is_solid_liquid_product(row))
+
+    def test_volume_flacon_code_na_retourne_true(self):
+        row = pd.Series({'Facteur liquide source': '',
+                         'Unité liquide': 'mL', 'Volume flacon (mL)': 1000,
+                         'Code NACRES': 'NA21',
+                         'Consommable': 'Acide acétique 1 litre'})
         self.assertTrue(self.mw._is_solid_liquid_product(row))
 
     def test_volume_flacon_zero_est_solide(self):

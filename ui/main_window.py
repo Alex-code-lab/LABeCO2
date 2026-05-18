@@ -36,6 +36,7 @@ from ui.display_utils import (
     format_quantity,
     format_subcategory_label,
     is_consumables_subcategory,
+    looks_like_liquid_commercial_product,
     normalize_nacres_prefix,
     normalize_search,
     safe_float,
@@ -1519,9 +1520,6 @@ class MainWindow(QMainWindow):
                 "origine": item.get("origine", self.data_manager.TRANSPORT_DEFAULT),
             }
 
-            # Optionnel : vérifier via un debug
-            # print("DEBUG new_data:", new_data)
-
             # 5) Recalculer les émissions pour cet item
             updated_data = self.calculate_emission_for_item(new_data)
 
@@ -2533,15 +2531,13 @@ class MainWindow(QMainWindow):
         )
 
     def _is_solid_liquid_product(self, solid_row):
-        if solid_row is None:
-            return False
-        factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")
-        unit_col = getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")
-        volume_col = getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)")
-        return bool(
-            clean_text(solid_row.get(factor_col, "")) or
-            clean_text(solid_row.get(unit_col, "")) or
-            safe_float(solid_row.get(volume_col, 0.0), default=0.0) > 0
+        return looks_like_liquid_commercial_product(
+            solid_row,
+            factor_col=getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source"),
+            unit_col=getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"),
+            volume_col=getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)"),
+            name_col=getattr(self.data_manager, "CONSOMMABLE_COL", "Consommable"),
+            code_col=getattr(self.data_manager, "CODE_NACRES_COL", "Code NACRES"),
         )
 
     def _update_masse_warning(self):
@@ -3259,8 +3255,6 @@ class MainWindow(QMainWindow):
                                     data_manager=self.data_manager)
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
-            # print("Debug - Nouveau self.modified_data :", modified_data)
-
             # On suppose que modified_data['value'] = val/jour
             # et modified_data['days'] = days.
             ep, ep_err, em, em_err, tm, msg_price = self.carbon_calculator.compute_emission_data(modified_data)

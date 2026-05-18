@@ -4,8 +4,7 @@
 # Ce fichier fait partie du projet LABeCO2.
 # Distribué sous licence : GNU GPL v3 (non commercial)
 # edit_calculation_dialog.py
-import sys
-import os
+import logging
 import pandas as pd
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel, QComboBox, QLineEdit, 
@@ -18,6 +17,9 @@ from ui.display_utils import (
     is_consumables_subcategory,
     normalize_nacres_prefix,
 )
+
+logger = logging.getLogger(__name__)
+
 
 class EditCalculationDialog(QDialog):
     """
@@ -625,7 +627,7 @@ class EditCalculationDialog(QDialog):
             self.accept()
 
         except ValueError as ve:
-            print("Erreur de conversion détectée :", ve)
+            logger.warning("Erreur de conversion détectée : %s", ve)
             QMessageBox.warning(self, 'Erreur', f"Erreur de conversion numérique : {ve}")
             return
 

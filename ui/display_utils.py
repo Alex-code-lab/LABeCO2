@@ -47,6 +47,62 @@ def is_consumables_subcategory(value):
     return clean_text(value).casefold().startswith("consommable")
 
 
+def looks_like_liquid_commercial_product(
+    row,
+    *,
+    factor_col="Facteur liquide source",
+    unit_col="Unité liquide",
+    volume_col="Volume flacon (mL)",
+    name_col="Consommable",
+    code_col="Code NACRES",
+):
+    """
+    Distingue un vrai produit liquide d'un objet solide qui a seulement une capacité.
+
+    Dans la base actuelle, "Unité liquide" et "Volume flacon (mL)" peuvent aussi
+    représenter la capacité d'une boîte, d'un sac, d'une étiquette pour tube, etc.
+    Ces champs ne suffisent donc pas à classifier la ligne comme liquide.
+    """
+    if row is None:
+        return False
+
+    factor_name = clean_text(row.get(factor_col, ""))
+    if factor_name:
+        return True
+
+    unit = clean_text(row.get(unit_col, ""))
+    volume = safe_float(row.get(volume_col, 0.0), default=0.0)
+    if not unit and volume <= 0:
+        return False
+
+    name = normalize_search(row.get(name_col, ""))
+    code = normalize_nacres_prefix(row.get(code_col, ""))
+    if not name and not code:
+        return False
+
+    solid_capacity_terms = (
+        "boite", "box", "sac", "bag", "etiquette", "label",
+        "tube", "microtube", "pipette", "flacon vide", "bouteille vide",
+        "bidon vide", "reservoir", "poubelle", "dechet", "aiguille", "lame",
+        "cryo-tag", "cryotag", "touch-spots",
+    )
+    if any(term in name for term in solid_capacity_terms):
+        return False
+
+    if code.startswith("NA"):
+        return True
+
+    liquid_terms = (
+        "solution", "soln", "liquide", "liquid", "solvant", "solvent",
+        "milieu", "medium", "buffer", "tampon", "acide", "acid",
+        "ethanol", "methanol", "propanol", "isopropanol", "acetone",
+        "acetonitrile", "chloroforme", "formamide", "dmso", "glycerol",
+        "glycogen", "temed", "sds", "tae", "tbe", "tris-glycine",
+        "bromide", "sybr", "stain", "hydroxyde", "hydroxide",
+    )
+    return any(term in name for term in liquid_terms)
+
+
 def format_subcategory_label(value):
     """
     Renvoie (texte_affiche, tooltip) pour une sous-catégorie.

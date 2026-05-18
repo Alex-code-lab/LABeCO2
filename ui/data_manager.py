@@ -8,7 +8,11 @@
 import os
 import pandas as pd
 from utils.data_loader import load_data  # Ajuster si nécessaire selon ta structure
-from ui.display_utils import clean_text, normalize_nacres_prefix
+from ui.display_utils import (
+    clean_text,
+    looks_like_liquid_commercial_product,
+    normalize_nacres_prefix,
+)
 
 class DataManager:
     """
@@ -434,10 +438,11 @@ class DataManager:
         return product_row, factor_row
 
     def is_liquid_commercial_row(self, row):
-        if row is None:
-            return False
-        return bool(
-            self._clean_cell(row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, "")) or
-            self._clean_cell(row.get(self.UNITE_LIQUIDE_COL, "")) or
-            (self._to_float_or_none(row.get(self.VOLUME_FLACON_COL, None)) or 0.0) > 0
+        return looks_like_liquid_commercial_product(
+            row,
+            factor_col=self.FACTEUR_LIQUIDE_SOURCE_COL,
+            unit_col=self.UNITE_LIQUIDE_COL,
+            volume_col=self.VOLUME_FLACON_COL,
+            name_col=self.CONSOMMABLE_COL,
+            code_col=self.CODE_NACRES_COL,
         )
