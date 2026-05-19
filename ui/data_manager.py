@@ -66,6 +66,8 @@ class DataManager:
     CODE_IJM_COL = "code_ijm"
     MARQUE_IJM_COL = "marque_ijm"
     SCORE_MATCH_COL = "score_match"
+    VALIDATION_STATUS_COL = "Statut validation"
+    VALIDATION_NATURE_COL = "Nature validation"
 
     SQLITE_ENV_VAR = "LABECO2_SQLITE_PATH"
     TRANSPORT_ORIGINE_COL = "Origine"
@@ -286,6 +288,19 @@ class DataManager:
         def get(col_name):
             return self._clean_cell(row.get(col_name, ""))
 
+        def validation_label():
+            status_labels = {
+                "validated": "Validé",
+                "draft": "Draft",
+                "deprecated": "Déprécié",
+            }
+            raw_status = get(self.VALIDATION_STATUS_COL)
+            nature = get(self.VALIDATION_NATURE_COL)
+            if not raw_status and not nature:
+                return ""
+            status = status_labels.get(raw_status.casefold(), raw_status)
+            return " - ".join(part for part in (status, nature.lower() if nature else "") if part)
+
         prix_conditionnement = self._row_price_conditionnement(row)
         nb_unites = self._row_nb_conditionnement(row)
         prix_unitaire = self._row_prix_unitaire(row)
@@ -301,6 +316,7 @@ class DataManager:
             "marque": get(self.MARQUE_IJM_COL),
             "score_match": get(self.SCORE_MATCH_COL),
             "source_catalogue": get(self.SOURCE_CATALOGUE_IJM_COL),
+            "validation": validation_label(),
         }
 
     def _find_prix_unitaire_row(self, code_nacres, consommable_name=""):

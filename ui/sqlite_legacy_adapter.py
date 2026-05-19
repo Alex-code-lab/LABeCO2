@@ -215,6 +215,8 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             cp.capacity_volume_ml,
             cp.emission_factor_id,
             cp.note,
+            cp.status,
+            cp.revision_of_id,
             ef.name AS factor_name,
             cp.created_at,
             s.title AS source_title,
@@ -268,6 +270,9 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         row["Prix du conditionnement"] = product["price_sold_packaging"]
         row["Facteur liquide source"] = _clean(product["factor_name"])
         row["Lien / Note / Remarque"] = _clean(product["note"])
+        row["Statut validation"] = _clean(product["status"])
+        row["Nature validation"] = "Modification" if _clean(product["revision_of_id"]) else "Nouvelle entrée"
+        row["revision_of_id"] = _clean(product["revision_of_id"])
         row["emission_factor_id"] = _clean(product["emission_factor_id"])
         row["date d'ajout"] = _clean(product["created_at"])
         row["Source"] = _clean(product["source_title"])
@@ -286,7 +291,13 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         rows.append(row)
 
     return pd.DataFrame(rows).reindex(
-        columns=COMMERCIAL_PRODUCT_COLUMNS + [SQLITE_ID_COL, "emission_factor_id"]
+        columns=COMMERCIAL_PRODUCT_COLUMNS + [
+            SQLITE_ID_COL,
+            "emission_factor_id",
+            "Statut validation",
+            "Nature validation",
+            "revision_of_id",
+        ]
     )
 
 

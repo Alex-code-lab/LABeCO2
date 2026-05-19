@@ -492,21 +492,22 @@ class DataMassWindow(QMainWindow):
             mats = self.data_materials['Materiau'].dropna().unique().tolist()
         else:
             mats = ["Polypropylène (PP)", "Polyéthylène (PE)"]
+        mats_with_empty = [""] + mats
 
         # Second matériau (optionnel)
         self.masse2_input = QLineEdit()
         self.materiau2_combo = QComboBox()
-        self.materiau2_combo.addItems(mats)
+        self.materiau2_combo.addItems(mats_with_empty)
 
         # Emballage
         self.masse_emb_input = QLineEdit()
         self.mat_emb_combo = QComboBox()
-        self.mat_emb_combo.addItems(mats)
+        self.mat_emb_combo.addItems(mats_with_empty)
 
         # Conditionnement
         self.masse_cond_input = QLineEdit()
         self.mat_cond_combo = QComboBox()
-        self.mat_cond_combo.addItems(mats)
+        self.mat_cond_combo.addItems(mats_with_empty)
         self.nbr_cond_input = QLineEdit()
         self.nbr_cond_input.setValidator(QIntValidator(1, 999999, self))
         self.nbr_cond_input.setPlaceholderText("ex: 50 tubes par boîte, 1 bouteille par flacon")
@@ -555,7 +556,7 @@ class DataMassWindow(QMainWindow):
 
         # Peupler la liste des matériaux depuis data_materials
         self.materiau_combo = QComboBox()
-        self.materiau_combo.addItems(mats)
+        self.materiau_combo.addItems(mats_with_empty)
 
         self.source_input = QLineEdit()
         self.source_input.setPlaceholderText("Article, lien, DOI, documentation...")
@@ -1939,7 +1940,12 @@ class DataMassWindow(QMainWindow):
             _fill(self.masse2_input,    "Masse unitaire deuxieme materiaux (g)")
             _fill(self.masse_emb_input, "Masse emballage unitaire (g)")
             _fill(self.masse_cond_input,"Masse condionnement (g)")
-            _fill(self.nbr_cond_input,  "Nbr par conditionnement")
+            nbr_raw = row.get("Nbr par conditionnement", "")
+            if not pd.isna(nbr_raw) and str(nbr_raw).strip() not in ("", "nan", "none"):
+                try:
+                    self.nbr_cond_input.setText(str(int(float(nbr_raw))))
+                except (ValueError, TypeError):
+                    self.nbr_cond_input.setText(str(nbr_raw).strip())
             _fill(self.solid_liquid_volume_input, "Volume flacon (mL)")
             if not self.nbr_cond_input.text().strip():
                 _fill(self.nbr_cond_input, "nb_unites_ijm")

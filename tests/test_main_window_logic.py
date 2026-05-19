@@ -499,11 +499,8 @@ class TestUpdateQuantityLabel(unittest.TestCase):
         mw.fe_massique_label.setVisible.assert_called_with(True)
         mw.fe_massique_input.setVisible.assert_called_with(True)
 
-    def test_solid_masse_sans_materiau_affiche_unites_et_cache_fe(self):
-        """Solide avec masse mais sans matériau → 'unités', FE masqué.
-        Sans matériau connu, on ne peut pas calculer le CO₂ par la masse ;
-        on traite toujours comme objet discret pour éviter un label trompeur.
-        """
+    def test_solid_masse_sans_materiau_affiche_grammes_et_cache_fe(self):
+        """Solide avec masse mais sans matériau → mode vrac → 'g', FE masqué."""
         sel = {'code_nacres': 'AA01', 'consommable': 'Poudre', 'source': 'solid'}
         mw = _make_mw(selected=sel)
         mw._find_consumable_mass_row = MagicMock(return_value=None)
@@ -511,8 +508,8 @@ class TestUpdateQuantityLabel(unittest.TestCase):
         mw._get_masse_unitaire_g       = MagicMock(return_value=50.0)
         mw._update_quantity_label(sel)
         text = mw.quantity_label.setText.call_args[0][0]
-        self.assertIn('unités', text)
-        self.assertIsNone(mw._current_masse_unitaire_g)
+        self.assertIn('g', text)
+        self.assertEqual(mw._current_masse_unitaire_g, 50.0)
         mw.fe_massique_label.setVisible.assert_called_with(False)
         mw.fe_massique_input.setVisible.assert_called_with(False)
 
@@ -572,6 +569,7 @@ class TestUpdatePrixUnitaire(unittest.TestCase):
             'prix_ht': 70.0,
             'nb_unites': 500,
             'score_match': '',
+            'validation': 'Draft - modification',
         }
         sel = {'code_nacres': 'NB11', 'consommable': 'Tube IJM', 'source': 'solid'}
         mw = _make_mw(selected=sel, data_manager=dm)
@@ -582,6 +580,10 @@ class TestUpdatePrixUnitaire(unittest.TestCase):
         self.assertAlmostEqual(mw._current_prix_unitaire, 0.14)
         text = mw.prix_unitaire_label.setText.call_args[0][0]
         self.assertIn('0.1400', text)
+        self.assertIn(
+            'Validation : Draft - modification',
+            mw._current_prix_unitaire_info_text,
+        )
 
     def test_prix_absent_cache_label(self):
         dm = _make_mock_dm()

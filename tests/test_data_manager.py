@@ -194,6 +194,8 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
             "code_ijm": "P001",
             "marque_ijm": "MARQUE",
             "score_match": "",
+            "Statut validation": "draft",
+            "Nature validation": "Modification",
         }])
 
         info = dm.get_prix_unitaire_info("NB11", "Tube IJM")
@@ -202,6 +204,7 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
         self.assertAlmostEqual(info["prix_unitaire"], 0.14)
         self.assertEqual(info["prix_ht"], 70.0)
         self.assertEqual(info["source_catalogue"], "Catalogue IJM 2025")
+        self.assertEqual(info["validation"], "Draft - modification")
 
     def test_ligne_manuelle_exacte_sans_prix_ne_fuzzy_match_pas(self):
         dm = _make_dm()

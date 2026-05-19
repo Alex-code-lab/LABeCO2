@@ -2381,6 +2381,7 @@ class MainWindow(QMainWindow):
             ("Unités par conditionnement vendu", prix_info.get("nb_unites")),
             ("Prix par unité vendue", prix_info.get("prix_unitaire")),
             ("Source catalogue", source_catalogue),
+            ("Validation", prix_info.get("validation")),
             ("Score de rapprochement", prix_info.get("score_match")),
         ]
 
@@ -2646,7 +2647,7 @@ class MainWindow(QMainWindow):
 
         if row.empty:
             self.masse_manquante_label.setText(
-                "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+                "⚠  Masse non enregistrée pour ce consommable : le calcul CO₂ sera incomplet."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #92400e; background-color: #fef3c7; "
@@ -2699,9 +2700,18 @@ class MainWindow(QMainWindow):
             return
 
         masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
+        materiau = str(solid_row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
         if pd.isna(masse) or str(masse).strip() == "":
             self.masse_manquante_label.setText(
-                "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+                "⚠  Masse non enregistrée pour ce consommable : le calcul CO₂ sera incomplet."
+            )
+            self.masse_manquante_label.setStyleSheet(
+                "color: #92400e; background-color: #fef3c7; "
+                "border: 1px solid #f59e0b; border-radius: 4px; padding: 4px 8px;"
+            )
+        elif not materiau:
+            self.masse_manquante_label.setText(
+                "⚠  Matériau du produit non disponible : calcul du eCO₂ par la masse non disponible."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #92400e; background-color: #fef3c7; "
@@ -2709,7 +2719,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.masse_manquante_label.setText(
-                "✔  Masse disponible — calcul eCO₂ par la masse effectué."
+                "✔  Masse disponible : calcul eCO₂ par la masse effectué."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #166534; background-color: #dcfce7; "
@@ -2900,8 +2910,13 @@ class MainWindow(QMainWindow):
                 self.fe_massique_label.setVisible(not has_factor)
                 self.fe_massique_input.setVisible(not has_factor)
                 return
-            self._current_masse_unitaire_g = None
-            self.quantity_label.setText("Quantité (unités) :")
+            masse_g = self._get_masse_unitaire_g(selected)
+            if masse_g and masse_g > 0:
+                self._current_masse_unitaire_g = masse_g
+                self.quantity_label.setText("Quantité (g) :")
+            else:
+                self._current_masse_unitaire_g = None
+                self.quantity_label.setText("Quantité (unités) :")
             self.fe_massique_label.setVisible(False)
             self.fe_massique_input.setVisible(False)
 
