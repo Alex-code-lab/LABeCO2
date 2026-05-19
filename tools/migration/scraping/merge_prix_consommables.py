@@ -175,11 +175,11 @@ def best_match(consommable_name, candidates):
 # ── Colonnes ajoutées côté catalogue ──────────────────────────────────────────
 PRIX_FIELDS = [
     "code_nacres_court",
-    "Source catalogue IJM",
-    "condt_ijm",
-    "designation_ijm",
-    "code_ijm",
-    "marque_ijm",
+    "Source catalogue fournisseur",
+    "condt_fournisseur",
+    "designation_fournisseur",
+    "code_fournisseur",
+    "marque_fournisseur",
     "score_match",
 ]
 
@@ -229,30 +229,31 @@ def merge():
     # Lignes IJM en lignes separees -> colonnes masse vides.
     # Les codes NA* volumiques restent dans les consommables comme produits
     # commerciaux; le facteur est reference depuis la base Liquides & Solvants.
-    ijm_only_rows = []
-    seen_ijm_codes = set()
+    catalogue_rows = []
+    seen_codes = set()
     for row in prix_rows:
-        code_ijm = row.get("code_ijm", "").strip()
-        if code_ijm and code_ijm in seen_ijm_codes:
+        code_f = row.get("code_fournisseur", "").strip()
+        if code_f and code_f in seen_codes:
             continue
-        if code_ijm:
-            seen_ijm_codes.add(code_ijm)
+        if code_f:
+            seen_codes.add(code_f)
+        fournisseur = row.get("fournisseur", "Catalogue fournisseur")
         code4 = row["code_nacres"].strip()[:4].upper()
         masse_empty = {f: "" for f in out_fields}
         page = row.get("page", "").strip()
-        prix_extra  = {
-            "code_nacres_court": code4,
-            "Source catalogue IJM": f"Catalogue IJM 2025, page {page}" if page else "Catalogue IJM 2025",
-            "condt_ijm"        : row["condt"],
-            "designation_ijm"  : row["designation"],
-            "code_ijm"         : row["code_ijm"],
-            "marque_ijm"       : row["marque"],
-            "score_match"      : "",
+        source_label = f"{fournisseur}, page {page}" if page else fournisseur
+        prix_extra = {
+            "code_nacres_court"         : code4,
+            "Source catalogue fournisseur": source_label,
+            "condt_fournisseur"          : row["condt"],
+            "designation_fournisseur"    : row["designation"],
+            "code_fournisseur"           : code_f,
+            "marque_fournisseur"         : row["marque"],
+            "score_match"                : "",
         }
-        # On peut pré-remplir quelques champs évidents
         masse_empty["Consommable"] = row["designation"]
         masse_empty["Marque"]      = row["marque"]
-        masse_empty["Référence"]   = row["code_ijm"]
+        masse_empty["Référence"]   = code_f
         masse_empty["Catégorie"]   = "Autres consommables"
         masse_empty["Code NACRES"] = row["code_nacres"]
         masse_empty["Masse unitaire (g)"] = infer_conditionnement_mass_g(row)
@@ -275,9 +276,9 @@ def merge():
             masse_empty["Volume flacon (mL)"] = vol
         masse_empty["date d'ajout"] = RUN_DATE
 
-        ijm_only_rows.append({**masse_empty, **prix_extra})
+        catalogue_rows.append({**masse_empty, **prix_extra})
 
-    complet_rows = results + ijm_only_rows
+    complet_rows = results + catalogue_rows
 
     with open(OUT_COMPLET, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=out_fields)
@@ -286,14 +287,11 @@ def merge():
 
     # ── Résumé ────────────────────────────────────────────────────────────────
     print(f"\n{'─'*70}")
-    print(f"Consommables traités        : {len(masses_rows)}")
-    print("  Prix IJM injectés         : 0 (lignes catalogue séparées)")
-    print(f"\nFichier 1 ({len(results)} lignes)      : {OUT_MASSE}")
-    print(f"Fichier 2 ({len(complet_rows)} lignes) : {OUT_COMPLET}")
-    print(f"  dont {len(ijm_only_rows)} produits IJM sans données masse (à compléter)")
+    print(f"Consommables traités               : {len(masses_rows)}")
+    print(f"\nFichier 1 ({len(results)} lignes)           : {OUT_MASSE}")
+    print(f"Fichier 2 ({len(complet_rows)} lignes)  : {OUT_COMPLET}")
+    print(f"  dont {len(catalogue_rows)} produits catalogue sans données masse (à compléter)")
     print(f"{'─'*70}\n")
-
-    print(f"  Produits IJM séparés      : {len(ijm_only_rows)}")
 
 
 if __name__ == "__main__":
