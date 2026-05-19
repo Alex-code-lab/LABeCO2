@@ -43,7 +43,8 @@ def _make_db():
             emission_factor_id TEXT,
             source_id TEXT,
             contributor_id TEXT,
-            status TEXT
+            status TEXT,
+            note TEXT
         );
         CREATE TABLE product_components (
             id TEXT PRIMARY KEY,
@@ -94,6 +95,25 @@ def test_product_detail_flags_liquid_factor_to_link():
     assert "1500.0 mL" in detail
 
 
+def test_product_detail_shows_note():
+    conn = _make_db()
+    conn.execute("""
+        INSERT INTO commercial_products(
+            id, name, code_nacres, product_type, status, note
+        ) VALUES(
+            'p-note', 'Ampicillin Sodium salt 1g', 'NA76', 'solid', 'draft',
+            'https://example.org/ampicillin ; remarque validation'
+        )
+    """)
+
+    detail = format_entry_detail(conn, "commercial_products", "p-note")
+
+    assert (
+        "Lien / Note / Remarque : https://example.org/ampicillin ; remarque validation"
+        in detail
+    )
+
+
 def test_product_detail_ignores_blank_mass_product_components():
     conn = _make_db()
     conn.execute("INSERT INTO emission_factors(id, name, co2_factor) VALUES('ef1', 'PS', 3.5)")
@@ -139,3 +159,30 @@ def test_product_detail_keeps_incomplete_packaging_divisor_context():
     assert "Composants détaillés : 0" in detail
     assert "Données composant à compléter : 1" in detail
     assert "primary_packaging : Papier ; masse manquante ; diviseur 50" in detail
+
+
+def test_product_detail_shows_revision_diff():
+    conn = _make_db()
+    conn.execute("ALTER TABLE commercial_products ADD COLUMN revision_of_id TEXT")
+    conn.execute("""
+        INSERT INTO commercial_products(
+            id, name, code_nacres, product_type, price_sold_packaging, status
+        ) VALUES('old-p', 'Tube test', 'NB11', 'solid', 40, 'deprecated')
+    """)
+    conn.execute("""
+        INSERT INTO commercial_products(
+            id, name, code_nacres, product_type, price_sold_packaging, status,
+            revision_of_id, note
+        ) VALUES(
+            'new-p', 'Tube test', 'NB11', 'solid', 55, 'draft', 'old-p',
+            'https://example.org/tube'
+        )
+    """)
+
+    detail = format_entry_detail(conn, "commercial_products", "new-p")
+
+    assert "Nature : Modification" in detail
+    assert "Modification de : Tube test (old-p)" in detail
+    assert "Prix conditionnement : 40.0 -> 55.0" in detail
+    assert "Lien / Note / Remarque : (vide) -> https://example.org/tube" in detail
+    assert detail.index("Composants détaillés : 0") < detail.index("Changements :")

@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from ui.sqlite_schema import ensure_app_schema
+
 
 METIER_TABLES = ["emission_factors", "materials", "commercial_products", "transport_factors"]
 
@@ -170,6 +172,7 @@ def build_contribution_payload(
     tables: list[str] | None = None,
     include_validated: bool = False,
 ) -> tuple[dict, dict | None]:
+    ensure_app_schema(conn)
     tables_to_export = tables or METIER_TABLES
     unknown = [table for table in tables_to_export if table not in METIER_TABLES]
     if unknown:
@@ -262,6 +265,8 @@ def upsert_row(
     logger: Logger = print,
 ) -> str:
     """Insère ou met à jour une ligne. Retourne 'new', 'updated', ou 'skipped'."""
+    if not dry_run:
+        ensure_app_schema(conn)
     row_id = data.get("id")
     existing = fetch_by_id(conn, table, row_id) if row_id else None
     cols = table_columns(conn, table)
@@ -366,6 +371,8 @@ def apply_contribution_entries(
     dry_run: bool,
     logger: Logger = print,
 ) -> ImportStats:
+    if not dry_run:
+        ensure_app_schema(conn)
     stats = ImportStats()
     by_table = entries_by_table(entries, logger=logger)
     for table in TABLES_ORDER:

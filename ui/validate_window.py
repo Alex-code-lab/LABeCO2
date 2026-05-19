@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 from ui.validation_details import format_entry_detail
 from ui.validation_ops import now_iso as _now, reject_entry, validate_entry
+from ui.sqlite_schema import ensure_app_schema
 
 _BLACK = QColor(0, 0, 0)
 
@@ -58,6 +59,8 @@ TABLES_META = {
         "alias": "ef",
         "query_tpl": """
             SELECT ef.id, ef.id AS "ID", ef.status AS "Statut",
+                   CASE WHEN ef.revision_of_id IS NOT NULL AND ef.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
                    ef.name AS "Nom", ef.name_key AS "Clé nom",
                    ef.factor_type AS "Type", ef.code_nacres AS "NACRES",
                    ef.co2_factor AS "CO₂", ef.co2_unit AS "Unité CO₂",
@@ -77,7 +80,10 @@ TABLES_META = {
             ORDER BY ef.name
         """,
         "summary_tpl": """
-            SELECT ef.id, ef.status AS "Statut", ef.name AS "Nom",
+            SELECT ef.id, ef.status AS "Statut",
+                   CASE WHEN ef.revision_of_id IS NOT NULL AND ef.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   ef.name AS "Nom",
                    s.title AS "Source", c.name AS "Contributeur", ef.created_at AS "Créé le"
             FROM emission_factors ef
             LEFT JOIN sources s ON s.id = ef.source_id
@@ -91,6 +97,8 @@ TABLES_META = {
         "alias": "m",
         "query_tpl": """
             SELECT m.id, m.id AS "ID", m.status AS "Statut",
+                   CASE WHEN m.revision_of_id IS NOT NULL AND m.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
                    m.name AS "Nom", m.name_key AS "Clé nom",
                    ef.name AS "FE matériau", m.emission_factor_id AS "FE ID",
                    ef.co2_factor AS "CO₂", ef.co2_unit AS "Unité CO₂",
@@ -109,7 +117,10 @@ TABLES_META = {
             ORDER BY m.name
         """,
         "summary_tpl": """
-            SELECT m.id, m.status AS "Statut", m.name AS "Nom",
+            SELECT m.id, m.status AS "Statut",
+                   CASE WHEN m.revision_of_id IS NOT NULL AND m.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   m.name AS "Nom",
                    s.title AS "Source", c.name AS "Contributeur", m.created_at AS "Créé le"
             FROM materials m
             LEFT JOIN sources s ON s.id = m.source_id
@@ -125,6 +136,8 @@ TABLES_META = {
         # Composants = nb de matériaux liés via product_components (solides).
         "query_tpl": """
             SELECT cp.id, cp.id AS "ID", cp.status AS "Statut",
+                   CASE WHEN cp.revision_of_id IS NOT NULL AND cp.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
                    cp.name AS "Nom", cp.brand AS "Marque", cp.reference AS "Référence",
                    cp.code_nacres AS "NACRES", cp.product_type AS "Type",
                    cp.sold_packaging_label AS "Conditionnement",
@@ -132,6 +145,7 @@ TABLES_META = {
                    cp.units_per_sold_packaging AS "Nbr cond.",
                    cp.sold_unit_volume_ml AS "Volume vendu (mL)",
                    cp.capacity_volume_ml AS "Capacité (mL)",
+                   cp.note AS "Lien / Note / Remarque",
                    CASE WHEN cp.product_type = 'liquid'
                         THEN COALESCE(ef.name, 'À relier')
                         ELSE ''
@@ -155,7 +169,10 @@ TABLES_META = {
             ORDER BY cp.code_nacres, cp.name
         """,
         "summary_tpl": """
-            SELECT cp.id, cp.status AS "Statut", cp.name AS "Nom",
+            SELECT cp.id, cp.status AS "Statut",
+                   CASE WHEN cp.revision_of_id IS NOT NULL AND cp.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   cp.name AS "Nom",
                    s.title AS "Source", c.name AS "Contributeur", cp.created_at AS "Créé le"
             FROM commercial_products cp
             LEFT JOIN sources s ON s.id = cp.source_id
@@ -169,6 +186,8 @@ TABLES_META = {
         "alias": "tf",
         "query_tpl": """
             SELECT tf.id, tf.id AS "ID", tf.status AS "Statut",
+                   CASE WHEN tf.revision_of_id IS NOT NULL AND tf.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
                    tf.origin AS "Origine", tf.distance_km AS "Distance (km)",
                    tf.mode AS "Mode",
                    tf.factor_kgco2e_per_kg AS "Facteur", tf.uncertainty AS "Incert.",
@@ -186,7 +205,10 @@ TABLES_META = {
             ORDER BY tf.origin
         """,
         "summary_tpl": """
-            SELECT tf.id, tf.status AS "Statut", tf.origin AS "Nom",
+            SELECT tf.id, tf.status AS "Statut",
+                   CASE WHEN tf.revision_of_id IS NOT NULL AND tf.revision_of_id != ''
+                        THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   tf.origin AS "Nom",
                    s.title AS "Source", c.name AS "Contributeur", tf.created_at AS "Créé le"
             FROM transport_factors tf
             LEFT JOIN sources s ON s.id = tf.source_id
@@ -198,7 +220,7 @@ TABLES_META = {
 }
 
 # Colonnes fixes pour la vue "Toutes les tables" (inclut Statut)
-_SUMMARY_HEADERS = ["Statut", "Nom", "Source", "Contributeur", "Créé le"]
+_SUMMARY_HEADERS = ["Statut", "Nature", "Nom", "Source", "Contributeur", "Créé le"]
 
 
 class ValidateWidget(QWidget):
@@ -385,6 +407,7 @@ class ValidateWidget(QWidget):
 
         conn = sqlite3.connect(self.sqlite_path)
         conn.row_factory = sqlite3.Row
+        ensure_app_schema(conn)
 
         if selected_key == "all":
             self._load_all(conn)

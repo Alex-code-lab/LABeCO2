@@ -557,6 +557,7 @@ class MergeTab(QWidget):
         co2_text = ""
         source_text = self._source_title(entry, data)
         packaging_count = ""
+        note_text = data.get("note") or ""
 
         if table == "emission_factors":
             type_value = data.get("factor_type") or ""
@@ -601,6 +602,7 @@ class MergeTab(QWidget):
             factor_text,
             co2_text,
             source_text,
+            note_text,
             data.get("status", ""),
         ]
 
@@ -617,6 +619,7 @@ class MergeTab(QWidget):
             "FE / comp.",
             "CO₂",
             "Source",
+            "Lien / Note",
             "Statut source",
         ]
         try:
@@ -681,6 +684,7 @@ class MergeTab(QWidget):
             f"FE / composants : {values[7]}",
             f"CO2 : {values[8]}",
             f"Source : {values[9]}",
+            f"Lien / Note : {values[10]}",
         ]
         if table == "commercial_products" and data.get("product_type") != "liquid":
             _, details = self._product_components_summary(entry, data.get("id", ""))

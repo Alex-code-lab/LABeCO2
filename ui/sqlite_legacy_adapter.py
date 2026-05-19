@@ -9,6 +9,8 @@ from typing import Any
 
 import pandas as pd
 
+from ui.sqlite_schema import ensure_app_schema
+
 
 COMMERCIAL_PRODUCT_COLUMNS = [
     "Consommable",
@@ -108,6 +110,7 @@ def load_legacy_dataframes(sqlite_path: str | Path) -> dict[str, pd.DataFrame]:
 
     with sqlite3.connect(sqlite_path) as conn:
         conn.row_factory = sqlite3.Row
+        ensure_app_schema(conn)
         return {
             "main_data": load_purchase_factors(conn),
             "data_masse": load_commercial_products(conn),
@@ -138,6 +141,7 @@ def load_materials(conn: sqlite3.Connection) -> pd.DataFrame:
         LEFT JOIN emission_factors ef ON ef.id = m.emission_factor_id
         LEFT JOIN sources s ON s.id = m.source_id
         LEFT JOIN contributors c ON c.id = m.contributor_id
+        WHERE m.status != 'deprecated'
         ORDER BY m.rowid
     """
     df = _read_sql(conn, query)
@@ -165,7 +169,7 @@ def load_liquid_factors(conn: sqlite3.Connection) -> pd.DataFrame:
         FROM emission_factors ef
         LEFT JOIN sources s ON s.id = ef.source_id
         LEFT JOIN contributors c ON c.id = ef.contributor_id
-        WHERE ef.factor_type = 'liquid'
+        WHERE ef.factor_type = 'liquid' AND ef.status != 'deprecated'
         ORDER BY ef.rowid
     """
     df = _read_sql(conn, query)
@@ -186,6 +190,7 @@ def load_transport_factors(conn: sqlite3.Connection) -> pd.DataFrame:
             factor_kgco2e_per_kg AS "Facteur transport (kg CO₂e/kg)",
             uncertainty AS "Incertitude"
         FROM transport_factors
+        WHERE status != 'deprecated'
         ORDER BY rowid
     """
     df = _read_sql(conn, query)
@@ -209,6 +214,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             cp.sold_unit_volume_ml,
             cp.capacity_volume_ml,
             cp.emission_factor_id,
+            cp.note,
             ef.name AS factor_name,
             cp.created_at,
             s.title AS source_title,
@@ -223,6 +229,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         LEFT JOIN sources s ON s.id = cp.source_id
         LEFT JOIN contributors c ON c.id = cp.contributor_id
         LEFT JOIN catalogue_ijm ijm ON ijm.id = cp.ijm_catalogue_id
+        WHERE cp.status != 'deprecated'
         ORDER BY cp.rowid
         """,
     )
@@ -260,6 +267,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
         row["Nbr par conditionnement"] = product["units_per_sold_packaging"]
         row["Prix du conditionnement"] = product["price_sold_packaging"]
         row["Facteur liquide source"] = _clean(product["factor_name"])
+        row["Lien / Note / Remarque"] = _clean(product["note"])
         row["emission_factor_id"] = _clean(product["emission_factor_id"])
         row["date d'ajout"] = _clean(product["created_at"])
         row["Source"] = _clean(product["source_title"])

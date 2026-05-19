@@ -24,6 +24,7 @@ from ui.quality_check import (
     errors as quality_errors,
     format_issues,
 )
+from ui.sqlite_schema import ensure_app_schema
 from ui.sqlite_legacy_adapter import SQLITE_ID_COL
 
 
@@ -113,6 +114,7 @@ def connect(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    ensure_app_schema(conn)
     return conn
 
 
@@ -195,14 +197,24 @@ def find_material_id(conn: sqlite3.Connection, material_name: Any) -> str | None
     return row["id"] if row else None
 
 
-def upsert_material_factor(sqlite_path: str | Path, row: dict[str, Any]) -> str:
+def upsert_material_factor(
+    sqlite_path: str | Path,
+    row: dict[str, Any],
+    *,
+    existing_id: str | None = None,
+) -> str:
     with connect(sqlite_path) as conn:
-        material_id = upsert_material_factor_conn(conn, row)
+        material_id = upsert_material_factor_conn(conn, row, existing_id=existing_id)
         conn.commit()
         return material_id
 
 
-def upsert_material_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -> str:
+def upsert_material_factor_conn(
+    conn: sqlite3.Connection,
+    row: dict[str, Any],
+    *,
+    existing_id: str | None = None,
+) -> str:
     name = clean_text(row.get("Materiau"))
     if not name:
         raise ValueError("Nom du matériau manquant.")
@@ -210,12 +222,24 @@ def upsert_material_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -
     if errs:
         raise ValueError(format_issues(errs))
     name_key = normalize_key(name)
-    canonical_factor_id = stable_id("emission_factors", "material", name_key)
-    canonical_material_id = stable_id("materials", name_key)
+    canonical_material_id = (
+        existing_id
+        or clean_text(row.get(SQLITE_ID_COL))
+        or clean_text(row.get("material_id"))
+        or stable_id("materials", name_key)
+    )
+    existing_factor = conn.execute(
+        "SELECT emission_factor_id FROM materials WHERE id = ?",
+        (canonical_material_id,),
+    ).fetchone()
+    canonical_factor_id = (
+        existing_factor["emission_factor_id"]
+        if existing_factor and existing_factor["emission_factor_id"]
+        else stable_id("emission_factors", "material", name_key)
+    )
     factor_id, factor_rev_of = _prepare_revision(conn, "emission_factors", canonical_factor_id)
     material_id, material_rev_of = _prepare_revision(conn, "materials", canonical_material_id)
     contributor_id, source_id = contributor_and_source(conn, row)
-    is_revision = bool(factor_rev_of or material_rev_of)
     conn.execute(
         """
         INSERT INTO emission_factors(
@@ -237,7 +261,7 @@ def upsert_material_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -
             "kg CO2e/kg",
             float_or_none(row.get("uncertainty")),
             source_id, contributor_id, now_iso(), now_iso(),
-            "draft" if is_revision else "validated",
+            "draft",
             factor_rev_of,
         ),
     )
@@ -256,19 +280,29 @@ def upsert_material_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -
             status = excluded.status
         """,
         (material_id, name, name_key, factor_id, source_id, contributor_id,
-         now_iso(), now_iso(), "draft" if is_revision else "validated", material_rev_of),
+         now_iso(), now_iso(), "draft", material_rev_of),
     )
     return material_id
 
 
-def upsert_liquid_factor(sqlite_path: str | Path, row: dict[str, Any]) -> str:
+def upsert_liquid_factor(
+    sqlite_path: str | Path,
+    row: dict[str, Any],
+    *,
+    existing_id: str | None = None,
+) -> str:
     with connect(sqlite_path) as conn:
-        factor_id = upsert_liquid_factor_conn(conn, row)
+        factor_id = upsert_liquid_factor_conn(conn, row, existing_id=existing_id)
         conn.commit()
         return factor_id
 
 
-def upsert_liquid_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -> str:
+def upsert_liquid_factor_conn(
+    conn: sqlite3.Connection,
+    row: dict[str, Any],
+    *,
+    existing_id: str | None = None,
+) -> str:
     name = clean_text(row.get("Produit"))
     if not name:
         raise ValueError("Nom du liquide / solvant manquant.")
@@ -277,7 +311,12 @@ def upsert_liquid_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -> 
         raise ValueError(format_issues(errs))
     name_key = normalize_key(name)
     code = normalize_nacres_prefix(row.get("Code NACRES"))
-    canonical_id = stable_id("emission_factors", "liquid", name_key)
+    canonical_id = (
+        existing_id
+        or clean_text(row.get(SQLITE_ID_COL))
+        or clean_text(row.get("factor_id"))
+        or stable_id("emission_factors", "liquid", name_key)
+    )
     factor_id, revision_of = _prepare_revision(conn, "emission_factors", canonical_id)
     contributor_id, source_id = contributor_and_source(conn, row)
     uncertainty = float_or_none(row.get("Incertitude (%)"))
@@ -317,7 +356,7 @@ def upsert_liquid_factor_conn(conn: sqlite3.Connection, row: dict[str, Any]) -> 
             contributor_id,
             text_or_none(row.get("date d'ajout")) or now_iso(),
             now_iso(),
-            "draft" if revision_of else "validated",
+            "draft",
             revision_of,
         ),
     )
@@ -371,7 +410,7 @@ def upsert_commercial_product_conn(
         factor_id = None
     contributor_id, source_id = contributor_and_source(conn, row)
     catalogue_id = find_catalogue_id(conn, row.get("code_ijm"))
-    status = "draft" if (revision_of or not clean_text(row.get("Source"))) else "validated"
+    status = "draft"
     conn.execute(
         """
         INSERT INTO commercial_products(
@@ -379,8 +418,8 @@ def upsert_commercial_product_conn(
             sold_packaging_label, units_per_sold_packaging, price_sold_packaging,
             sold_unit_volume_ml, capacity_volume_ml, emission_factor_id,
             ijm_catalogue_id, source_id, contributor_id, created_at, updated_at, status,
-            revision_of_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            revision_of_id, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             brand = excluded.brand,
@@ -397,7 +436,8 @@ def upsert_commercial_product_conn(
             source_id = excluded.source_id,
             contributor_id = excluded.contributor_id,
             updated_at = excluded.updated_at,
-            status = excluded.status
+            status = excluded.status,
+            note = excluded.note
         """,
         (
             product_id,
@@ -419,6 +459,7 @@ def upsert_commercial_product_conn(
             now_iso(),
             status,
             revision_of,
+            text_or_none(row.get("Lien / Note / Remarque")),
         ),
     )
     replace_product_components(conn, product_id, row)

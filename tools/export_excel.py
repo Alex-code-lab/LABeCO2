@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from ui.quality_check import check_database, QualityIssue
+from ui.sqlite_schema import ensure_app_schema
 DEFAULT_DB = ROOT / "private" / "labeco2.sqlite"
 DEFAULT_OUT = ROOT / "exports" / "données_LABeCO2_reference.xlsx"
 
@@ -49,6 +50,7 @@ def sheet_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             ijm.designation              AS "Désignation catalogue IJM",
             ijm.conditionnement          AS "Conditionnement catalogue IJM",
             s.title                      AS "Source",
+            cp.note                      AS "Lien / Note / Remarque",
             c.name                       AS "Contributeur",
             cp.status                    AS "Statut",
             cp.created_at                AS "Date d'ajout",
@@ -221,6 +223,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(db_path)
+    ensure_app_schema(conn)
 
     sheets = {
         "Produits commerciaux": sheet_commercial_products(conn),

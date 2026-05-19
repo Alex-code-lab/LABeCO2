@@ -179,6 +179,7 @@ class DataMassWindow(QMainWindow):
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
         self.prefill_row_index = None
+        self._prefill_liq_id = None
 
         # data_materials transmis par MainWindow
         # data_materials doit contenir 'Materiau' et 'eCO2_kg'
@@ -1515,6 +1516,7 @@ class DataMassWindow(QMainWindow):
         self.mat_emb_liq_combo.setCurrentIndex(0)
         self.prefill_row_index = None
         self._prefill_liq_produit = None
+        self._prefill_liq_id = None
         self.update_action_button_text()
         self.update_required_indicators()
         self.update_price_preview()
@@ -1528,8 +1530,13 @@ class DataMassWindow(QMainWindow):
         """Ajoute ou met à jour un facteur liquide."""
         if self._uses_sqlite():
             try:
-                factor_uuid = upsert_liquid_factor(self.sqlite_path, obj_dict)
+                factor_uuid = upsert_liquid_factor(
+                    self.sqlite_path,
+                    obj_dict,
+                    existing_id=self._prefill_liq_id,
+                )
                 self._prefill_liq_produit = None
+                self._prefill_liq_id = None
                 self.data_liquids = self.load_liquid_df()
                 if self.current_mode() == self.MODE_LIQUID_FACTOR:
                     self.afficher_donnees()
@@ -1803,6 +1810,7 @@ class DataMassWindow(QMainWindow):
         """
         self.prefill_row_index = None
         self._prefill_liq_produit = None
+        self._prefill_liq_id = None
         self.update_action_button_text()
 
         def _clean_value(value):
@@ -1849,6 +1857,7 @@ class DataMassWindow(QMainWindow):
             if not rows.empty:
                 row = rows.iloc[0]
                 self._prefill_liq_produit = consommable_name.strip()
+                self._prefill_liq_id = clean_sqlite_id(row.get("factor_id", ""))
                 self.add_button.setText("Enregistrer les informations")
 
                 def _fill(field, col):
