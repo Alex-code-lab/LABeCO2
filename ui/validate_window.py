@@ -227,6 +227,7 @@ class ValidateWidget(QWidget):
     """Widget de validation embarquable (onglet ou fenêtre standalone)."""
 
     validated = Signal()
+    edit_requested = Signal(str, str)  # (db_table, row_id)
 
     def __init__(self, sqlite_path: str | Path, show_close: bool = True, parent=None):
         super().__init__(parent)
@@ -337,12 +338,21 @@ class ValidateWidget(QWidget):
             "QPushButton:hover{background:#d32f2f;}"
             "QPushButton:disabled{background:#aaa;}"
         )
+        self.btn_edit = QPushButton("✎  Modifier le facteur")
+        self.btn_edit.setStyleSheet(
+            "QPushButton{background:#e65100;color:white;font-weight:bold;padding:6px 16px;}"
+            "QPushButton:hover{background:#f4511e;}"
+            "QPushButton:disabled{background:#aaa;}"
+        )
         self.btn_validate.setEnabled(False)
         self.btn_reject.setEnabled(False)
+        self.btn_edit.setEnabled(False)
         self.btn_validate.clicked.connect(self._on_validate)
         self.btn_reject.clicked.connect(self._on_reject)
+        self.btn_edit.clicked.connect(self._on_edit)
         action_bar.addWidget(self.btn_validate)
         action_bar.addWidget(self.btn_reject)
+        action_bar.addWidget(self.btn_edit)
         action_bar.addStretch()
         if self._show_close:
             btn_close = QPushButton("Fermer")
@@ -563,15 +573,25 @@ class ValidateWidget(QWidget):
         if item.column() == 0:
             self._update_sel_count()
 
+    _EDITABLE_TABLES = frozenset({"emission_factors", "materials"})
+
     def _update_sel_count(self) -> None:
-        n = sum(
-            1 for r in range(self.table_widget.rowCount())
+        checked = [
+            self.table_widget.item(r, 0)
+            for r in range(self.table_widget.rowCount())
             if self.table_widget.item(r, 0) and
                self.table_widget.item(r, 0).checkState() == Qt.CheckState.Checked
-        )
+        ]
+        n = len(checked)
         self.sel_count_label.setText(f"{n} sélectionné(e)s")
         self.btn_validate.setEnabled(n > 0)
         self.btn_reject.setEnabled(n > 0)
+        can_edit = (
+            n == 1 and
+            checked[0].data(Qt.ItemDataRole.UserRole) is not None and
+            checked[0].data(Qt.ItemDataRole.UserRole)[0] in self._EDITABLE_TABLES
+        )
+        self.btn_edit.setEnabled(can_edit)
 
     def _selected_entries(self) -> list[tuple[str, str]]:
         result = []
@@ -693,6 +713,15 @@ class ValidateWidget(QWidget):
             return
         QMessageBox.information(self, "Succès", f"{len(entries)} entrée(s) rejetée(s).")
         self._load_table()
+
+    def _on_edit(self) -> None:
+        entries = self._selected_entries()
+        if len(entries) != 1:
+            return
+        db_table, row_id = entries[0]
+        if db_table not in self._EDITABLE_TABLES:
+            return
+        self.edit_requested.emit(db_table, row_id)
 
 
 class ValidateWindow(QDialog):

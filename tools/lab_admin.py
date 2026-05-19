@@ -58,15 +58,45 @@ class ValidationTab(QWidget):
     def __init__(self, db_path: Path):
         super().__init__()
         self.db_path = db_path
+        self._edit_window = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         self._widget = ValidateWidget(db_path, show_close=False, parent=self)
+        self._widget.edit_requested.connect(self._on_edit_requested)
         layout.addWidget(self._widget)
 
     def reload(self, db_path: Path) -> None:
         self.db_path = db_path
         self._widget.sqlite_path = db_path
         self._widget._load_table()
+
+    def _on_edit_requested(self, table: str, row_id: str) -> None:
+        import sqlite3
+        from ui.data_mass_window import DataMassWindow
+
+        factor_id = row_id
+        if table == "materials":
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    r = conn.execute(
+                        "SELECT emission_factor_id FROM materials WHERE id = ?", (row_id,)
+                    ).fetchone()
+                    if r and r[0]:
+                        factor_id = r[0]
+            except Exception:
+                pass
+
+        win = DataMassWindow(
+            parent=self,
+            base_path=str(ROOT),
+            user_path=str(ROOT),
+            mode_filter="factor",
+            sqlite_path=self.db_path,
+        )
+        win.prefill_factor_from_sqlite(factor_id)
+        win.data_added.connect(self._widget._load_table)
+        win.show()
+        self._edit_window = win
 
 
 # ============================================================

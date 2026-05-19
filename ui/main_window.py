@@ -2953,8 +2953,22 @@ class MainWindow(QMainWindow):
             subsub, name = '', subsub_name
         return subsub.strip(), name.strip()
     
+    def _raise_existing_data_mass_window(self):
+        """Ramène au premier plan la fenêtre déjà ouverte. Retourne True si elle existait."""
+        if (
+            self.data_mass_window is not None
+            and isValid(self.data_mass_window)
+            and self.data_mass_window.isVisible()
+        ):
+            self.data_mass_window.raise_()
+            self.data_mass_window.activateWindow()
+            return True
+        return False
+
     def open_data_mass_window(self):
         """Ouvre la fenêtre de gestion pré-remplie avec le consommable sélectionné."""
+        if self._raise_existing_data_mass_window():
+            return
         if not self.has_selected_consumable():
             return
 
@@ -2981,6 +2995,8 @@ class MainWindow(QMainWindow):
 
     def open_data_mass_window_new(self):
         """Ouvre la fenêtre de gestion avec le formulaire vierge pour ajouter un nouveau consommable."""
+        if self._raise_existing_data_mass_window():
+            return
         self.data_mass_window = DataMassWindow(
             parent=self,
             data_materials=self.data_materials,
@@ -2994,6 +3010,8 @@ class MainWindow(QMainWindow):
 
     def open_emission_factor_window(self):
         """Ouvre la fenêtre dédiée aux facteurs d'émission matériaux/liquides."""
+        if self._raise_existing_data_mass_window():
+            return
         self.data_mass_window = DataMassWindow(
             parent=self,
             data_materials=self.data_materials,
