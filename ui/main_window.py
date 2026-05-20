@@ -2245,9 +2245,9 @@ class MainWindow(QMainWindow):
         self._update_quantity_label(selected)
         self.quantity_label.setVisible(True)
         self.quantity_input.setVisible(True)
-        has_mass = self._consumable_has_mass_data(selected)
-        self.origine_label.setVisible(has_mass)
-        self.origine_row_widget.setVisible(has_mass)
+        show_origin = self._should_show_origin_selector(selected)
+        self.origine_label.setVisible(show_origin)
+        self.origine_row_widget.setVisible(show_origin)
 
         self.update_unit()
         self._update_prix_unitaire()
@@ -2559,6 +2559,15 @@ class MainWindow(QMainWindow):
             return True
         masse = row[self.data_manager.MASSE_G_COL].iloc[0]
         return not (pd.isna(masse) or str(masse).strip() == "")
+
+    def _should_show_origin_selector(self, selected):
+        """Demande la provenance dès qu'un consommable est sélectionné.
+
+        La provenance reste utile même si les données de masse sont incomplètes :
+        elle est conservée dans l'historique, et le calcul transport s'active dès
+        qu'une masse exploitable existe.
+        """
+        return selected is not None
 
     def _solid_row_liquid_factor(self, solid_row):
         factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")

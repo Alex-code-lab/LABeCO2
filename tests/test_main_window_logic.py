@@ -461,6 +461,29 @@ class TestUpdateMasseWarning(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# _should_show_origin_selector
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestOriginSelectorVisibility(unittest.TestCase):
+
+    def test_aucune_selection_cache_provenance(self):
+        mw = _make_mw(selected=None)
+        self.assertFalse(mw._should_show_origin_selector(None))
+
+    def test_consommable_sans_masse_demande_provenance(self):
+        """Régression Parafilm : masse absente, mais origine à renseigner."""
+        sel = {'code_nacres': 'NB35', 'consommable': 'PARAFILM 10cmx75m', 'source': 'solid'}
+        mw = _make_mw(selected=sel, data_masse=_solid_row(
+            code='NB35',
+            nom='PARAFILM 10cmx75m',
+            masse_g=float('nan'),
+            materiau='',
+        ))
+        self.assertFalse(mw._consumable_has_mass_data(sel))
+        self.assertTrue(mw._should_show_origin_selector(sel))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # _update_quantity_label
 # ─────────────────────────────────────────────────────────────────────────────
 
