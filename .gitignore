@@ -11,6 +11,14 @@ Desktop/
 packaging/
 private/
 .DS_Store
+~$*
 *.xlsx
 *.hdf5.backup
+*.backup_before_*
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 docs/test_carbon_calculator_annote.py
