@@ -32,6 +32,10 @@ def ensure_app_schema(conn: sqlite3.Connection) -> None:
     """Ajoute les colonnes applicatives manquantes sur les bases existantes."""
     conn.execute(_CREATE_SUPPLIER_CATALOGUE)
 
+    nacres_columns = _columns(conn, "nacres_codes")
+    if nacres_columns and "statut_maj_2026" not in nacres_columns:
+        conn.execute("ALTER TABLE nacres_codes ADD COLUMN statut_maj_2026 TEXT")
+
     commercial_product_columns = _columns(conn, "commercial_products")
     if commercial_product_columns and "note" not in commercial_product_columns:
         conn.execute("ALTER TABLE commercial_products ADD COLUMN note TEXT")

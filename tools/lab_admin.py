@@ -19,8 +19,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import QModelIndex, QSortFilterProxyModel, Qt
+from PySide6.QtGui import QColor, QFont, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -50,6 +50,7 @@ from tools.contribution_io import (
 )
 from ui.validate_window import ValidateWidget
 from ui.quality_check import check_database
+from ui.nacres_metadata import load_nacres_options
 
 
 # ============================================================
@@ -1077,6 +1078,11 @@ _NACRES_RULES: list[tuple[list[str], str, str]] = [
 ]
 
 _COLOR_SUGGESTION = QColor(200, 220, 255)   # bleu clair : suggestion IA
+_COLOR_NACRES_NEW_NO_FE = QColor(255, 210, 150)  # orange : nouveau NACRES sans FE achats
+_NACRES_NEW_NO_FE_TOOLTIP = (
+    "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
+    "de facteur d'émission pour cette catégorie."
+)
 
 
 def suggest_nacres(name: str) -> tuple[str, str]:
@@ -1086,82 +1092,6 @@ def suggest_nacres(name: str) -> tuple[str, str]:
         if any(kw in name_l for kw in keywords):
             return code, reason
     return "", ""
-
-
-# ============================================================
-# Labels officiels NACRES (64 codes présents dans la base)
-# ============================================================
-
-_NACRES_LABELS: dict[str, str] = {
-    "AA01": "PAINS, PATISSERIES, VIENNOISERIES CONGELES",
-    "AA23": "CONSERVES ET EPICERIE",
-    "AA41": "CONSOMMABLES POUR LA RESTAURATION",
-    "AA42": "PETITES FOURNITURES POUR LA RESTAURATION",
-    "AB01": "PETITES FOURNITURES ET PETITS EQUIPEMENTS DE BUREAU (HORS INFORMATIQUE)",
-    "AC01": "PAPIERS BLANCS OU COLORES COURANTS POUR IMPRESSION-REPROGRAPHIE",
-    "AC02": "PAPIERS CARTONNES POUR IMPRESSION-REPROGRAPHIE",
-    "BB01": "PRODUITS ET PETITES FOURNITURES D'HYGIENE ET DE TOILETTE",
-    "BB02": "PRODUITS ET PETITES FOURNITURES D'ENTRETIEN MENAGER",
-    "BD21": "PETITES FOURNITURES ELECTRIQUES POUR L'EQUIPEMENT DES BATIMENTS ET INFRASTR.",
-    "FA01": "FOURNITURES D'EMBALLAGE ET DE TRANSPORT DE MARCHANDISES ORDINAIRES",
-    "HA01": "EPI : GANTS A USAGE UNIQUE",
-    "HA02": "EPI : AUTRES EPI JETABLES (BLOUSES, SURCHAUSSES, CHARLOTTES, MASQUES...)",
-    "HA03": "EPI : BLOUSES ET AUTRES VETEMENTS DE LABORATOIRE REUTILISABLES",
-    "HA04": "EPI : VETEMENTS DE TRAVAIL ET DE PROTECTION COURANTS (HORS LABORATOIRE)",
-    "HA05": "EPI : ACCESSOIRES (LUNETTES, CASQUES, ETC...)",
-    "HA11": "CONSOMMABLES POUR RECEPTION DES DECHETS (ABSORBANTS, RECIPIENTS...)",
-    "IA24": "AUTRE MATERIEL INFORMATIQUE PERIPHERIQUE (ECRANS, CLAVIERS, SOURIS...)",
-    "KE12": "MATERIELS CHIRUGICAUX ET DE TECHNIQUES OPERATOIRES ANIMALES",
-    "KE13": "CONSOMMABLES D'ANESTHESIE ET DE TECHNIQUES OPERATOIRES ANIMALES",
-    "MA45": "LAMPES POUR MICROSCOPES PHOTONIQUES ET DE FLUORESCENCE",
-    "NA02": "SOLVANTS : ACETONE",
-    "NA03": "SOLVANTS : ACETONITRILE",
-    "NA04": "SOLVANTS : SOLVANTS CHLORES (DICHLOROMETHANE, CHLOROFORME...)",
-    "NA05": "SOLVANTS : EAU ET ALCOOLS (METHANOL, ETHANOL, PROPAN-2-OL...)",
-    "NA06": "SOLVANTS : HYDROCARBURES (PENTANE, HEXANE, HEPTANE...)",
-    "NA07": "SOLVANTS : AUTRES SOLVANTS (ETHERS...)",
-    "NA21": "PRODUITS CHIMIQUES COURANTS (ACIDES, BASES, SELS...)",
-    "NA25": "PRODUITS BIOCHIMIQUES COURANTS (TAMPONS, BSA, etc.)",
-    "NA26": "BIOLOGIE : PEPTIDES ET ACIDES AMINES",
-    "NA28": "BIOLOGIE : PRODUITS CHIMIQUES A USAGE BIOCHIMIQUE OU BIOLOGIQUE",
-    "NA31": "REACTIFS ET KITS POUR LE MARQUAGE ET LA DETECTION DES ACIDES NUCLEIQUES",
-    "NA46": "ANTICORPS SECONDAIRES",
-    "NA52": "KITS ET REACTIFS POUR L'ISOLEMENT ET LA PURIFICATION DES ACIDES NUCLEIQUES",
-    "NA53": "ENZYMES DE RESTRICTION",
-    "NA54": "ENZYMES DE MODIFICATION ET DE CLONAGE (Nucleases, Kinases, Phosphatases)",
-    "NA55": "ENZYMES ET KITS DE SYNTHESE DES ACIDES NUCLEIQUES (PCR...)",
-    "NA56": "KITS ET REACTIFS POUR L'ISOLEMENT ET LA PURIFICATION DES PROTEINES",
-    "NA71": "SERUMS ET AUTRES MILIEUX POUR CULTURE DE CELLULES ANIMALES",
-    "NA73": "MILIEUX POUR CULTURE DE PETITS ORGANISMES VIVANTS",
-    "NA76": "ANTIBIOTIQUES POUR CULTURE CELLULAIRE",
-    "NA78": "ENZYMES POUR CULTURE CELLULAIRE",
-    "NB01": "MICROPIPETTES MONO-CANAL, MULTI-CANAUX ET ACCESSOIRES",
-    "NB02": "POINTES (CONES) POUR MICROPIPETTES MONO-CANAL ET MULTI-CANAUX",
-    "NB03": "SERINGUES EN PLASTIQUE ET AIGUILLES",
-    "NB04": "PIPETTES A USAGE UNIQUE",
-    "NB05": "PIPETTES REUTILISABLES",
-    "NB11": "MICROTUBES, CRYOTUBES, TUBES A USAGE UNIQUE",
-    "NB12": "PORTOIRS ET BOITES DE STOCKAGE POUR MICROTUBES",
-    "NB13": "CULTURE CELLULAIRE EUCARYOTE : CONSOMMABLES EN PLASTIQUE SPECIFIQUES",
-    "NB14": "BACTERIOLOGIE : CONSOMMABLES EN PLASTIQUE SPECIFIQUES",
-    "NB15": "MICROPLAQUES (PCR, HTS, ELISA...) HORS CULTURE CELLULAIRE ET FILTRATION",
-    "NB16": "LAMES ET LAMELLES EN VERRE ET PLASTIQUE",
-    "NB17": "AUTRES CONSOMMABLES EN PLASTIQUE ET EN VERRE HORS CULTURE CELL. ET BACTERIO",
-    "NB22": "ELECTROPHORESE SUR GEL : CONSOMMABLES NON DEDIES AUX INSTRUMENTS",
-    "NB23": "MEMBRANES ET KITS POUR LE TRANSFERT D'ACIDES NUCLEIQUES ET DES PROTEINES (BLOT)",
-    "NB24": "CONSOMMABLES POUR FILTRATION ET DIALYSE",
-    "NB32": "HUILE A IMMERSION POUR MICROSCOPIE",
-    "NB34": "PRODUITS DE LAVAGE, DESINFECTION, STERILISATION",
-    "NB35": "AUTRES CONSOMMABLES DE LABO HORS PLASTIQUE ET VERRE",
-    "NB43": "VAISSELLE DE LABORATOIRE REUTILISABLE EN VERRE, PLASTIQUE, PORCELAINE",
-    "NB51": "PETIT MATERIEL DE PAILLASSE NON ELECTRIQUE COURANT",
-    "NE02": "BIOLOGIE : SERVICES DE SEQUENCAGE HAUT DEBIT ET SERVICES CONNEXES",
-    "TB12": "ENERGIE : PILES A L'UNITE ET ASSEMBLAGE DE PILES CLASSIQUES ET SPECIALES",
-}
-
-_NACRES_COMBO_ITEMS: list[str] = [""] + [
-    f"{code} — {label}" for code, label in sorted(_NACRES_LABELS.items())
-]
 
 
 # ============================================================
@@ -1190,6 +1120,44 @@ _COLOR_HAS_NACRES = QColor(210, 240, 210)   # vert  : NACRES confirmé
 _COLOR_VALIDATED  = QColor(220, 235, 255)   # bleu clair : déjà validé
 
 
+def _combo_stylesheet(color: QColor) -> str:
+    return f"""
+        QComboBox, QComboBox QLineEdit {{
+            background: {color.name()};
+            color: black;
+        }}
+        QComboBox QAbstractItemView {{
+            background: white;
+            color: black;
+            selection-background-color: #d7ebff;
+            selection-color: black;
+        }}
+    """
+
+
+class _NacresPrefixFilterProxy(QSortFilterProxyModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._prefix = ""
+
+    def set_prefix(self, text: str) -> None:
+        prefix = (text or "").strip().upper()
+        if prefix == self._prefix:
+            return
+        self._prefix = prefix
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        if not self._prefix:
+            return True
+        source_model = self.sourceModel()
+        if source_model is None:
+            return False
+        index = source_model.index(source_row, 0, source_parent)
+        code = str(source_model.data(index, Qt.ItemDataRole.UserRole) or "").upper()
+        return bool(code) and code.startswith(self._prefix)
+
+
 class CatalogueTab(QWidget):
     """Onglet d'assignation des codes NACRES aux produits importés (status=pending)."""
 
@@ -1197,6 +1165,9 @@ class CatalogueTab(QWidget):
         super().__init__()
         self.db_path = db_path
         self._pending_changes: dict[str, str] = {}   # product_id → new nacres
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        self._nacres_model = QStandardItemModel(self)
         self._build_ui()
         self._load()
 
@@ -1254,6 +1225,7 @@ class CatalogueTab(QWidget):
             ("Suggestion auto", _COLOR_SUGGESTION),
             ("NACRES assigné", _COLOR_HAS_NACRES),
             ("Validé", _COLOR_VALIDATED),
+            ("Nouveau sans FE Labo1point5", _COLOR_NACRES_NEW_NO_FE),
         ]:
             lbl = QLabel(f"  ■ {text}  ")
             lbl.setStyleSheet(
@@ -1271,6 +1243,7 @@ class CatalogueTab(QWidget):
         self.table.setHorizontalHeaderLabels(_CATALOGUE_HEADERS)
         self.table.hideColumn(_COL_ID)
         self.table.setColumnWidth(_COL_CHK, 28)
+        self.table.setColumnWidth(_COL_NACRES, 260)
         self.table.horizontalHeader().setSectionResizeMode(
             _COL_CHK, QHeaderView.ResizeMode.Fixed
         )
@@ -1278,8 +1251,12 @@ class CatalogueTab(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(
             _COL_CHK, QHeaderView.ResizeMode.Fixed
         )
+        self.table.horizontalHeader().setSectionResizeMode(
+            _COL_NACRES, QHeaderView.ResizeMode.Interactive
+        )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemChanged.connect(self._on_item_changed)
+        self.table.cellDoubleClicked.connect(self._activate_nacres_editor)
         root.addWidget(self.table)
 
         # Actions
@@ -1345,6 +1322,9 @@ class CatalogueTab(QWidget):
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
+            self._nacres_options = load_nacres_options(conn)
+            self._nacres_by_code = {option.code: option for option in self._nacres_options}
+            self._rebuild_nacres_model()
 
             rows = conn.execute("""
                 SELECT
@@ -1427,11 +1407,11 @@ class CatalogueTab(QWidget):
             price = row["price_ht"]
             self.table.setItem(r, _COL_PRICE,  _item(f"{price:.2f}" if price else ""))
             self.table.setItem(r, _COL_TYPE,   _item(row["product_type"]))
-            # NACRES : item caché (pour le filtrage) + QComboBox pour les pending
-            self.table.setItem(r, _COL_NACRES, _item(nacres))
+            # NACRES : item texte léger. Le QComboBox est créé au double-clic.
+            nacres_cell = _item(nacres)
             if is_pending:
-                combo = self._make_nacres_combo(r, nacres, color)
-                self.table.setCellWidget(r, _COL_NACRES, combo)
+                nacres_cell.setToolTip("Double-cliquer pour ouvrir la liste NACRES.")
+            self.table.setItem(r, _COL_NACRES, nacres_cell)
             self.table.setItem(r, _COL_STATUS, _item(status))
 
         self.table.blockSignals(False)
@@ -1485,17 +1465,87 @@ class CatalogueTab(QWidget):
     # NACRES combobox helpers
     # ------------------------------------------------------------------
 
+    def _activate_nacres_editor(self, row: int, column: int) -> None:
+        if column != _COL_NACRES:
+            return
+        status_item = self.table.item(row, _COL_STATUS)
+        if not status_item or status_item.text().strip() != "pending":
+            return
+        if isinstance(self.table.cellWidget(row, _COL_NACRES), QComboBox):
+            return
+
+        nacres_item = self.table.item(row, _COL_NACRES)
+        nacres = nacres_item.text().strip() if nacres_item else ""
+        color = _COLOR_HAS_NACRES if nacres else _COLOR_PENDING
+        if nacres_item:
+            color = nacres_item.background().color()
+        combo = self._make_nacres_combo(row, nacres, color)
+        self.table.setCellWidget(row, _COL_NACRES, combo)
+        combo.setFocus()
+        combo.showPopup()
+
+    def _nacres_display(self, code: str) -> str:
+        option = self._nacres_by_code.get((code or "").strip().upper())
+        if not option:
+            return (code or "").strip().upper()
+        return f"{option.code} — {option.label}" if option.label else option.code
+
+    def _nacres_code_from_text(self, text: str) -> str:
+        raw = (text or "").strip().upper()
+        if " — " in raw:
+            return raw.split(" — ", 1)[0].strip()
+        if " - " in raw:
+            return raw.split(" - ", 1)[0].strip()
+        return raw
+
+    def _show_short_nacres_code(self, combo: QComboBox, code: str) -> None:
+        combo.blockSignals(True)
+        combo.setEditText(code.strip().upper())
+        combo.lineEdit().setCursorPosition(0)
+        combo.blockSignals(False)
+
+    def _filter_nacres_combo(self, combo: QComboBox, text: str) -> None:
+        proxy = getattr(combo, "_nacres_proxy", None)
+        if not isinstance(proxy, _NacresPrefixFilterProxy):
+            return
+        proxy.set_prefix(self._nacres_code_from_text(text))
+        combo.lineEdit().setText(text)
+        combo.lineEdit().setCursorPosition(len(text))
+
+    def _rebuild_nacres_model(self) -> None:
+        model = QStandardItemModel(self)
+        empty = QStandardItem("")
+        empty.setData("", Qt.ItemDataRole.UserRole)
+        empty.setData(QColor(0, 0, 0), Qt.ItemDataRole.ForegroundRole)
+        model.appendRow(empty)
+        for option in self._nacres_options:
+            item = QStandardItem(self._nacres_display(option.code))
+            item.setData(option.code, Qt.ItemDataRole.UserRole)
+            item.setData(QColor(0, 0, 0), Qt.ItemDataRole.ForegroundRole)
+            if option.is_new_without_labo1point5_fe:
+                item.setData(_COLOR_NACRES_NEW_NO_FE, Qt.ItemDataRole.BackgroundRole)
+                item.setData(_NACRES_NEW_NO_FE_TOOLTIP, Qt.ItemDataRole.ToolTipRole)
+            model.appendRow(item)
+        self._nacres_model = model
+
     def _make_nacres_combo(self, row: int, nacres: str, color: QColor) -> QComboBox:
         combo = QComboBox()
         combo.setEditable(True)
-        combo.addItems(_NACRES_COMBO_ITEMS)
+        combo.setMinimumWidth(260)
+        combo.view().setMinimumWidth(560)
+        proxy = _NacresPrefixFilterProxy(combo)
+        proxy.setSourceModel(self._nacres_model)
+        combo._nacres_proxy = proxy
+        combo.setModel(proxy)
+        combo.setCompleter(None)
         combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         combo.lineEdit().setPlaceholderText("Sélectionner ou saisir…")
-        combo.setStyleSheet(f"background: {color.name()};")
+        combo.lineEdit().setCompleter(None)
+        combo.setStyleSheet(_combo_stylesheet(color))
         if nacres:
-            label = _NACRES_LABELS.get(nacres, "")
-            entry = f"{nacres} — {label}" if label else nacres
-            idx = combo.findText(entry)
+            nacres = nacres.strip().upper()
+            entry = self._nacres_display(nacres)
+            idx = combo.findData(nacres)
             if idx < 0:
                 for i in range(combo.count()):
                     if combo.itemText(i).startswith(nacres):
@@ -1505,17 +1555,24 @@ class CatalogueTab(QWidget):
                 combo.setCurrentIndex(idx)
             else:
                 combo.setCurrentText(entry)
+            self._show_short_nacres_code(combo, nacres)
         else:
             combo.setCurrentIndex(0)
-        combo.currentTextChanged.connect(
-            lambda text, r=row: self._on_nacres_combo_changed(r, text)
+        combo.lineEdit().textEdited.connect(
+            lambda text, c=combo: self._filter_nacres_combo(c, text)
+        )
+        combo.activated.connect(
+            lambda _index, r=row, c=combo: self._on_nacres_combo_changed(r, c.currentText())
+        )
+        combo.lineEdit().editingFinished.connect(
+            lambda r=row, c=combo: self._on_nacres_combo_changed(r, c.currentText())
         )
         return combo
 
     def _on_nacres_combo_changed(self, row: int, text: str) -> None:
-        code = text.split(" — ")[0].strip().upper() if " — " in text else text.strip().upper()
-        if code and code not in _NACRES_LABELS:
-            code = ""
+        code = self._nacres_code_from_text(text)
+        if code and code not in self._nacres_by_code:
+            return
 
         id_item = self.table.item(row, _COL_ID)
         if not id_item:
@@ -1540,7 +1597,9 @@ class CatalogueTab(QWidget):
         self.table.blockSignals(False)
         widget = self.table.cellWidget(row, _COL_NACRES)
         if widget:
-            widget.setStyleSheet(f"background: {color.name()};")
+            widget.setStyleSheet(_combo_stylesheet(color))
+        if isinstance(widget, QComboBox):
+            self._show_short_nacres_code(widget, code)
 
         self._update_unsaved_label()
 
@@ -1566,6 +1625,8 @@ class CatalogueTab(QWidget):
             code, reason = suggest_nacres(name_item.text())
             if not code:
                 continue
+            if code not in self._nacres_by_code:
+                continue
             product_id = id_item.text()
             # Mise à jour de l'item caché
             nacres_item.setText(code)
@@ -1573,14 +1634,18 @@ class CatalogueTab(QWidget):
             # Mise à jour du QComboBox si présent (pending)
             widget = self.table.cellWidget(r, _COL_NACRES)
             if isinstance(widget, QComboBox):
-                label = _NACRES_LABELS.get(code, "")
-                entry = f"{code} — {label}" if label else code
-                idx = widget.findText(entry)
+                proxy = getattr(widget, "_nacres_proxy", None)
+                if isinstance(proxy, _NacresPrefixFilterProxy):
+                    proxy.set_prefix("")
+                entry = self._nacres_display(code)
+                idx = widget.findData(code)
                 widget.blockSignals(True)
                 if idx >= 0:
                     widget.setCurrentIndex(idx)
                 else:
                     widget.setCurrentText(entry)
+                widget.setEditText(code)
+                widget.lineEdit().setCursorPosition(0)
                 widget.blockSignals(False)
                 widget.setToolTip(f"Suggestion automatique : {reason}")
             # Couleur bleu clair = suggestion
@@ -1589,7 +1654,7 @@ class CatalogueTab(QWidget):
                 if cell:
                     cell.setBackground(_COLOR_SUGGESTION)
             if widget:
-                widget.setStyleSheet(f"background: {_COLOR_SUGGESTION.name()};")
+                widget.setStyleSheet(_combo_stylesheet(_COLOR_SUGGESTION))
             self._pending_changes[product_id] = code
             filled += 1
         self.table.blockSignals(False)

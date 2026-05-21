@@ -13,6 +13,7 @@ private/
 .DS_Store
 ~$*
 *.xlsx
+!data/nacres_codes/*.xlsx
 *.hdf5.backup
 *.backup_before_*
 *.aux

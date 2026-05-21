@@ -17,6 +17,7 @@ import os
 import math
 import re
 import json
+import sqlite3
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
@@ -26,11 +27,12 @@ from PySide6.QtWidgets import (
     QToolButton, QStyle,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
+from PySide6.QtGui import QColor, QCursor, QIntValidator, QDoubleValidator
 from shiboken6 import isValid
 
 from ui.data_manager import DataManager
 from ui.carbon_calculator import CarbonCalculator
+from ui.nacres_metadata import load_nacres_options
 from ui.display_utils import (
     clean_text,
     display_unit,
@@ -70,6 +72,12 @@ from ui.charts.coverage_by_category import CoverageCategoryWindow
 from ui.user_manip_dialog import UserManipDialog
 from ui.charts.history_utils import iter_history_data
 
+
+_NACRES_NEW_NO_FE_COLOR = QColor(255, 210, 150)
+_NACRES_NEW_NO_FE_TOOLTIP = (
+    "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
+    "de facteur d'émission pour cette catégorie."
+)
 
 
 class MainWindow(QMainWindow):
@@ -178,6 +186,9 @@ class MainWindow(QMainWindow):
         self.origine_combo = None
         self.origine_info_button = None
         self.origine_row_widget = None
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        self._load_nacres_options()
 
         self.setStyleSheet("""
             QPushButton {
@@ -1092,6 +1103,20 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Helpers d'affichage et de sélection
     # ------------------------------------------------------------------
+    def _load_nacres_options(self):
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        sqlite_path = getattr(self.data_manager, "sqlite_path", None)
+        if not sqlite_path:
+            return
+        try:
+            with sqlite3.connect(sqlite_path) as conn:
+                self._nacres_options = load_nacres_options(conn)
+            self._nacres_by_code = {option.code: option for option in self._nacres_options}
+        except Exception:
+            self._nacres_options = []
+            self._nacres_by_code = {}
+
     def _populate_subcategory_combo(self, subcategories):
         self.subcategory_combo.clear()
         for subcategory in sorted(clean_text(s) for s in subcategories if clean_text(s)):
@@ -1882,11 +1907,59 @@ class MainWindow(QMainWindow):
                 if row is not None:
                     add_subsub_entry(row)
 
+            existing_prefixes = {
+                normalize_nacres_prefix(data["subsubcategory"])
+                for _, _, data in entries
+                if normalize_nacres_prefix(data["subsubcategory"])
+            }
+            conso_filter_norm = normalize_search(conso_filter) if conso_filter else None
+            for option in self._nacres_options:
+                if option.code in existing_prefixes:
+                    continue
+                purchase_row = self._purchase_factor_row_for_nacres(option.code)
+                if purchase_row is not None:
+                    subsubcategory = clean_text(purchase_row.get("subsubcategory", "")) or option.code
+                    name = clean_text(purchase_row.get("name", "")) or option.label
+                    item_subcategory = clean_text(purchase_row.get("subcategory", "")) or subcategory
+                else:
+                    subsubcategory = option.code
+                    name = option.label
+                    item_subcategory = subcategory
+                display = f"{subsubcategory} - {name}".strip(" - ")
+                haystack = normalize_search(display)
+                if search_text and search_text not in haystack:
+                    continue
+                if conso_filter_norm and conso_filter_norm not in haystack:
+                    continue
+                item_data = {
+                    "category": "Achats",
+                    "subcategory": item_subcategory,
+                    "subsubcategory": subsubcategory,
+                    "name": name,
+                    "nacres_status": option.statut_maj_2026,
+                    "nacres_no_purchase_factor": not option.has_purchase_factor,
+                    "nacres_new_without_fe": option.is_new_without_labo1point5_fe,
+                }
+                key = (
+                    item_data["category"],
+                    item_data["subcategory"],
+                    item_data["subsubcategory"],
+                    item_data["name"],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append((display.casefold(), display, item_data))
+
         self.subsub_name_combo.blockSignals(True)
         self.subsub_name_combo.clear()
         self.subsub_name_combo.addItem("non renseignée")
         for _, display, item_data in sorted(entries):
             self.subsub_name_combo.addItem(display, userData=item_data)
+            idx = self.subsub_name_combo.count() - 1
+            if item_data.get("nacres_new_without_fe"):
+                self.subsub_name_combo.setItemData(idx, _NACRES_NEW_NO_FE_COLOR, Qt.BackgroundRole)
+                self.subsub_name_combo.setItemData(idx, _NACRES_NEW_NO_FE_TOOLTIP, Qt.ToolTipRole)
         self.subsub_name_combo.blockSignals(False)
 
         self.update_years()
@@ -1967,11 +2040,16 @@ class MainWindow(QMainWindow):
             self.input_field.setEnabled(True)
         else:
             self.current_unit = None
-            if self.days_label.isVisible():
+            if item_data.get("nacres_new_without_fe"):
+                self.input_label.setText(
+                    "Aucun facteur d'émission GES 1point5 n'est défini pour cette nouvelle catégorie NACRES."
+                )
+            elif self.days_label.isVisible():
                 self.input_label.setText('Entrez la valeur journalière:')
             else:
                 self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
+        self.input_field.setToolTip(_NACRES_NEW_NO_FE_TOOLTIP if item_data.get("nacres_new_without_fe") else "")
         self._update_field_indicators()
 
     def update_conso_filtered_combo(self, filter_text=None):
@@ -4303,6 +4381,10 @@ avant toute intégration fiable.
                 <b><a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">Labos 1point5 (PER1p5) - Données achats</a></b><br>
                 Données PER1p5 pour les achats (NACRES vers facteurs d'émission macro / méso / micro).<br>
                 M. De Paepe, L. Jeanneau, J. Mariette, O. Aumont, A. Estevez-Torres, <i>Purchases dominate the carbon footprint of research laboratories</i>, bioRxiv 2023 (<a href="https://doi.org/10.1101/2023.04.04.535626">https://doi.org/10.1101/2023.04.04.535626</a>).
+            </li>
+            <li>
+                <b><a href="https://www.amue.fr/publications/actualites/details/nomenclature-nacres-mise-a-jour-ce-mois-de-mars-2026">AMUE - Nomenclature NACRES mise à jour en mars 2026</a></b><br>
+                Source de la nomenclature NACRES 2026 utilisée pour les nouveaux codes et leur statut de mise à jour.
             </li>
             <li>
                 <b><a href="https://base-empreinte.ademe.fr/">Base Carbone®</a></b><br>

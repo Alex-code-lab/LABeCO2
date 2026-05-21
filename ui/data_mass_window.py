@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
     QScrollArea, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor, QDoubleValidator, QIntValidator
+from PySide6.QtGui import QColor, QCursor, QDoubleValidator, QIntValidator
 from ui.display_utils import looks_like_liquid_commercial_product
+from ui.nacres_metadata import load_nacres_options
 from ui.sqlite_legacy_adapter import SQLITE_ID_COL, load_legacy_dataframes
 from ui.sqlite_writer import (
     normalize_key,
@@ -31,6 +32,11 @@ from ui.sqlite_writer import (
 
 logger = logging.getLogger(__name__)
 SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
+_NACRES_NEW_NO_FE_COLOR = QColor(255, 210, 150)
+_NACRES_NEW_NO_FE_TOOLTIP = (
+    "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
+    "de facteur d'émission pour cette catégorie."
+)
 
 
 def clean_sqlite_id(value):
@@ -115,7 +121,7 @@ class DataMassWindow(QMainWindow):
         if not self.sqlite_path:
             raise ValueError("DataMassWindow nécessite un chemin SQLite.")
 
-        self._all_nacres = []  # Will store (code, description)
+        self._all_nacres = []
 
         self.columns = [
             "Consommable",
@@ -829,14 +835,7 @@ class DataMassWindow(QMainWindow):
 
         try:
             with sqlite3.connect(self.sqlite_path) as conn:
-                rows = conn.execute(
-                    """
-                    SELECT code, COALESCE(label, '') AS label
-                    FROM nacres_codes
-                    ORDER BY code
-                    """
-                ).fetchall()
-            self._all_nacres = [(str(code), str(label)) for code, label in rows]
+                self._all_nacres = load_nacres_options(conn)
             self.filter_nacres_list()
         except Exception as e:
             self._all_nacres = []
@@ -914,10 +913,16 @@ class DataMassWindow(QMainWindow):
         search_text = self.nacres_search.text().strip().lower()
         self.nacres_combo.clear()
         self.nacres_combo.addItem("Sélectionnez un code NACRES...", None)
-        for (code, desc) in self._all_nacres:
+        for option in self._all_nacres:
+            code = option.code
+            desc = option.label
             if search_text in code.lower() or search_text in desc.lower():
                 display_text = f"{code} - {desc}"
                 self.nacres_combo.addItem(display_text, code)
+                idx = self.nacres_combo.count() - 1
+                if option.is_new_without_labo1point5_fe:
+                    self.nacres_combo.setItemData(idx, _NACRES_NEW_NO_FE_COLOR, Qt.BackgroundRole)
+                    self.nacres_combo.setItemData(idx, _NACRES_NEW_NO_FE_TOOLTIP, Qt.ToolTipRole)
         self.update_required_indicators()
 
     def show_material_info(self, material_combo, button):
