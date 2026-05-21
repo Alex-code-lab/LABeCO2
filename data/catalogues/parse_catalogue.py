@@ -281,11 +281,11 @@ _DUCHEFA_PRICE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Entrée d'index : cat_no  CAS  page  (le nom est ce qui précède le cat_no)
+# Entrée d'index : cat_no  [CAS]  page  (le CAS est absent pour les milieux sans n° CAS)
 _DUCHEFA_IDX_RE = re.compile(
-    r'([A-Z]\d{4})'            # cat_no (sans espace dans l'index)
-    r'\s+([\d/\-\.]+)'         # CAS (peut être "11/4/7758" ou "7758-99-8")
-    r'\s+(\d{1,3})\b',         # numéro de page (1-3 chiffres)
+    r'([A-Z]\d{4})'             # cat_no (sans espace dans l'index)
+    r'(?:\s+[\d/\-\.]+)?'       # CAS optionnel (peut être "7758-99-8" ou absent)
+    r'\s+(\d{1,3})\b',          # numéro de page (1-3 chiffres)
 )
 
 # Pages de l'index alphabétique (contiennent "Cat. no." dans le texte)
@@ -312,7 +312,7 @@ def _parse_duchefa_index(pdf) -> dict[str, str]:
                 raw_name = re.sub(r'^[\d/\-\.\s]+', '', raw_name).strip()
                 if raw_name and len(raw_name) > 2 and cat_no not in names:
                     names[cat_no] = raw_name
-                prev_end = m.end()
+                prev_end = m.end()  # group(2) est maintenant la page (CAS optionnel)
 
     return names
 

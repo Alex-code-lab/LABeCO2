@@ -12,9 +12,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Acyclovir,A0183.1000,51.8,1 g,1,51.8,Duchefa Biochemie,DUCHEFA,2010-2012,78
 ,Amiprophos methyl,A0185.0250,51.9,250 mg,1,51.9,Duchefa Biochemie,DUCHEFA,2010-2012,81
 ,Amiprophos methyl,A0185.1000,166.3,1 g,1,166.3,Duchefa Biochemie,DUCHEFA,2010-2012,81
-,,A0189.0002,26.2,2 g,1,26.2,Duchefa Biochemie,DUCHEFA,2010-2012,82
-,,A0189.0010,122.7,10 g,1,122.7,Duchefa Biochemie,DUCHEFA,2010-2012,82
-,,A0189.0025,290.5,25 g,1,290.5,Duchefa Biochemie,DUCHEFA,2010-2012,82
+,Amoxycillin sodium / Clavulanate potassium,A0189.0002,26.2,2 g,1,26.2,Duchefa Biochemie,DUCHEFA,2010-2012,82
+,Amoxycillin sodium / Clavulanate potassium,A0189.0010,122.7,10 g,1,122.7,Duchefa Biochemie,DUCHEFA,2010-2012,82
+,Amoxycillin sodium / Clavulanate potassium,A0189.0025,290.5,25 g,1,290.5,Duchefa Biochemie,DUCHEFA,2010-2012,82
 ,Amphotericin B suspension,A0192.0040,44.2,40 ml,1,44.2,Duchefa Biochemie,DUCHEFA,2010-2012,83
 ,Ammonium nitrate,A0501.1000,16.2,1 kg,1,16.2,Duchefa Biochemie,DUCHEFA,2010-2012,82
 ,Ammonium nitrate,A0501.5000,63.2,5 kg,1,63.2,Duchefa Biochemie,DUCHEFA,2010-2012,82
@@ -74,9 +74,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Benzylaminopurine riboside,B0930.1000,129.2,1 g,1,129.2,Duchefa Biochemie,DUCHEFA,2010-2012,85
 ,N-Benzyl-9-(tetrahydropyranyl)-adenine (BPA),B0932.0100,59.4,100 mg,1,59.4,Duchefa Biochemie,DUCHEFA,2010-2012,86
 ,N-Benzyl-9-(tetrahydropyranyl)-adenine (BPA),B0932.0500,251.6,500 mg,1,251.6,Duchefa Biochemie,DUCHEFA,2010-2012,86
-,,B1304.0500,49.7,500 g,1,49.7,Duchefa Biochemie,DUCHEFA,2010-2012,85
-,,B1304.1000,86.9,1 kg,1,86.9,Duchefa Biochemie,DUCHEFA,2010-2012,85
-,,B1304.5000,397.0,5 kg,1,397.0,Duchefa Biochemie,DUCHEFA,2010-2012,85
+,Banana powder,B1304.0500,49.7,500 g,1,49.7,Duchefa Biochemie,DUCHEFA,2010-2012,85
+,Banana powder,B1304.1000,86.9,1 kg,1,86.9,Duchefa Biochemie,DUCHEFA,2010-2012,85
+,Banana powder,B1304.5000,397.0,5 kg,1,397.0,Duchefa Biochemie,DUCHEFA,2010-2012,85
 ,Blue-Gal,B1414.0100,19.5,100 mg,1,19.5,Duchefa Biochemie,DUCHEFA,2010-2012,89
 ,BES,B1514.0025,15.2,25 g,1,15.2,Duchefa Biochemie,DUCHEFA,2010-2012,86
 ,BES,B1514.0250,130.8,250 g,1,130.8,Duchefa Biochemie,DUCHEFA,2010-2012,86
@@ -165,9 +165,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Doxycycline HCl,D0121.0010,41.2,10 g,1,41.2,Duchefa Biochemie,DUCHEFA,2010-2012,100
 ,Doxycycline HCl,D0121.0025,98.0,25 g,1,98.0,Duchefa Biochemie,DUCHEFA,2010-2012,100
 ,Chloroxylenol (“Dettol”),D0161.1000,20.3,1 litre,1,20.3,Duchefa Biochemie,DUCHEFA,2010-2012,95
-,,D0906.0001,45.7,1 g,1,45.7,Duchefa Biochemie,DUCHEFA,2010-2012,98
-,,D0906.0005,194.5,5 g,1,194.5,Duchefa Biochemie,DUCHEFA,2010-2012,98
-,,D0906.0010,366.6,10 g,1,366.6,Duchefa Biochemie,DUCHEFA,2010-2012,98
+,C0113 Chloramphenicol 56-75-7 92,D0906.0001,45.7,1 g,1,45.7,Duchefa Biochemie,DUCHEFA,2010-2012,98
+,C0113 Chloramphenicol 56-75-7 92,D0906.0005,194.5,5 g,1,194.5,Duchefa Biochemie,DUCHEFA,2010-2012,98
+,C0113 Chloramphenicol 56-75-7 92,D0906.0010,366.6,10 g,1,366.6,Duchefa Biochemie,DUCHEFA,2010-2012,98
 ,",4-Dichlorophenoxyacetic acid (2,4 D)",D0911.0100,7.6,100 g,1,7.6,Duchefa Biochemie,DUCHEFA,2010-2012,98
 ,",4-Dichlorophenoxyacetic acid (2,4 D)",D0911.0250,12.6,250 g,1,12.6,Duchefa Biochemie,DUCHEFA,2010-2012,98
 ,Dicamba,D0920.0250,70.3,250 mg,1,70.3,Duchefa Biochemie,DUCHEFA,2010-2012,98
@@ -206,9 +206,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Fluoro orotic acid (5-FOA),F0176.5000,400.7,5 g,1,400.7,Duchefa Biochemie,DUCHEFA,2010-2012,102
 ,Ferrous sulphate heptahydrate,F0512.0250,9.4,250 g,1,9.4,Duchefa Biochemie,DUCHEFA,2010-2012,101
 ,Ferrous sulphate heptahydrate,F0512.1000,21.0,1 kg,1,21.0,Duchefa Biochemie,DUCHEFA,2010-2012,101
-,,F0527.0025,16.3,25 g,1,16.3,Duchefa Biochemie,DUCHEFA,2010-2012,101
-,,F0527.0100,25.1,100 g,1,25.1,Duchefa Biochemie,DUCHEFA,2010-2012,101
-,,F0527.0250,55.9,250 g,1,55.9,Duchefa Biochemie,DUCHEFA,2010-2012,101
+,Fe-EDDHA,F0527.0025,16.3,25 g,1,16.3,Duchefa Biochemie,DUCHEFA,2010-2012,101
+,Fe-EDDHA,F0527.0100,25.1,100 g,1,25.1,Duchefa Biochemie,DUCHEFA,2010-2012,101
+,Fe-EDDHA,F0527.0250,55.9,250 g,1,55.9,Duchefa Biochemie,DUCHEFA,2010-2012,101
 ,Folic acid,F0608.0025,24.5,25 g,1,24.5,Duchefa Biochemie,DUCHEFA,2010-2012,103
 ,Folic acid,F0608.0100,80.9,100 g,1,80.9,Duchefa Biochemie,DUCHEFA,2010-2012,103
 ,Folinate calcium pentahydrate (old C0607),F0619.0001,52.4,1 g,1,52.4,Duchefa Biochemie,DUCHEFA,2010-2012,103
@@ -223,8 +223,8 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Gentamycin sulphate,G0124.0005,18.8,5 g,1,18.8,Duchefa Biochemie,DUCHEFA,2010-2012,104
 ,Gentamycin sulphate,G0124.0010,30.4,10 g,1,30.4,Duchefa Biochemie,DUCHEFA,2010-2012,104
 ,Gentamycin sulphate,G0124.0025,61.7,25 g,1,61.7,Duchefa Biochemie,DUCHEFA,2010-2012,104
-,CHÉE & POOL medium including vitamins C0249 35 Glyphosate,G0158.0001,25.3,1 g,1,25.3,Duchefa Biochemie,DUCHEFA,2010-2012,106
-,CHÉE & POOL medium including vitamins C0249 35 Glyphosate,G0158.0005,98.5,5 g,1,98.5,Duchefa Biochemie,DUCHEFA,2010-2012,106
+,Glyphosate,G0158.0001,25.3,1 g,1,25.3,Duchefa Biochemie,DUCHEFA,2010-2012,106
+,Glyphosate,G0158.0005,98.5,5 g,1,98.5,Duchefa Biochemie,DUCHEFA,2010-2012,106
 ,Griseofulvin,G0167.0005,12.3,5 g,1,12.3,Duchefa Biochemie,DUCHEFA,2010-2012,106
 ,Griseofulvin,G0167.0025,39.7,25 g,1,39.7,Duchefa Biochemie,DUCHEFA,2010-2012,106
 ,G-418 disulphate,G0175.0001,44.7,1 g,1,44.7,Duchefa Biochemie,DUCHEFA,2010-2012,103
@@ -235,8 +235,8 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,L-Glutamine,G0708.0100,28.3,100 g,1,28.3,Duchefa Biochemie,DUCHEFA,2010-2012,105
 ,L-Glutamine,G0708.0250,59.6,250 g,1,59.6,Duchefa Biochemie,DUCHEFA,2010-2012,105
 ,L-Glutamine,G0708.0500,101.1,500g,1,101.1,Duchefa Biochemie,DUCHEFA,2010-2012,105
-,CHÉE & POOL basal salt medium C0248 35 Glycine,G0709.1000,26.8,1 kg,1,26.8,Duchefa Biochemie,DUCHEFA,2010-2012,106
-,CHÉE & POOL basal salt medium C0248 35 Glycine,G0709.5000,115.3,5 kg,1,115.3,Duchefa Biochemie,DUCHEFA,2010-2012,106
+,Glycine,G0709.1000,26.8,1 kg,1,26.8,Duchefa Biochemie,DUCHEFA,2010-2012,106
+,Glycine,G0709.5000,115.3,5 kg,1,115.3,Duchefa Biochemie,DUCHEFA,2010-2012,106
 ,D-Glucose monohydrate,G0802.1000,7.2,1 kg,1,7.2,Duchefa Biochemie,DUCHEFA,2010-2012,105
 ,D-Glucose monohydrate,G0802.5000,24.3,5 kg,1,24.3,Duchefa Biochemie,DUCHEFA,2010-2012,105
 ,D-Galactose,G0810.0100,15.8,100 g,1,15.8,Duchefa Biochemie,DUCHEFA,2010-2012,104
@@ -271,26 +271,26 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,HEPES,H1504.0250,100.0,250 g,1,100.0,Duchefa Biochemie,DUCHEFA,2010-2012,107
 ,HEPES,H1504.0500,182.7,500 g,1,182.7,Duchefa Biochemie,DUCHEFA,2010-2012,107
 ,HEPES,H1504.1000,317.7,1 kg,1,317.7,Duchefa Biochemie,DUCHEFA,2010-2012,107
-,Leifert and Waites sterility test medium L1716 178 Myo-Inositol,I0609.0100,24.1,100 g,1,24.1,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,Leifert and Waites sterility test medium L1716 178 Myo-Inositol,I0609.0250,48.0,250 g,1,48.0,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,Leifert and Waites sterility test medium L1716 178 Myo-Inositol,I0609.0500,77.8,500 g,1,77.8,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,Leifert and Waites sterility test medium L1716 178 Myo-Inositol,I0609.1000,120.3,1 kg,1,120.3,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Myo-Inositol,I0609.0100,24.1,100 g,1,24.1,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Myo-Inositol,I0609.0250,48.0,250 g,1,48.0,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Myo-Inositol,I0609.0500,77.8,500 g,1,77.8,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Myo-Inositol,I0609.1000,120.3,1 kg,1,120.3,Duchefa Biochemie,DUCHEFA,2010-2012,108
 ,L-Isoleucine,I0711.0010,9.4,10 g,1,9.4,Duchefa Biochemie,DUCHEFA,2010-2012,109
 ,L-Isoleucine,I0711.0025,19.3,25 g,1,19.3,Duchefa Biochemie,DUCHEFA,2010-2012,109
 ,L-Isoleucine,I0711.0100,64.0,100 g,1,64.0,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CHU (N6) Medium including vitamins C0204 36 Indole-3-acetic acid (IAA),I0901.0005,11.6,5 g,1,11.6,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,CHU (N6) Medium including vitamins C0204 36 Indole-3-acetic acid (IAA),I0901.0025,34.9,25 g,1,34.9,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,CHU (N6) Medium including vitamins C0204 36 Indole-3-acetic acid (IAA),I0901.0100,140.5,100 g,1,140.5,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,CHU vitamine mixture C0401 36 Indole-3-butyric acid (IBA),I0902.0005,23.3,5 g,1,23.3,Duchefa Biochemie,DUCHEFA,2010-2012,108
-,CHU vitamine mixture C0401 36 Indole-3-butyric acid (IBA),I0902.0025,63.2,25 g,1,63.2,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Indole-3-acetic acid (IAA),I0901.0005,11.6,5 g,1,11.6,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Indole-3-acetic acid (IAA),I0901.0025,34.9,25 g,1,34.9,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Indole-3-acetic acid (IAA),I0901.0100,140.5,100 g,1,140.5,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Indole-3-butyric acid (IBA),I0902.0005,23.3,5 g,1,23.3,Duchefa Biochemie,DUCHEFA,2010-2012,108
+,Indole-3-butyric acid (IBA),I0902.0025,63.2,25 g,1,63.2,Duchefa Biochemie,DUCHEFA,2010-2012,108
 ,IPTG,I1401.0001,15.9,1 g,1,15.9,Duchefa Biochemie,DUCHEFA,2010-2012,109
 ,IPTG,I1401.0005,47.4,5 g,1,47.4,Duchefa Biochemie,DUCHEFA,2010-2012,109
 ,IPTG,I1401.0025,183.5,25 g,1,183.5,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CKTM medium C5140 168 Jasmonic acid,J0936.0250,74.1,250 mg,1,74.1,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CLC / Ipomoea CP medium C0228 37 Kanamycine sulphate monohydrate,K0126.0001,4.7,1 g,1,4.7,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CLC / Ipomoea CP medium C0228 37 Kanamycine sulphate monohydrate,K0126.0005,21.8,5 g,1,21.8,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CLC / Ipomoea CP medium C0228 37 Kanamycine sulphate monohydrate,K0126.0010,40.2,10 g,1,40.2,Duchefa Biochemie,DUCHEFA,2010-2012,109
-,CLC / Ipomoea CP medium C0228 37 Kanamycine sulphate monohydrate,K0126.0025,75.1,25 g,1,75.1,Duchefa Biochemie,DUCHEFA,2010-2012,109
+,Jasmonic acid,J0936.0250,74.1,250 mg,1,74.1,Duchefa Biochemie,DUCHEFA,2010-2012,109
+,Kanamycine sulphate monohydrate,K0126.0001,4.7,1 g,1,4.7,Duchefa Biochemie,DUCHEFA,2010-2012,109
+,Kanamycine sulphate monohydrate,K0126.0005,21.8,5 g,1,21.8,Duchefa Biochemie,DUCHEFA,2010-2012,109
+,Kanamycine sulphate monohydrate,K0126.0010,40.2,10 g,1,40.2,Duchefa Biochemie,DUCHEFA,2010-2012,109
+,Kanamycine sulphate monohydrate,K0126.0025,75.1,25 g,1,75.1,Duchefa Biochemie,DUCHEFA,2010-2012,109
 ,Kinetin,K0905.0001,16.2,1 g,1,16.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
 ,Kinetin,K0905.0005,60.2,5 g,1,60.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
 ,Kinetin,K0905.0025,268.7,25 g,1,268.7,Duchefa Biochemie,DUCHEFA,2010-2012,110
@@ -306,18 +306,18 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,D-Luciferin,L1349.1000,1780.1,1 g,1,1780.1,Duchefa Biochemie,DUCHEFA,2010-2012,111
 ,Lactose monohydrate,L1372.1000,12.1,1 kg,1,12.1,Duchefa Biochemie,DUCHEFA,2010-2012,110
 ,Lactose monohydrate,L1372.5000,43.4,5 kg,1,43.4,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1703.0100,7.9,100 g,1,7.9,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1703.0500,31.6,500 g,1,31.6,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1703.2500,138.8,2.5 kg,1,138.8,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1704.0100,7.5,100 g,1,7.5,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1704.0500,30.2,500 g,1,30.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1704.2500,132.8,"2,5 kg",1,132.8,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1705.0100,10.0,100 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1705.0500,39.4,500 g,1,39.4,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1705.2500,183.2,"2,5 kg",1,183.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1706.0100,10.0,100 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1706.0500,39.4,500 g,1,39.4,Duchefa Biochemie,DUCHEFA,2010-2012,110
-,,L1706.2500,183.2,"2,5 kg",1,183.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth Low salt,L1703.0100,7.9,100 g,1,7.9,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth Low salt,L1703.0500,31.6,500 g,1,31.6,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth Low salt,L1703.2500,138.8,2.5 kg,1,138.8,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth High salt,L1704.0100,7.5,100 g,1,7.5,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth High salt,L1704.0500,30.2,500 g,1,30.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Broth High salt,L1704.2500,132.8,"2,5 kg",1,132.8,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar Low salt,L1705.0100,10.0,100 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar Low salt,L1705.0500,39.4,500 g,1,39.4,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar Low salt,L1705.2500,183.2,"2,5 kg",1,183.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar High salt,L1706.0100,10.0,100 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar High salt,L1706.0500,39.4,500 g,1,39.4,Duchefa Biochemie,DUCHEFA,2010-2012,110
+,LB Agar High salt,L1706.2500,183.2,"2,5 kg",1,183.2,Duchefa Biochemie,DUCHEFA,2010-2012,110
 ,Mercaptopurine monohydrate,M0129.0005,32.9,5 g,1,32.9,Duchefa Biochemie,DUCHEFA,2010-2012,114
 ,Methotrexate,M0130.0001,83.3,1 g,1,83.3,Duchefa Biochemie,DUCHEFA,2010-2012,115
 ,Metronidazole,M0131.0025,31.5,25 g,1,31.5,Duchefa Biochemie,DUCHEFA,2010-2012,115
@@ -334,8 +334,8 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Manganese sulphate monohydrate,M0514.1000,31.8,1 kg,1,31.8,Duchefa Biochemie,DUCHEFA,2010-2012,113
 ,Magnesium chloride hexahydrate,M0533.1000,12.3,1 kg,1,12.3,Duchefa Biochemie,DUCHEFA,2010-2012,112
 ,L-Methionine,M0715.0100,22.8,100 g,1,22.8,Duchefa Biochemie,DUCHEFA,2010-2012,114
-,Amoxycillin sodium / Clavulanate potassium A0189 81 D-Mannitol,M0803.1000,22.8,1 kg,1,22.8,Duchefa Biochemie,DUCHEFA,2010-2012,113
-,Amoxycillin sodium / Clavulanate potassium A0189 81 D-Mannitol,M0803.5000,89.5,5 kg,1,89.5,Duchefa Biochemie,DUCHEFA,2010-2012,113
+,D-Mannitol,M0803.1000,22.8,1 kg,1,22.8,Duchefa Biochemie,DUCHEFA,2010-2012,113
+,D-Mannitol,M0803.5000,89.5,5 kg,1,89.5,Duchefa Biochemie,DUCHEFA,2010-2012,113
 ,Maltose monohydrate,M0811.0250,21.8,250 g,1,21.8,Duchefa Biochemie,DUCHEFA,2010-2012,113
 ,Maltose monohydrate,M0811.0500,36.4,500 g,1,36.4,Duchefa Biochemie,DUCHEFA,2010-2012,113
 ,Maltose monohydrate,M0811.1000,68.3,1 kg,1,68.3,Duchefa Biochemie,DUCHEFA,2010-2012,113
@@ -369,11 +369,11 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Macerozyme R-10,M8002.0001,11.6,1 g,1,11.6,Duchefa Biochemie,DUCHEFA,2010-2012,112
 ,Macerozyme R-10,M8002.0005,47.3,5 g,1,47.3,Duchefa Biochemie,DUCHEFA,2010-2012,112
 ,Macerozyme R-10,M8002.0010,77.8,10 g,1,77.8,Duchefa Biochemie,DUCHEFA,2010-2012,112
-,"Leucopore tape, 1.25 cm x 9.2 m L3302 142 Nalidixic acid",N0134.0005,10.0,5 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,117
-,"Leucopore tape, 1.25 cm x 9.2 m L3302 142 Nalidixic acid",N0134.0025,29.9,25 g,1,29.9,Duchefa Biochemie,DUCHEFA,2010-2012,117
-,Litvay vitamin mixture L0407 48 Nystatine,N0138.0005,21.7,5 g,1,21.7,Duchefa Biochemie,DUCHEFA,2010-2012,120
-,Litvay vitamin mixture L0407 48 Nystatine,N0138.0010,37.3,10 g,1,37.3,Duchefa Biochemie,DUCHEFA,2010-2012,120
-,Litvay vitamin mixture L0407 48 Nystatine,N0138.0025,73.8,25 g,1,73.8,Duchefa Biochemie,DUCHEFA,2010-2012,120
+,Nalidixic acid,N0134.0005,10.0,5 g,1,10.0,Duchefa Biochemie,DUCHEFA,2010-2012,117
+,Nalidixic acid,N0134.0025,29.9,25 g,1,29.9,Duchefa Biochemie,DUCHEFA,2010-2012,117
+,Nystatine,N0138.0005,21.7,5 g,1,21.7,Duchefa Biochemie,DUCHEFA,2010-2012,120
+,Nystatine,N0138.0010,37.3,10 g,1,37.3,Duchefa Biochemie,DUCHEFA,2010-2012,120
+,Nystatine,N0138.0025,73.8,25 g,1,73.8,Duchefa Biochemie,DUCHEFA,2010-2012,120
 ,Nicotinamide,N0610.0100,8.7,100 g,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,118
 ,Nicotinamide,N0610.0250,18.2,250 g,1,18.2,Duchefa Biochemie,DUCHEFA,2010-2012,118
 ,Nicotinic acid,N0611.0100,8.9,100 g,1,8.9,Duchefa Biochemie,DUCHEFA,2010-2012,119
@@ -384,13 +384,13 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,a-naphtalene acetic acid,N0903.0100,21.8,100 g,1,21.8,Duchefa Biochemie,DUCHEFA,2010-2012,117
 ,b-Naphtoxyacetic acid,N0912.0025,8.3,25 g,1,8.3,Duchefa Biochemie,DUCHEFA,2010-2012,117
 ,b-Naphtoxyacetic acid,N0912.0500,66.3,500 g,1,66.3,Duchefa Biochemie,DUCHEFA,2010-2012,117
-,"Leucopore tape, 2.5 cm x 9.2 m L3301 142 Naphthylphtalamic acid",N0926.0250,149.5,250 mg,1,149.5,Duchefa Biochemie,DUCHEFA,2010-2012,118
+,Naphthylphtalamic acid,N0926.0250,149.5,250 mg,1,149.5,Duchefa Biochemie,DUCHEFA,2010-2012,118
 ,Naphtylphosphate sodium monohydrate,N1350.0001,7.0,1 g,1,7.0,Duchefa Biochemie,DUCHEFA,2010-2012,118
 ,Naphtylphosphate sodium monohydrate,N1350.0005,27.5,5 g,1,27.5,Duchefa Biochemie,DUCHEFA,2010-2012,118
-,Malt Agar (MA) L1719 176 p-Nitrophenyl-b-D-glucuronide,N1408.0250,24.5,250 mg,1,24.5,Duchefa Biochemie,DUCHEFA,2010-2012,119
-,Malt Agar (MA) L1719 176 p-Nitrophenyl-b-D-glucuronide,N1408.1000,79.1,1 g,1,79.1,Duchefa Biochemie,DUCHEFA,2010-2012,119
-,Lindemann Orchid medium L0216 46 Nitro Blue Tetrazolium (NBT),N1411.0100,13.8,100 mg,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,119
-,Lindemann Orchid medium L0216 46 Nitro Blue Tetrazolium (NBT),N1411.1000,46.0,1 g,1,46.0,Duchefa Biochemie,DUCHEFA,2010-2012,119
+,p-Nitrophenyl-b-D-glucuronide,N1408.0250,24.5,250 mg,1,24.5,Duchefa Biochemie,DUCHEFA,2010-2012,119
+,p-Nitrophenyl-b-D-glucuronide,N1408.1000,79.1,1 g,1,79.1,Duchefa Biochemie,DUCHEFA,2010-2012,119
+,Nitro Blue Tetrazolium (NBT),N1411.0100,13.8,100 mg,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,119
+,Nitro Blue Tetrazolium (NBT),N1411.1000,46.0,1 g,1,46.0,Duchefa Biochemie,DUCHEFA,2010-2012,119
 ,Oxytetracycline HCl,O0140.0005,8.9,5 g,1,8.9,Duchefa Biochemie,DUCHEFA,2010-2012,120
 ,Oxytetracycline HCl,O0140.0025,34.9,25 g,1,34.9,Duchefa Biochemie,DUCHEFA,2010-2012,120
 ,Oryzaline,O1318.1000,51.3,1 g,1,51.3,Duchefa Biochemie,DUCHEFA,2010-2012,120
@@ -402,16 +402,16 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Paromomycin sulphate,P0141.0001,10.1,1 g,1,10.1,Duchefa Biochemie,DUCHEFA,2010-2012,121
 ,Paromomycin sulphate,P0141.0005,39.8,5 g,1,39.8,Duchefa Biochemie,DUCHEFA,2010-2012,121
 ,Paromomycin sulphate,P0141.0025,124.2,25 g,1,124.2,Duchefa Biochemie,DUCHEFA,2010-2012,121
-,"Luria Broth Agar, Miller L1718 179 Penicillin G sodium",P0142.0005,5.3,5 g,1,5.3,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,"Luria Broth Agar, Miller L1718 179 Penicillin G sodium",P0142.0025,8.4,25 g,1,8.4,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,"Luria Broth Agar, Miller L1718 179 Penicillin G sodium",P0142.0100,27.9,100 g,1,27.9,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,McCown Woody Plant medium M0219 49 Polymixine B sulphate,P0145.0001,21.1,1 g,1,21.1,Duchefa Biochemie,DUCHEFA,2010-2012,124
-,McCown Woody Plant medium M0219 49 Polymixine B sulphate,P0145.0005,83.8,5 g,1,83.8,Duchefa Biochemie,DUCHEFA,2010-2012,124
-,Macro salt mixture Nitsch M0306 74 Phosphinotricin,P0159.0250,84.5,250 mg,1,84.5,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,Macro salt mixture Nitsch M0306 74 Phosphinotricin,P0159.1000,296.1,1 g,1,296.1,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,Macro salt mixture B5 M0304 73 Phleomycin,P0187.0100,161.5,100 mg,1,161.5,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,Macro salt mixture B5 M0304 73 Phleomycin,P0187.0250,358.9,250 mg,1,358.9,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,mD5A medium D5124 161 Potassium chloride,P0515.1000,12.9,1 kg,1,12.9,Duchefa Biochemie,DUCHEFA,2010-2012,125
+,Penicillin G sodium,P0142.0005,5.3,5 g,1,5.3,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Penicillin G sodium,P0142.0025,8.4,25 g,1,8.4,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Penicillin G sodium,P0142.0100,27.9,100 g,1,27.9,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Polymixine B sulphate,P0145.0001,21.1,1 g,1,21.1,Duchefa Biochemie,DUCHEFA,2010-2012,124
+,Polymixine B sulphate,P0145.0005,83.8,5 g,1,83.8,Duchefa Biochemie,DUCHEFA,2010-2012,124
+,Phosphinotricin,P0159.0250,84.5,250 mg,1,84.5,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Phosphinotricin,P0159.1000,296.1,1 g,1,296.1,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Phleomycin,P0187.0100,161.5,100 mg,1,161.5,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Phleomycin,P0187.0250,358.9,250 mg,1,358.9,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Potassium chloride,P0515.1000,12.9,1 kg,1,12.9,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,Potassium hydroxide,P0517.0500,14.7,500 g,1,14.7,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,Potassium hydroxide,P0517.1000,20.1,1 kg,1,20.1,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,Potassium iodide,P0518.0100,14.6,100 g,1,14.6,Duchefa Biochemie,DUCHEFA,2010-2012,126
@@ -424,9 +424,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,di-Potassium hydrogen phosphate,P0573.5000,113.7,5 kg,1,113.7,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,Potassium dihydrogen phosphate,P0574.1000,17.8,1 kg,1,17.8,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,Potassium dihydrogen phosphate,P0574.5000,70.1,5 kg,1,70.1,Duchefa Biochemie,DUCHEFA,2010-2012,125
-,Micro salt mixture MS M0301 74 Pyridoxine HCl,P0612.0050,15.6,50 g,1,15.6,Duchefa Biochemie,DUCHEFA,2010-2012,127
-,Micro salt mixture MS M0301 74 Pyridoxine HCl,P0612.0100,22.1,100 g,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,127
-,Micro salt mixture MS M0301 74 Pyridoxine HCl,P0612.0250,45.0,250 g,1,45.0,Duchefa Biochemie,DUCHEFA,2010-2012,127
+,Pyridoxine HCl,P0612.0050,15.6,50 g,1,15.6,Duchefa Biochemie,DUCHEFA,2010-2012,127
+,Pyridoxine HCl,P0612.0100,22.1,100 g,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,127
+,Pyridoxine HCl,P0612.0250,45.0,250 g,1,45.0,Duchefa Biochemie,DUCHEFA,2010-2012,127
 ,L-Phenylalanine,P0716.0100,24.5,100 g,1,24.5,Duchefa Biochemie,DUCHEFA,2010-2012,122
 ,L-Phenylalanine,P0716.0500,90.1,500 g,1,90.1,Duchefa Biochemie,DUCHEFA,2010-2012,122
 ,L-Proline,P0717.0025,12.6,25 g,1,12.6,Duchefa Biochemie,DUCHEFA,2010-2012,126
@@ -443,23 +443,23 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Picloram,P0914.0050,115.6,50 g,1,115.6,Duchefa Biochemie,DUCHEFA,2010-2012,123
 ,Paclobutrazol,P0922.0500,37.9,500 mg,1,37.9,Duchefa Biochemie,DUCHEFA,2010-2012,121
 ,Paclobutrazol,P0922.1000,67.8,1 g,1,67.8,Duchefa Biochemie,DUCHEFA,2010-2012,121
-,Micro salt mixture B5 M0302 73 Putrescine HCl,P0927.0001,8.7,1 g,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,126
-,Micro salt mixture B5 M0302 73 Putrescine HCl,P0927.0005,18.1,5 g,1,18.1,Duchefa Biochemie,DUCHEFA,2010-2012,126
-,Micro salt mixture B5 M0302 73 Putrescine HCl,P0927.0025,62.5,25 g,1,62.5,Duchefa Biochemie,DUCHEFA,2010-2012,126
+,Putrescine HCl,P0927.0001,8.7,1 g,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,126
+,Putrescine HCl,P0927.0005,18.1,5 g,1,18.1,Duchefa Biochemie,DUCHEFA,2010-2012,126
+,Putrescine HCl,P0927.0025,62.5,25 g,1,62.5,Duchefa Biochemie,DUCHEFA,2010-2012,126
 ,Plant agar,P1001.1000,77.8,1 kg,1,77.8,Duchefa Biochemie,DUCHEFA,2010-2012,79
 ,Plant agar,P1001.5000,375.3,5 kg,1,375.3,Duchefa Biochemie,DUCHEFA,2010-2012,79
 ,Plant agar,P1001.9025,1772.2,25 kg,1,1772.2,Duchefa Biochemie,DUCHEFA,2010-2012,79
 ,Phyto agar,P1003.1000,89.9,1 kg,1,89.9,Duchefa Biochemie,DUCHEFA,2010-2012,79
 ,Phyto agar,P1003.5000,427.5,5 kg,1,427.5,Duchefa Biochemie,DUCHEFA,2010-2012,79
-,"Luria Broth Base, Miller L1717 180 Peptone",P1328.0100,11.2,100 g,1,11.2,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,"Luria Broth Base, Miller L1717 180 Peptone",P1328.0500,54.1,500 g,1,54.1,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,"Luria Broth Base, Miller L1717 180 Peptone",P1328.1000,90.7,1 kg,1,90.7,Duchefa Biochemie,DUCHEFA,2010-2012,122
-,Macro salt mixture MS M0305 74 Phloroglucinol,P1353.0025,19.3,25 g,1,19.3,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,Macro salt mixture MS M0305 74 Phloroglucinol,P1353.0100,61.7,100 g,1,61.7,Duchefa Biochemie,DUCHEFA,2010-2012,123
-,McCown Woody Plant medium including vitamins M0220 49 Polyoxyethylenesorbitan monolaurate,P1362.0500,22.1,500 ml,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,124
-,McCown Woody Plant vitamin mixture M0408 49 Polyoxyethylenesorbitan monooleate,P1365.0500,22.1,500 ml,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,125
-,mCS20ABN medium C5122 159 Polyvinyl pyrrolidone (PVP 10),P1368.0100,12.3,100 g,1,12.3,Duchefa Biochemie,DUCHEFA,2010-2012,125
-,mCS20ABN medium C5122 159 Polyvinyl pyrrolidone (PVP 10),P1368.0500,43.4,500 g,1,43.4,Duchefa Biochemie,DUCHEFA,2010-2012,125
+,Peptone,P1328.0100,11.2,100 g,1,11.2,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Peptone,P1328.0500,54.1,500 g,1,54.1,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Peptone,P1328.1000,90.7,1 kg,1,90.7,Duchefa Biochemie,DUCHEFA,2010-2012,122
+,Phloroglucinol,P1353.0025,19.3,25 g,1,19.3,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Phloroglucinol,P1353.0100,61.7,100 g,1,61.7,Duchefa Biochemie,DUCHEFA,2010-2012,123
+,Polyoxyethylenesorbitan monolaurate,P1362.0500,22.1,500 ml,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,124
+,Polyoxyethylenesorbitan monooleate,P1365.0500,22.1,500 ml,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,125
+,Polyvinyl pyrrolidone (PVP 10),P1368.0100,12.3,100 g,1,12.3,Duchefa Biochemie,DUCHEFA,2010-2012,125
+,Polyvinyl pyrrolidone (PVP 10),P1368.0500,43.4,500 g,1,43.4,Duchefa Biochemie,DUCHEFA,2010-2012,125
 ,PIPES,P1505.0025,11.6,25 g,1,11.6,Duchefa Biochemie,DUCHEFA,2010-2012,124
 ,PIPES,P1505.0100,39.5,100 g,1,39.5,Duchefa Biochemie,DUCHEFA,2010-2012,124
 ,PIPES,P1505.0250,96.0,250 g,1,96.0,Duchefa Biochemie,DUCHEFA,2010-2012,124
@@ -469,13 +469,13 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Peptone water,P1707.2500,115.2,"2,5 kg",1,115.2,Duchefa Biochemie,DUCHEFA,2010-2012,122
 ,Pectolyase Y-23,P8004.0001,217.0,1 g,1,217.0,Duchefa Biochemie,DUCHEFA,2010-2012,121
 ,Pectolyase Y-23,P8004.0005,977.1,5 g,1,977.1,Duchefa Biochemie,DUCHEFA,2010-2012,121
-,MT medium M5133 156 Rifampicin,R0146.0001,19.2,1 g,1,19.2,Duchefa Biochemie,DUCHEFA,2010-2012,128
-,MT medium M5133 156 Rifampicin,R0146.0005,66.7,5 g,1,66.7,Duchefa Biochemie,DUCHEFA,2010-2012,128
-,MT medium M5133 156 Rifampicin,R0146.0025,252.6,25 g,1,252.6,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Rifampicin,R0146.0001,19.2,1 g,1,19.2,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Rifampicin,R0146.0005,66.7,5 g,1,66.7,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Rifampicin,R0146.0025,252.6,25 g,1,252.6,Duchefa Biochemie,DUCHEFA,2010-2012,128
 ,Ribavirin,R0182.0250,17.5,250 mg,1,17.5,Duchefa Biochemie,DUCHEFA,2010-2012,127
 ,Ribavirin,R0182.1000,48.7,1 g,1,48.7,Duchefa Biochemie,DUCHEFA,2010-2012,127
-,MSP medium M5167 155 Riboflavine,R0613.0025,10.7,25 g,1,10.7,Duchefa Biochemie,DUCHEFA,2010-2012,127
-,MSP medium M5167 155 Riboflavine,R0613.0100,28.0,100 g,1,28.0,Duchefa Biochemie,DUCHEFA,2010-2012,127
+,Riboflavine,R0613.0025,10.7,25 g,1,10.7,Duchefa Biochemie,DUCHEFA,2010-2012,127
+,Riboflavine,R0613.0100,28.0,100 g,1,28.0,Duchefa Biochemie,DUCHEFA,2010-2012,127
 ,D-Ribose,R0806.0025,29.2,25 g,1,29.2,Duchefa Biochemie,DUCHEFA,2010-2012,127
 ,Raffinose pentahydrate,R0812.0025,43.2,25 g,1,43.2,Duchefa Biochemie,DUCHEFA,2010-2012,127
 ,Raffinose pentahydrate,R0812.0100,122.8,100 g,1,122.8,Duchefa Biochemie,DUCHEFA,2010-2012,127
@@ -496,8 +496,8 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Sodium nitrate,S0524.1000,17.0,1 kg,1,17.0,Duchefa Biochemie,DUCHEFA,2010-2012,130
 ,Sodium molybdate dihydrate,S0525.0025,40.6,25 g,1,40.6,Duchefa Biochemie,DUCHEFA,2010-2012,130
 ,Sodium molybdate dihydrate,S0525.0100,78.0,100 g,1,78.0,Duchefa Biochemie,DUCHEFA,2010-2012,130
-,Murashige & Skoog medium incl. vitamins/MES M0255 54 Silver nitrate,S0536.0005,10.2,5 g,1,10.2,Duchefa Biochemie,DUCHEFA,2010-2012,128
-,Murashige & Skoog medium incl. vitamins/MES M0255 54 Silver nitrate,S0536.0025,37.9,25 g,1,37.9,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Silver nitrate,S0536.0005,10.2,5 g,1,10.2,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Silver nitrate,S0536.0025,37.9,25 g,1,37.9,Duchefa Biochemie,DUCHEFA,2010-2012,128
 ,Di-Sodium hydrogen phosphate dihydrate,S0537.1000,15.1,1 kg,1,15.1,Duchefa Biochemie,DUCHEFA,2010-2012,129
 ,Di-Sodium hydrogen phosphate dihydrate,S0537.5000,59.8,5 kg,1,59.8,Duchefa Biochemie,DUCHEFA,2010-2012,129
 ,Sodium thiosulphate,S0538.0250,7.6,250 g,1,7.6,Duchefa Biochemie,DUCHEFA,2010-2012,130
@@ -509,16 +509,16 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Sucrose,S0809.1000,9.2,1 kg,1,9.2,Duchefa Biochemie,DUCHEFA,2010-2012,132
 ,Sucrose,S0809.5000,37.5,5 kg,1,37.5,Duchefa Biochemie,DUCHEFA,2010-2012,132
 ,Sucrose,S0809.9025,108.8,25 kg,1,108.8,Duchefa Biochemie,DUCHEFA,2010-2012,132
-,Murashige & Skoog medium incl. Nitsch vitamins M0256 53 Seaplaque™ agarose,S1202.0100,529.8,100 g,1,529.8,Duchefa Biochemie,DUCHEFA,2010-2012,80
-,Murashige & Skoog medium incl. Nitsch vitamins M0256 53 Seaplaque™ agarose,S1202.0250,1253.1,250 g,1,1253.1,Duchefa Biochemie,DUCHEFA,2010-2012,80
+,Seaplaque™ agarose,S1202.0100,529.8,100 g,1,529.8,Duchefa Biochemie,DUCHEFA,2010-2012,80
+,Seaplaque™ agarose,S1202.0250,1253.1,250 g,1,1253.1,Duchefa Biochemie,DUCHEFA,2010-2012,80
 ,Sodium alginate,S1320.0250,22.1,250 g,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,129
 ,Sodium alginate,S1320.1000,69.2,1 kg,1,69.2,Duchefa Biochemie,DUCHEFA,2010-2012,129
 ,Starch from rice,S1324.1000,17.0,1 kg,1,17.0,Duchefa Biochemie,DUCHEFA,2010-2012,132
 ,Soya peptone,S1330.0100,10.8,100 g,1,10.8,Duchefa Biochemie,DUCHEFA,2010-2012,130
 ,Soya peptone,S1330.0500,41.4,500 g,1,41.4,Duchefa Biochemie,DUCHEFA,2010-2012,130
 ,Starch from potatoes,S1357.1000,8.7,1 kg,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,132
-,mTMB medium T5126 166 Salicylic acid,S1367.0100,5.3,100 g,1,5.3,Duchefa Biochemie,DUCHEFA,2010-2012,128
-,mTMB medium T5126 166 Salicylic acid,S1367.0500,12.9,500 g,1,12.9,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Salicylic acid,S1367.0100,5.3,100 g,1,5.3,Duchefa Biochemie,DUCHEFA,2010-2012,128
+,Salicylic acid,S1367.0500,12.9,500 g,1,12.9,Duchefa Biochemie,DUCHEFA,2010-2012,128
 ,Spermidine,S1369.0001,14.7,1 g,1,14.7,Duchefa Biochemie,DUCHEFA,2010-2012,131
 ,Spermidine,S1369.0005,53.4,5 g,1,53.4,Duchefa Biochemie,DUCHEFA,2010-2012,131
 ,Spermidine,S1369.0025,217.8,25 g,1,217.8,Duchefa Biochemie,DUCHEFA,2010-2012,131
@@ -529,10 +529,10 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Salmon Gal,S1403.0100,15.2,100 mg,1,15.2,Duchefa Biochemie,DUCHEFA,2010-2012,94
 ,Salmon Gal,S1403.1000,86.1,1 g,1,86.1,Duchefa Biochemie,DUCHEFA,2010-2012,94
 ,Salmon-XGlcA cyclohexylammonium salt,S1407.0100,55.9,100 mg,1,55.9,Duchefa Biochemie,DUCHEFA,2010-2012,94
-,,S1511.0020,4.9,263.56 g,1,4.9,Duchefa Biochemie,DUCHEFA,2010-2012,131
-,,S1511.0200,41.6,2635.6 g,1,41.6,Duchefa Biochemie,DUCHEFA,2010-2012,131
-,,S1512.0020,4.4,210.4 g,1,4.4,Duchefa Biochemie,DUCHEFA,2010-2012,131
-,,S1512.0200,30.9,2103.6 g,1,30.9,Duchefa Biochemie,DUCHEFA,2010-2012,131
+,SSC-buffer,S1511.0020,4.9,263.56 g,1,4.9,Duchefa Biochemie,DUCHEFA,2010-2012,131
+,SSC-buffer,S1511.0200,41.6,2635.6 g,1,41.6,Duchefa Biochemie,DUCHEFA,2010-2012,131
+,SSPE-buffer,S1512.0020,4.4,210.4 g,1,4.4,Duchefa Biochemie,DUCHEFA,2010-2012,131
+,SSPE-buffer,S1512.0200,30.9,2103.6 g,1,30.9,Duchefa Biochemie,DUCHEFA,2010-2012,131
 ,Tetracycline HCl,T0150.0025,13.7,25 g,1,13.7,Duchefa Biochemie,DUCHEFA,2010-2012,133
 ,Tetracycline HCl,T0150.0100,40.9,100 g,1,40.9,Duchefa Biochemie,DUCHEFA,2010-2012,133
 ,Thimerosal,T0151.0010,49.5,10 g,1,49.5,Duchefa Biochemie,DUCHEFA,2010-2012,134
@@ -545,9 +545,9 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Ticarcillin disodium,T0180.0010,140.3,10 g,1,140.3,Duchefa Biochemie,DUCHEFA,2010-2012,134
 ,Trimethoprim lactate,T0181.0250,59.4,250mg,1,59.4,Duchefa Biochemie,DUCHEFA,2010-2012,136
 ,Trimethoprim lactate,T0181.1000,203.4,1 g,1,203.4,Duchefa Biochemie,DUCHEFA,2010-2012,136
-,,T0190.0002,29.3,2 g,1,29.3,Duchefa Biochemie,DUCHEFA,2010-2012,135
-,,T0190.0010,140.3,10 g,1,140.3,Duchefa Biochemie,DUCHEFA,2010-2012,135
-,,T0190.0025,335.0,25 g,1,335.0,Duchefa Biochemie,DUCHEFA,2010-2012,135
+,Ticarcillin disodium / clavulanate potassium,T0190.0002,29.3,2 g,1,29.3,Duchefa Biochemie,DUCHEFA,2010-2012,135
+,Ticarcillin disodium / clavulanate potassium,T0190.0010,140.3,10 g,1,140.3,Duchefa Biochemie,DUCHEFA,2010-2012,135
+,Ticarcillin disodium / clavulanate potassium,T0190.0025,335.0,25 g,1,335.0,Duchefa Biochemie,DUCHEFA,2010-2012,135
 ,Thiamine HCl,T0614.0025,7.4,25 g,1,7.4,Duchefa Biochemie,DUCHEFA,2010-2012,134
 ,Thiamine HCl,T0614.0100,22.8,100 g,1,22.8,Duchefa Biochemie,DUCHEFA,2010-2012,134
 ,Thiamine HCl,T0614.0250,44.7,250 g,1,44.7,Duchefa Biochemie,DUCHEFA,2010-2012,134
@@ -571,11 +571,11 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,meta-Topoline,T0941.0500,75.1,500 mg,1,75.1,Duchefa Biochemie,DUCHEFA,2010-2012,135
 ,meta-Topoline,T0941.1000,112.9,1 g,1,112.9,Duchefa Biochemie,DUCHEFA,2010-2012,135
 ,meta-Topoline,T0941.5000,440.4,5 g,1,440.4,Duchefa Biochemie,DUCHEFA,2010-2012,135
-,,T1332.0100,9.4,100 g,1,9.4,Duchefa Biochemie,DUCHEFA,2010-2012,137
-,,T1332.0500,46.3,500 g,1,46.3,Duchefa Biochemie,DUCHEFA,2010-2012,137
-,,T1332.1000,82.0,1 kg,1,82.0,Duchefa Biochemie,DUCHEFA,2010-2012,137
-,,T1359.1000,8.7,1 kg,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,132
-,,T1359.5000,34.9,5 kg,1,34.9,Duchefa Biochemie,DUCHEFA,2010-2012,132
+,Tryptone,T1332.0100,9.4,100 g,1,9.4,Duchefa Biochemie,DUCHEFA,2010-2012,137
+,Tryptone,T1332.0500,46.3,500 g,1,46.3,Duchefa Biochemie,DUCHEFA,2010-2012,137
+,Tryptone,T1332.1000,82.0,1 kg,1,82.0,Duchefa Biochemie,DUCHEFA,2010-2012,137
+,Talc,T1359.1000,8.7,1 kg,1,8.7,Duchefa Biochemie,DUCHEFA,2010-2012,132
+,Talc,T1359.5000,34.9,5 kg,1,34.9,Duchefa Biochemie,DUCHEFA,2010-2012,132
 ,Taurine,T1360.0100,8.9,100 g,1,8.9,Duchefa Biochemie,DUCHEFA,2010-2012,133
 ,Triethanolamine,T1361.0500,22.1,500 ml,1,22.1,Duchefa Biochemie,DUCHEFA,2010-2012,136
 ,Trehalose Anhydrous,T1395.0002,25.0,25 g,1,25.0,Duchefa Biochemie,DUCHEFA,2010-2012,135
@@ -585,29 +585,29 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,TRIS ultrapure,T1501.5000,192.2,5 kg,1,192.2,Duchefa Biochemie,DUCHEFA,2010-2012,137
 ,TRIS ultrapure,T1501.9010,372.6,10 kg,1,372.6,Duchefa Biochemie,DUCHEFA,2010-2012,137
 ,TRIS ultrapure,T1501.9025,887.9,25 kg,1,887.9,Duchefa Biochemie,DUCHEFA,2010-2012,137
-,,T1507.0010,7.7,170.2 g,1,7.7,Duchefa Biochemie,DUCHEFA,2010-2012,133
-,,T1507.0100,76.1,1702.0 g,1,76.1,Duchefa Biochemie,DUCHEFA,2010-2012,133
-,,T1508.0100,7.5,158.35 g,1,7.5,Duchefa Biochemie,DUCHEFA,2010-2012,133
-,,T1508.1000,66.2,1583.5 g,1,66.2,Duchefa Biochemie,DUCHEFA,2010-2012,133
+,TBE buffer,T1507.0010,7.7,170.2 g,1,7.7,Duchefa Biochemie,DUCHEFA,2010-2012,133
+,TBE buffer,T1507.0100,76.1,1702.0 g,1,76.1,Duchefa Biochemie,DUCHEFA,2010-2012,133
+,TE-buffer,T1508.0100,7.5,158.35 g,1,7.5,Duchefa Biochemie,DUCHEFA,2010-2012,133
+,TE-buffer,T1508.1000,66.2,1583.5 g,1,66.2,Duchefa Biochemie,DUCHEFA,2010-2012,133
 ,TRIS HCl,T1513.0100,13.2,100 g,1,13.2,Duchefa Biochemie,DUCHEFA,2010-2012,137
 ,TRIS HCl,T1513.0250,28.3,250 g,1,28.3,Duchefa Biochemie,DUCHEFA,2010-2012,137
 ,TRIS HCl,T1513.0500,50.0,500 g,1,50.0,Duchefa Biochemie,DUCHEFA,2010-2012,137
 ,TRIS HCl,T1513.1000,91.4,1 kg,1,91.4,Duchefa Biochemie,DUCHEFA,2010-2012,137
-,SSC-buffer S1511 130 Urea,U1363.1000,10.6,1 kg,1,10.6,Duchefa Biochemie,DUCHEFA,2010-2012,138
-,SSC-buffer S1511 130 Urea,U1363.5000,43.2,5 kg,1,43.2,Duchefa Biochemie,DUCHEFA,2010-2012,138
+,Urea,U1363.1000,10.6,1 kg,1,10.6,Duchefa Biochemie,DUCHEFA,2010-2012,138
+,Urea,U1363.5000,43.2,5 kg,1,43.2,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,Vancomycin HCl,V0155.0001,49.9,1 g,1,49.9,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,Vancomycin HCl,V0155.0005,197.0,5 g,1,197.0,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,Vancomycin HCl,V0155.0025,837.1,25 g,1,837.1,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,Validamycin A,V0170.0001,32.1,1 g,1,32.1,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,L-Valine,V0722.0100,20.4,100 g,1,20.4,Duchefa Biochemie,DUCHEFA,2010-2012,138
 ,L-Valine,V0722.0500,64.0,500 g,1,64.0,Duchefa Biochemie,DUCHEFA,2010-2012,138
-,Anderson’s Rhododendron A0201 34 D-Xylose,X0808.0100,14.6,100 g,1,14.6,Duchefa Biochemie,DUCHEFA,2010-2012,138
-,Anderson’s Rhododendron A0201 34 D-Xylose,X0808.0500,52.3,500 g,1,52.3,Duchefa Biochemie,DUCHEFA,2010-2012,138
-,Sterivent high S1685 144 X-Gal,X1402.0100,15.9,100 mg,1,15.9,Duchefa Biochemie,DUCHEFA,2010-2012,87
-,Sterivent high S1685 144 X-Gal,X1402.1000,48.6,1 g,1,48.6,Duchefa Biochemie,DUCHEFA,2010-2012,87
-,Sterivent high S1685 144 X-Gal,X1402.5000,212.6,5 g,1,212.6,Duchefa Biochemie,DUCHEFA,2010-2012,87
-,Sterivent low S1680 144 X-GlcA cyclohexylammonium salt,X1405.0100,58.4,100 mg,1,58.4,Duchefa Biochemie,DUCHEFA,2010-2012,88
-,Sterivent low S1680 144 X-GlcA cyclohexylammonium salt,X1405.1000,393.9,1 g,1,393.9,Duchefa Biochemie,DUCHEFA,2010-2012,88
+,D-Xylose,X0808.0100,14.6,100 g,1,14.6,Duchefa Biochemie,DUCHEFA,2010-2012,138
+,D-Xylose,X0808.0500,52.3,500 g,1,52.3,Duchefa Biochemie,DUCHEFA,2010-2012,138
+,X-Gal,X1402.0100,15.9,100 mg,1,15.9,Duchefa Biochemie,DUCHEFA,2010-2012,87
+,X-Gal,X1402.1000,48.6,1 g,1,48.6,Duchefa Biochemie,DUCHEFA,2010-2012,87
+,X-Gal,X1402.5000,212.6,5 g,1,212.6,Duchefa Biochemie,DUCHEFA,2010-2012,87
+,X-GlcA cyclohexylammonium salt,X1405.0100,58.4,100 mg,1,58.4,Duchefa Biochemie,DUCHEFA,2010-2012,88
+,X-GlcA cyclohexylammonium salt,X1405.1000,393.9,1 g,1,393.9,Duchefa Biochemie,DUCHEFA,2010-2012,88
 ,X-GlcA sodium salt trihydrate,X1406.0100,59.0,100 mg,1,59.0,Duchefa Biochemie,DUCHEFA,2010-2012,88
 ,X-GlcA sodium salt trihydrate,X1406.1000,409.6,1 g,1,409.6,Duchefa Biochemie,DUCHEFA,2010-2012,88
 ,X-phos disodium salt (BCIP disodium salt),X1410.0100,25.3,100 mg,1,25.3,Duchefa Biochemie,DUCHEFA,2010-2012,88
@@ -617,10 +617,10 @@ code_nacres,designation,code_fournisseur,prix_ht,condt,nb_unites,prix_unitaire,m
 ,Yeast extract,Y1333.0100,9.4,100 g,1,9.4,Duchefa Biochemie,DUCHEFA,2010-2012,139
 ,Yeast extract,Y1333.0500,37.8,500 g,1,37.8,Duchefa Biochemie,DUCHEFA,2010-2012,139
 ,Yeast extract,Y1333.1000,61.0,1 kg,1,61.0,Duchefa Biochemie,DUCHEFA,2010-2012,139
-,,Y1708.0100,13.8,100 g,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,139
-,,Y1708.0500,47.4,500 g,1,47.4,Duchefa Biochemie,DUCHEFA,2010-2012,139
-,,Y1709.0100,13.8,100 g,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,139
-,,Y1709.0500,47.4,500 g,1,47.4,Duchefa Biochemie,DUCHEFA,2010-2012,139
+,YPD Broth,Y1708.0100,13.8,100 g,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,139
+,YPD Broth,Y1708.0500,47.4,500 g,1,47.4,Duchefa Biochemie,DUCHEFA,2010-2012,139
+,YPD Agar,Y1709.0100,13.8,100 g,1,13.8,Duchefa Biochemie,DUCHEFA,2010-2012,139
+,YPD Agar,Y1709.0500,47.4,500 g,1,47.4,Duchefa Biochemie,DUCHEFA,2010-2012,139
 ,Zeocin™,Z0186.0250,52.6,250 mg,1,52.6,Duchefa Biochemie,DUCHEFA,2010-2012,140
 ,Zeocin™,Z0186.1000,169.1,1 g,1,169.1,Duchefa Biochemie,DUCHEFA,2010-2012,140
 ,Zinc sulphate heptahydrate,Z0526.0500,11.1,500 g,1,11.1,Duchefa Biochemie,DUCHEFA,2010-2012,140

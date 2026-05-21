@@ -221,17 +221,18 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             cp.created_at,
             s.title AS source_title,
             c.name AS contributor_name,
-            ijm.source_catalogue,
-            ijm.conditionnement AS catalogue_conditionnement,
-            ijm.designation AS catalogue_designation,
-            ijm.code_ijm,
-            ijm.brand AS catalogue_brand
+            COALESCE(sc.supplier || ' ' || sc.catalogue_date, ijm.source_catalogue) AS source_catalogue,
+            COALESCE(sc.conditionnement, ijm.conditionnement) AS catalogue_conditionnement,
+            COALESCE(sc.designation,     ijm.designation)     AS catalogue_designation,
+            COALESCE(sc.code_fournisseur, ijm.code_ijm)       AS code_ijm,
+            COALESCE(sc.brand,           ijm.brand)           AS catalogue_brand
         FROM commercial_products cp
         LEFT JOIN emission_factors ef ON ef.id = cp.emission_factor_id
         LEFT JOIN sources s ON s.id = cp.source_id
         LEFT JOIN contributors c ON c.id = cp.contributor_id
-        LEFT JOIN catalogue_ijm ijm ON ijm.id = cp.ijm_catalogue_id
-        WHERE cp.status != 'deprecated'
+        LEFT JOIN supplier_catalogue sc  ON sc.id  = cp.supplier_catalogue_id
+        LEFT JOIN catalogue_ijm      ijm ON ijm.id = cp.ijm_catalogue_id
+        WHERE cp.status NOT IN ('deprecated', 'pending')
         ORDER BY cp.rowid
         """,
     )

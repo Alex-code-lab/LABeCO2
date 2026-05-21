@@ -326,19 +326,19 @@ class ValidateWidget(QWidget):
 
         # Actions
         action_bar = QHBoxLayout()
-        self.btn_validate = QPushButton("✓  Valider la sélection")
+        self.btn_validate = QPushButton("Valider la sélection")
         self.btn_validate.setStyleSheet(
             "QPushButton{background:#2e7d32;color:white;font-weight:bold;padding:6px 16px;}"
             "QPushButton:hover{background:#388e3c;}"
             "QPushButton:disabled{background:#aaa;}"
         )
-        self.btn_reject = QPushButton("✗  Rejeter la sélection")
+        self.btn_reject = QPushButton("Rejeter la sélection")
         self.btn_reject.setStyleSheet(
             "QPushButton{background:#c62828;color:white;font-weight:bold;padding:6px 16px;}"
             "QPushButton:hover{background:#d32f2f;}"
             "QPushButton:disabled{background:#aaa;}"
         )
-        self.btn_edit = QPushButton("✎  Modifier le facteur")
+        self.btn_edit = QPushButton("Modifier le facteur")
         self.btn_edit.setStyleSheet(
             "QPushButton{background:#e65100;color:white;font-weight:bold;padding:6px 16px;}"
             "QPushButton:hover{background:#f4511e;}"
