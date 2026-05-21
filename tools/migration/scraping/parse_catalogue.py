@@ -60,6 +60,14 @@ class SupplierConfig:
     noise_re: str = r'\bSur\s+Cde\b|\bNouveau\b|\bSupprimé\b.*'
     min_cols: int = 4
 
+    # Date ou période du catalogue (ex. "2025", "2010-2012") — informatif
+    catalogue_date: str = ""
+
+    # ── Extracteur texte personnalisé (pour PDF non tabulaires) ───────────
+    # Si renseigné, court-circuite toute la logique tableau et appelle
+    # cette fonction avec (cfg) → list[dict]. Voir _extract_duchefa().
+    custom_extractor: object = None  # Callable[[SupplierConfig], list[dict]]
+
 
 # ── Configurations préconfigurées ─────────────────────────────────────────────
 
@@ -69,6 +77,7 @@ CONFIGS: dict[str, SupplierConfig] = {
         pdf_path=os.path.join(BASE_DIR, "Catalogue_IJM_2025.pdf"),
         output_csv=os.path.join(OUTPUT_DIR, "prix_ijm_2025.csv"),
         has_nacres=True,
+        catalogue_date="2025",
         # Pas de header_map : détection par patterns (structure connue)
     ),
 
@@ -100,6 +109,15 @@ CONFIGS: dict[str, SupplierConfig] = {
     #     code_supplier_re=r'^[A-Z]{2}-?\d{4,6}$',
     #     prix_re=r'^\d{1,6}[,\.]\d{2}\s*€?$',
     # ),
+
+    "DUCHEFA": SupplierConfig(
+        name="DUCHEFA",
+        pdf_path=os.path.join(BASE_DIR, "Duchefa-catalogue.pdf"),
+        output_csv=os.path.join(OUTPUT_DIR, "prix_duchefa.csv"),
+        has_nacres=False,
+        catalogue_date="2010-2012",
+        # custom_extractor assigné après définition de _extract_duchefa (voir bas du fichier)
+    ),
 }
 
 
@@ -252,9 +270,115 @@ def row_from_patterns(cells: list[str], cfg: SupplierConfig) -> Optional[dict]:
     }
 
 
+# ── Extracteur texte Duchefa ──────────────────────────────────────────────────
+#
+# Structure du catalogue Duchefa :
+#   - Produits décrits en texte libre (pas de tableau), 2 colonnes par page
+#   - Référence : lettre + 4 chiffres, ex. "C 0506" (avec espace dans le PDF)
+#   - Ligne prix : "C0506.1000 1 kg € 16,00"
+#   - Index alphabétique en fin de catalogue (pages ~187-194)
+
+_DUCHEFA_PRICE_RE = re.compile(
+    r'([A-Z])\s?(\d{4})'                                     # base cat_no (lettre + 4 chiffres)
+    r'(\.\d{3,5})'                                            # code pack capturé (.0100, .1000…)
+    r'\s+([\d,\.]+\s*'                                        # quantité
+    r'(?:g|kg|mg|ml|mL|µg|µl|litre?s?|IU|U|nmol|mmol|µmol|unit)s?)'  # unité
+    r'\s+€\s*([\d,]+)',                                       # prix
+    re.IGNORECASE,
+)
+
+# Entrée d'index : cat_no  CAS  page  (le nom est ce qui précède le cat_no)
+_DUCHEFA_IDX_RE = re.compile(
+    r'([A-Z]\d{4})'            # cat_no (sans espace dans l'index)
+    r'\s+([\d/\-\.]+)'         # CAS (peut être "11/4/7758" ou "7758-99-8")
+    r'\s+(\d{1,3})\b',         # numéro de page (1-3 chiffres)
+)
+
+# Pages de l'index alphabétique (contiennent "Cat. no." dans le texte)
+_IDX_HEADER = re.compile(r'Cat\.\s*no\.', re.IGNORECASE)
+
+
+def _parse_duchefa_index(pdf) -> dict[str, str]:
+    """Retourne {cat_no: nom_produit} depuis les pages d'index."""
+    names: dict[str, str] = {}
+
+    for page in pdf.pages:
+        text = page.extract_text() or ""
+        if not _IDX_HEADER.search(text):
+            continue
+
+        # Parcours ligne par ligne
+        for line in text.splitlines():
+            prev_end = 0
+            for m in _DUCHEFA_IDX_RE.finditer(line):
+                cat_no = m.group(1)
+                # Le nom est le texte entre la fin du match précédent et le début du cat_no
+                raw_name = line[prev_end:m.start()].strip(" \t,")
+                # Nettoyer : enlever les restes du précédent cat_no/CAS/page en début
+                raw_name = re.sub(r'^[\d/\-\.\s]+', '', raw_name).strip()
+                if raw_name and len(raw_name) > 2 and cat_no not in names:
+                    names[cat_no] = raw_name
+                prev_end = m.end()
+
+    return names
+
+
+def _extract_duchefa(cfg: SupplierConfig) -> list[dict]:
+    """Extracteur texte pour le catalogue Duchefa (pas de tableau structuré)."""
+    rows = []
+
+    with pdfplumber.open(cfg.pdf_path) as pdf:
+        print(f"  Pass 1 : lecture de l'index…")
+        names = _parse_duchefa_index(pdf)
+        print(f"  → {len(names)} produits trouvés dans l'index")
+
+        print(f"  Pass 2 : extraction des prix ({len(pdf.pages)} pages)…")
+        seen: set[tuple] = set()  # (cat_no, condt) pour déduplication
+
+        for page_num, page in enumerate(pdf.pages, start=1):
+            text = page.extract_text() or ""
+            for m in _DUCHEFA_PRICE_RE.finditer(text):
+                base_ref  = m.group(1) + m.group(2)        # "C0506"
+                pack_code = m.group(3)                      # ".1000"
+                cat_no    = base_ref + pack_code            # "C0506.1000" — référence complète
+                condt     = m.group(4).strip()
+                prix      = parse_prix(m.group(5))
+                if prix is None:
+                    continue
+                if cat_no in seen:
+                    continue
+                seen.add(cat_no)
+
+                designation = names.get(base_ref, "")  # index indexé par base_ref sans pack
+                rows.append({
+                    "code_nacres"     : "",
+                    "designation"     : designation,
+                    "code_fournisseur": cat_no,
+                    "prix_ht"         : prix,
+                    "condt"           : condt,
+                    "nb_unites"       : 1,
+                    "prix_unitaire"   : prix,
+                    "marque"          : "Duchefa Biochemie",
+                    "fournisseur"     : cfg.name,
+                    "catalogue_date"  : cfg.catalogue_date,
+                    "page"            : page_num,
+                })
+
+    # Trier par cat_no puis conditionnement pour lisibilité
+    rows.sort(key=lambda r: (r["code_fournisseur"], r["condt"]))
+    return rows
+
+
+# Assignation tardive : _extract_duchefa est définie après CONFIGS
+CONFIGS["DUCHEFA"].custom_extractor = _extract_duchefa
+
+
 # ── Extraction principale ─────────────────────────────────────────────────────
 
 def extract_rows(cfg: SupplierConfig) -> list[dict]:
+    if cfg.custom_extractor is not None:
+        return cfg.custom_extractor(cfg)
+
     rows = []
     use_headers = bool(cfg.header_map)
 
@@ -282,8 +406,9 @@ def extract_rows(cfg: SupplierConfig) -> list[dict]:
                         else row_from_patterns(cells, cfg)
                     )
                     if result:
-                        result["fournisseur"] = cfg.name
-                        result["page"]        = page_num
+                        result["fournisseur"]     = cfg.name
+                        result["catalogue_date"]  = cfg.catalogue_date
+                        result["page"]            = page_num
                         rows.append(result)
 
     return rows
@@ -294,7 +419,7 @@ def extract_rows(cfg: SupplierConfig) -> list[dict]:
 FIELDNAMES = [
     "code_nacres", "designation", "code_fournisseur",
     "prix_ht", "condt", "nb_unites", "prix_unitaire",
-    "marque", "fournisseur", "page",
+    "marque", "fournisseur", "catalogue_date", "page",
 ]
 
 
