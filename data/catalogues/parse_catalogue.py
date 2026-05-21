@@ -32,9 +32,7 @@ from datetime import date
 from typing import Optional
 import pdfplumber
 
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # data/catalogues/
 
 
 # ── Config fournisseur ────────────────────────────────────────────────────────
@@ -71,53 +69,49 @@ class SupplierConfig:
 
 # ── Configurations préconfigurées ─────────────────────────────────────────────
 
+def _supplier_dir(name: str) -> str:
+    """Retourne le chemin du dossier d'un fournisseur dans data/catalogues/."""
+    return os.path.join(BASE_DIR, name)
+
+
 CONFIGS: dict[str, SupplierConfig] = {
     "IJM": SupplierConfig(
         name="IJM",
-        pdf_path=os.path.join(BASE_DIR, "Catalogue_IJM_2025.pdf"),
-        output_csv=os.path.join(OUTPUT_DIR, "prix_ijm_2025.csv"),
+        pdf_path=os.path.join(_supplier_dir("IJM"), "Catalogue_IJM_2025.pdf"),
+        output_csv=os.path.join(_supplier_dir("IJM"), "prix_ijm_2025.csv"),
         has_nacres=True,
         catalogue_date="2025",
-        # Pas de header_map : détection par patterns (structure connue)
     ),
-
-    # ── Exemples pour d'autres fournisseurs ───────────────────────────────
-    # Fournisseur avec en-têtes explicites dans le tableau :
-    #
-    # "VWR": SupplierConfig(
-    #     name="VWR",
-    #     pdf_path=os.path.join(BASE_DIR, "Catalogue_VWR_2026.pdf"),
-    #     output_csv=os.path.join(OUTPUT_DIR, "prix_vwr_2026.csv"),
-    #     has_nacres=False,
-    #     header_map={
-    #         "description":  "designation",
-    #         "cat. no.":     "code_fournisseur",
-    #         "pack size":    "condt",
-    #         "price":        "prix_ht",
-    #         "brand":        "marque",
-    #         "nacres":       "code_nacres",   # si présent
-    #     },
-    # ),
-    #
-    # Fournisseur sans NACRES, patterns différents (ex. référence type "AB-1234") :
-    #
-    # "DUTSCHER": SupplierConfig(
-    #     name="DUTSCHER",
-    #     pdf_path=os.path.join(BASE_DIR, "Catalogue_Dutscher_2026.pdf"),
-    #     output_csv=os.path.join(OUTPUT_DIR, "prix_dutscher_2026.csv"),
-    #     has_nacres=False,
-    #     code_supplier_re=r'^[A-Z]{2}-?\d{4,6}$',
-    #     prix_re=r'^\d{1,6}[,\.]\d{2}\s*€?$',
-    # ),
 
     "DUCHEFA": SupplierConfig(
         name="DUCHEFA",
-        pdf_path=os.path.join(BASE_DIR, "Duchefa-catalogue.pdf"),
-        output_csv=os.path.join(OUTPUT_DIR, "prix_duchefa.csv"),
+        pdf_path=os.path.join(_supplier_dir("DUCHEFA"), "Duchefa-catalogue.pdf"),
+        output_csv=os.path.join(_supplier_dir("DUCHEFA"), "prix_duchefa.csv"),
         has_nacres=False,
         catalogue_date="2010-2012",
         # custom_extractor assigné après définition de _extract_duchefa (voir bas du fichier)
     ),
+
+    # ── Ajouter un nouveau fournisseur ────────────────────────────────────
+    # 1. Créer data/catalogues/NOM_FOURNI/  et y déposer le PDF
+    # 2. Copier le bloc ci-dessous, adapter les champs
+    # 3. Si le PDF a des en-têtes de colonnes → renseigner header_map
+    #    Sinon → ajuster code_supplier_re / prix_re selon le format
+    #
+    # "VWR": SupplierConfig(
+    #     name="VWR",
+    #     pdf_path=os.path.join(_supplier_dir("VWR"), "Catalogue_VWR_2026.pdf"),
+    #     output_csv=os.path.join(_supplier_dir("VWR"), "prix_vwr_2026.csv"),
+    #     has_nacres=False,
+    #     catalogue_date="2026",
+    #     header_map={
+    #         "description": "designation",
+    #         "cat. no.":    "code_fournisseur",
+    #         "pack size":   "condt",
+    #         "price":       "prix_ht",
+    #         "brand":       "marque",
+    #     },
+    # ),
 }
 
 
@@ -451,11 +445,13 @@ def main() -> None:
         if args.out:
             cfg.output_csv = args.out
     elif args.pdf:
+        # PDF hors config : le CSV est déposé dans le même dossier que le PDF
         name = os.path.splitext(os.path.basename(args.pdf))[0]
+        pdf_dir = os.path.dirname(os.path.abspath(args.pdf))
         cfg = SupplierConfig(
             name=name,
             pdf_path=args.pdf,
-            output_csv=args.out or os.path.join(OUTPUT_DIR, f"prix_{name.lower()}.csv"),
+            output_csv=args.out or os.path.join(pdf_dir, f"prix_{name.lower()}.csv"),
         )
     else:
         # Défaut : IJM (compatibilité avec l'ancien parse_catalogue_ijm.py)
