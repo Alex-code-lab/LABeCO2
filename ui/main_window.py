@@ -188,7 +188,12 @@ class MainWindow(QMainWindow):
         self.origine_row_widget = None
         self._nacres_options = []
         self._nacres_by_code = {}
+        self._consumable_search_entries = []
+        self._consumable_prefixes_all = set()
+        self._purchase_rows_by_prefix = {}
+        self._purchase_row_cache = {}
         self._load_nacres_options()
+        self._rebuild_search_indexes()
 
         self.setStyleSheet("""
             QPushButton {
@@ -1117,6 +1122,52 @@ class MainWindow(QMainWindow):
             self._nacres_options = []
             self._nacres_by_code = {}
 
+    def _rebuild_search_indexes(self):
+        """Prépare les index utilisés par la recherche consommables/NACRES."""
+        self._consumable_search_entries = []
+        self._consumable_prefixes_all = set()
+        self._purchase_rows_by_prefix = {}
+        self._purchase_row_cache = {}
+
+        df = getattr(self, "data_masse", None)
+        if (
+            df is not None and
+            not df.empty and
+            self.data_manager.CODE_NACRES_COL in df.columns and
+            self.data_manager.CONSOMMABLE_COL in df.columns
+        ):
+            unit_col = getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")
+            for row in df.to_dict("records"):
+                full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
+                consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
+                prefix = normalize_nacres_prefix(full_code)
+                if not consommable or not prefix:
+                    continue
+                source = "liquid" if clean_text(row.get(unit_col)) else "solid"
+                search_text = normalize_search(f"{full_code} {consommable}")
+                self._consumable_search_entries.append(
+                    (consommable.casefold(), full_code, consommable, source, search_text, prefix)
+                )
+                self._consumable_prefixes_all.add(prefix)
+
+        data = getattr(self, "data", None)
+        if data is None or data.empty:
+            return
+        achats = data[data["category"] == "Achats"].copy()
+        if achats.empty:
+            return
+        subsub = achats["subsubcategory"].fillna("").astype(str).str.strip().str.upper()
+        achats = achats.assign(_nacres_prefix=subsub.str[:4])
+        for row in achats.to_dict("records"):
+            prefix = normalize_nacres_prefix(row.get("_nacres_prefix", ""))
+            if not prefix:
+                continue
+            self._purchase_rows_by_prefix.setdefault(prefix, []).append(row)
+
+    def _ensure_search_indexes(self):
+        if not hasattr(self, "_consumable_search_entries") or not hasattr(self, "_purchase_rows_by_prefix"):
+            self._rebuild_search_indexes()
+
     def _populate_subcategory_combo(self, subcategories):
         self.subcategory_combo.clear()
         for subcategory in sorted(clean_text(s) for s in subcategories if clean_text(s)):
@@ -1192,62 +1243,54 @@ class MainWindow(QMainWindow):
         Si filter_text est fourni, seuls les codes dont au moins un consommable
         correspond au filtre sont inclus.
         """
-        prefixes = set()
-        df = self.data_masse
-        if df is None or df.empty:
-            return prefixes
-        if (
-            self.data_manager.CODE_NACRES_COL not in df.columns or
-            self.data_manager.CONSOMMABLE_COL not in df.columns
-        ):
-            return prefixes
-
+        self._ensure_search_indexes()
         norm_filter = normalize_search(filter_text) if filter_text else None
-        for _, row in df.iterrows():
-            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            prefix = normalize_nacres_prefix(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            if not consommable or not prefix:
-                continue
-            if norm_filter:
-                haystack = normalize_search(f"{prefix} {consommable}")
-                if norm_filter not in haystack:
-                    continue
-            prefixes.add(prefix)
-        return prefixes
+        if not norm_filter:
+            return set(self._consumable_prefixes_all)
+        return {
+            prefix
+            for _, _, _, _, search_text, prefix in self._consumable_search_entries
+            if norm_filter in search_text
+        }
 
     def _nacres_prefix_has_consumables(self, code_nacres):
         return normalize_nacres_prefix(code_nacres) in self._consumable_code_prefixes()
 
     def _purchase_factor_rows_for_nacres(self, code_nacres):
         """Retourne les lignes Achats du référentiel monétaire pour un préfixe NACRES."""
+        self._ensure_search_indexes()
         prefix = normalize_nacres_prefix(code_nacres)
-        if not prefix or self.data is None or self.data.empty:
-            return pd.DataFrame()
-        subsub = self.data["subsubcategory"].fillna("").astype(str).str.strip().str.upper()
-        return self.data[
-            (self.data["category"] == "Achats") &
-            (subsub.str[:4] == prefix)
-        ]
+        if not prefix:
+            return []
+        return self._purchase_rows_by_prefix.get(prefix, [])
 
     def _purchase_factor_row_for_nacres(self, code_nacres, preferred_subcategory=None):
         """Choisit la ligne d'achat à utiliser pour un code NACRES donné."""
+        prefix = normalize_nacres_prefix(code_nacres)
+        preferred = clean_text(preferred_subcategory)
+        cache_key = (prefix, preferred)
+        self._ensure_search_indexes()
+        if cache_key in self._purchase_row_cache:
+            return self._purchase_row_cache[cache_key]
+
         rows = self._purchase_factor_rows_for_nacres(code_nacres)
-        if rows.empty:
+        if not rows:
+            self._purchase_row_cache[cache_key] = None
             return None
 
-        preferred = clean_text(preferred_subcategory)
         if preferred:
-            exact = rows[rows["subcategory"].fillna("").astype(str).str.strip() == preferred]
-            if not exact.empty:
-                return exact.iloc[0]
+            for row in rows:
+                if clean_text(row.get("subcategory", "")) == preferred:
+                    self._purchase_row_cache[cache_key] = row
+                    return row
 
-        consumables = rows[
-            rows["subcategory"].fillna("").astype(str).map(is_consumables_subcategory)
-        ]
-        if not consumables.empty:
-            return consumables.iloc[0]
+        for row in rows:
+            if is_consumables_subcategory(clean_text(row.get("subcategory", ""))):
+                self._purchase_row_cache[cache_key] = row
+                return row
 
-        return rows.iloc[0]
+        self._purchase_row_cache[cache_key] = rows[0]
+        return rows[0]
 
     def _current_subsub_data(self):
         if self.subsub_name_combo is None:
@@ -2071,13 +2114,11 @@ class MainWindow(QMainWindow):
             filter_text = self.conso_search_field.text() if self.conso_search_field else ""
         filter_text = normalize_search(filter_text)
 
-        entries = []
-        for _, row in self.data_masse.iterrows():
-            full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            haystack = normalize_search(f"{full_code} {consommable}")
-            if consommable and (not filter_text or filter_text in haystack):
-                entries.append((consommable.casefold(), full_code, consommable, "solid"))
+        entries = [
+            (sort_key, full_code, consommable, source)
+            for sort_key, full_code, consommable, source, search_text, _ in self._consumable_search_entries
+            if not filter_text or filter_text in search_text
+        ]
 
         for _, code, name, source in sorted(entries):
             self._add_consumable_combo_item(code, name, source)
@@ -2136,12 +2177,11 @@ class MainWindow(QMainWindow):
             self._update_field_indicators()
             return
 
-        filtered_items = []
-        for _, row in self.data_masse.iterrows():
-            full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            if consommable and normalize_nacres_prefix(full_code) == code_nacres_4:
-                filtered_items.append((consommable.casefold(), full_code, consommable, "solid"))
+        filtered_items = [
+            (sort_key, full_code, consommable, source)
+            for sort_key, full_code, consommable, source, _, prefix in self._consumable_search_entries
+            if prefix == code_nacres_4
+        ]
 
         if not filtered_items:
             self.conso_filtered_combo.blockSignals(True)
@@ -3118,6 +3158,7 @@ class MainWindow(QMainWindow):
             self.data_masse = self.data_manager.get_data_masse()
             self.data_liquides = self.data_manager.get_data_liquides()
             self.data_materials = self.data_manager.get_data_materials()
+            self._rebuild_search_indexes()
             if self.category_combo is not None:
                 self.update_subsubcategory_names()
                 self.update_nacres_visibility()
