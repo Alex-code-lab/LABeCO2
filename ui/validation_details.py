@@ -43,9 +43,42 @@ _DIFF_LABELS = {
     "destination": "Destination",
 }
 
+_STATUS_LABELS = {
+    "pending": "En attente",
+    "draft": "À valider",
+    "validated": "Validé",
+    "deprecated": "Déprécié",
+}
+
+_TYPE_LABELS = {
+    "solid": "Solide",
+    "liquid": "Liquide",
+    "material": "Matériau",
+    "transport": "Transport",
+    "spend": "Achat",
+}
+
 
 def _row_get(row: sqlite3.Row, key: str, default=None):
     return row[key] if key in row.keys() else default
+
+
+def _status_label(value) -> str:
+    text = "" if value is None else str(value).strip()
+    return _STATUS_LABELS.get(text, text)
+
+
+def _type_label(value) -> str:
+    text = "" if value is None else str(value).strip()
+    return _TYPE_LABELS.get(text, text)
+
+
+def _format_display_value(key: str, value) -> str:
+    if key == "status":
+        return _status_label(value)
+    if key in {"product_type", "factor_type"}:
+        return _type_label(value)
+    return "" if value is None else str(value)
 
 
 def format_entry_detail(conn: sqlite3.Connection, table: str, entry_id: str) -> str:
@@ -74,8 +107,8 @@ def _format_product_detail(conn: sqlite3.Connection, entry_id: str) -> str:
     lines = [
         f"Produit : {product['name']}",
         f"NACRES : {product['code_nacres'] or ''}",
-        f"Type : {product['product_type'] or ''}",
-        f"Statut : {product['status'] or ''}",
+        f"Type : {_type_label(product['product_type'])}",
+        f"Statut : {_status_label(product['status'])}",
         f"Nature : {'Modification' if _row_get(product, 'revision_of_id') else 'Nouvelle entrée'}",
         f"Prix conditionnement : {product['price_sold_packaging'] or ''}",
         f"Unités / conditionnement : {product['units_per_sold_packaging'] or ''}",
@@ -150,7 +183,8 @@ def _format_generic_detail(conn: sqlite3.Connection, table: str, entry_id: str) 
     for key in row.keys():
         value = row[key]
         if value is not None and str(value).strip():
-            lines.append(f"{key} : {value}")
+            label = _DIFF_LABELS.get(key, key)
+            lines.append(f"{label} : {_format_display_value(key, value)}")
     revision_lines = _format_revision_diff(conn, table, row)
     if revision_lines:
         lines.extend(["", *revision_lines])
@@ -181,7 +215,7 @@ def _format_revision_diff(conn: sqlite3.Connection, table: str, row: sqlite3.Row
         if (old_value or "") != (new_value or ""):
             label = _DIFF_LABELS.get(key, key)
             changes.append(
-                f"  - {label} : {_format_diff_value(old_value)} -> {_format_diff_value(new_value)}"
+                f"  - {label} : {_format_diff_value(key, old_value)} -> {_format_diff_value(key, new_value)}"
             )
     if not changes:
         changes.append("  Aucun changement métier détecté.")
@@ -198,6 +232,6 @@ def _revision_label(table: str, row: sqlite3.Row) -> str:
     return "entrée précédente"
 
 
-def _format_diff_value(value) -> str:
-    text = "" if value is None else str(value).strip()
+def _format_diff_value(key: str, value) -> str:
+    text = _format_display_value(key, value).strip()
     return text if text else "(vide)"

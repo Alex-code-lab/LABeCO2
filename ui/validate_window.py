@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Fenêtre de validation des entrées draft pour le mainteneur LABeCO2."""
+"""Fenêtre de validation des entrées à valider pour le mainteneur LABeCO2."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -25,15 +27,33 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from ui.validation_details import format_entry_detail
-from ui.validation_ops import now_iso as _now, reject_entry, validate_entry
+from ui.validation_ops import now_iso as _now, reject_entries, validate_entries
 from ui.sqlite_schema import ensure_app_schema
+from tools.admin.workflow import (
+    blocking_issues,
+    check_entries_quality,
+    format_issues as format_admin_issues,
+)
 
 _BLACK = QColor(0, 0, 0)
 
-_COLOR_WARN      = QColor(255, 243, 180)   # jaune  : draft sans source
-_COLOR_OK        = QColor(210, 240, 210)   # vert   : draft avec source
+_COLOR_WARN      = QColor(255, 243, 180)   # jaune  : entrée à valider sans source
+_COLOR_OK        = QColor(210, 240, 210)   # vert   : entrée à valider avec source
 _COLOR_VALIDATED = QColor(200, 225, 255)   # bleu   : validé
 _COLOR_DEPRECATED = QColor(220, 220, 220)  # gris   : déprécié
+_STATUS_LABEL = {
+    "pending": "En attente",
+    "draft": "À valider",
+    "validated": "Validé",
+    "deprecated": "Déprécié",
+}
+_TYPE_LABEL = {
+    "solid": "Solide",
+    "liquid": "Liquide",
+    "material": "Matériau",
+    "transport": "Transport",
+    "spend": "Achat",
+}
 
 
 def _item(text: str, bg: QColor | None = None) -> QTableWidgetItem:
@@ -50,6 +70,14 @@ def _row_color(status: str, has_source: bool) -> QColor:
     if status == "deprecated":
         return _COLOR_DEPRECATED
     return _COLOR_OK if has_source else _COLOR_WARN
+
+
+def _status_label(status: str) -> str:
+    return _STATUS_LABEL.get(str(status or ""), str(status or ""))
+
+
+def _type_label(value: str) -> str:
+    return _TYPE_LABEL.get(str(value or ""), str(value or ""))
 
 
 # Les requêtes incluent toujours status AS "Statut" et utilisent {where}.
@@ -145,6 +173,8 @@ TABLES_META = {
                    cp.units_per_sold_packaging AS "Nbr cond.",
                    cp.sold_unit_volume_ml AS "Volume vendu (mL)",
                    cp.capacity_volume_ml AS "Capacité (mL)",
+                   sc.supplier AS "Fournisseur",
+                   sc.catalogue_date AS "Version catalogue",
                    cp.note AS "Lien / Note / Remarque",
                    CASE WHEN cp.product_type = 'liquid'
                         THEN COALESCE(ef.name, 'À relier')
@@ -165,6 +195,7 @@ TABLES_META = {
             LEFT JOIN sources s ON s.id = cp.source_id
             LEFT JOIN contributors c ON c.id = cp.contributor_id
             LEFT JOIN contributors v ON v.id = cp.validated_by_id
+            LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
             {where}
             ORDER BY cp.code_nacres, cp.name
         """,
@@ -256,10 +287,36 @@ class ValidateWidget(QWidget):
 
         filter_bar.addWidget(QLabel("  Statut :"))
         self.status_combo = QComboBox()
-        self.status_combo.addItem("Drafts en attente", "draft")
+        self.status_combo.addItem("À valider", "draft")
         self.status_combo.addItem("Tous les statuts", "all")
         self.status_combo.currentIndexChanged.connect(self._load_table)
         filter_bar.addWidget(self.status_combo)
+
+        filter_bar.addWidget(QLabel("  Catégorie :"))
+        self.category_combo = QComboBox()
+        self.category_combo.addItem("Toutes", "all")
+        self.category_combo.addItem("Consommables solides", "product_solid")
+        self.category_combo.addItem("Consommables liquides", "product_liquid")
+        self.category_combo.addItem("Facteurs", "emission_factors")
+        self.category_combo.addItem("Matériaux", "materials")
+        self.category_combo.addItem("Transport", "transport_factors")
+        self.category_combo.addItem("Sources", "sources")
+        self.category_combo.currentIndexChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
+        filter_bar.addWidget(self.category_combo)
+
+        filter_bar.addWidget(QLabel("  NACRES :"))
+        self.nacres_filter_edit = QLineEdit()
+        self.nacres_filter_edit.setPlaceholderText("NA25")
+        self.nacres_filter_edit.setMaximumWidth(90)
+        self.nacres_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
+        filter_bar.addWidget(self.nacres_filter_edit)
+
+        filter_bar.addWidget(QLabel("  Fournisseur :"))
+        self.supplier_filter_edit = QLineEdit()
+        self.supplier_filter_edit.setPlaceholderText("DUCHEFA")
+        self.supplier_filter_edit.setMaximumWidth(140)
+        self.supplier_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
+        filter_bar.addWidget(self.supplier_filter_edit)
 
         filter_bar.addSpacing(12)
         filter_bar.addWidget(QLabel("Recherche :"))
@@ -338,7 +395,8 @@ class ValidateWidget(QWidget):
             "QPushButton:hover{background:#d32f2f;}"
             "QPushButton:disabled{background:#aaa;}"
         )
-        self.btn_edit = QPushButton("Modifier le facteur")
+        self.btn_edit = QPushButton("Ouvrir / modifier")
+        self.btn_quality = QPushButton("Contrôle qualité sélection")
         self.btn_edit.setStyleSheet(
             "QPushButton{background:#e65100;color:white;font-weight:bold;padding:6px 16px;}"
             "QPushButton:hover{background:#f4511e;}"
@@ -347,11 +405,14 @@ class ValidateWidget(QWidget):
         self.btn_validate.setEnabled(False)
         self.btn_reject.setEnabled(False)
         self.btn_edit.setEnabled(False)
+        self.btn_quality.setEnabled(False)
         self.btn_validate.clicked.connect(self._on_validate)
         self.btn_reject.clicked.connect(self._on_reject)
         self.btn_edit.clicked.connect(self._on_edit)
+        self.btn_quality.clicked.connect(self._on_quality_check)
         action_bar.addWidget(self.btn_validate)
         action_bar.addWidget(self.btn_reject)
+        action_bar.addWidget(self.btn_quality)
         action_bar.addWidget(self.btn_edit)
         action_bar.addStretch()
         if self._show_close:
@@ -368,8 +429,8 @@ class ValidateWidget(QWidget):
 
         show_all = self.status_combo.currentData() == "all" if hasattr(self, "status_combo") else False
         legend_items = [
-            ("Draft sans source", _COLOR_WARN),
-            ("Draft avec source", _COLOR_OK),
+            ("À valider sans source", _COLOR_WARN),
+            ("À valider avec source", _COLOR_OK),
         ]
         if show_all:
             legend_items += [
@@ -467,25 +528,54 @@ class ValidateWidget(QWidget):
     def _filter_rows(self, text: str = "") -> None:
         """Masque les lignes ne contenant pas le texte cherché."""
         needle = text.strip().lower()
+        category = self.category_combo.currentData() if hasattr(self, "category_combo") else "all"
+        nacres_prefix = self.nacres_filter_edit.text().strip().upper() if hasattr(self, "nacres_filter_edit") else ""
+        supplier_filter = self.supplier_filter_edit.text().strip().lower() if hasattr(self, "supplier_filter_edit") else ""
+        nacres_col = self._column_index("NACRES")
+        type_col = self._column_index("Type")
+        supplier_col = self._column_index("Fournisseur")
         total = self.table_widget.rowCount()
         visible = 0
         for r in range(total):
-            if not needle:
-                self.table_widget.setRowHidden(r, False)
+            key_data = self.table_widget.item(r, 0).data(Qt.ItemDataRole.UserRole)
+            db_table = key_data[0] if key_data else ""
+            row_type = self.table_widget.item(r, type_col).text().strip().lower() if type_col >= 0 and self.table_widget.item(r, type_col) else ""
+            row_nacres = self.table_widget.item(r, nacres_col).text().strip().upper() if nacres_col >= 0 and self.table_widget.item(r, nacres_col) else ""
+            row_supplier = self.table_widget.item(r, supplier_col).text().strip().lower() if supplier_col >= 0 and self.table_widget.item(r, supplier_col) else ""
+
+            category_match = (
+                category in ("", "all")
+                or category == db_table
+                or (category == "product_solid" and db_table == "commercial_products" and row_type in {"solid", "solide"})
+                or (category == "product_liquid" and db_table == "commercial_products" and row_type in {"liquid", "liquide"})
+            )
+            nacres_match = not nacres_prefix or row_nacres.startswith(nacres_prefix)
+            supplier_match = not supplier_filter or supplier_filter in row_supplier
+            text_match = not needle or any(
+                (item := self.table_widget.item(r, c)) is not None
+                and needle in item.text().lower()
+                for c in range(self.table_widget.columnCount())
+            )
+            match = category_match and nacres_match and supplier_match and text_match
+            self.table_widget.setRowHidden(r, not match)
+            if match:
                 visible += 1
-            else:
-                match = any(
-                    (item := self.table_widget.item(r, c)) is not None
-                    and needle in item.text().lower()
-                    for c in range(self.table_widget.columnCount())
-                )
-                self.table_widget.setRowHidden(r, not match)
-                if match:
-                    visible += 1
-        if needle:
+        has_structured_filter = (
+            category not in ("", "all")
+            or bool(nacres_prefix)
+            or bool(supplier_filter)
+        )
+        if needle or has_structured_filter:
             self.count_label.setText(f"{visible}/{total} entrée(s)")
         else:
             self.count_label.setText(f"{total} entrée(s)")
+
+    def _column_index(self, header: str) -> int:
+        for col in range(self.table_widget.columnCount()):
+            item = self.table_widget.horizontalHeaderItem(col)
+            if item and item.text() == header:
+                return col
+        return -1
 
     def _fill_widget(
         self,
@@ -547,7 +637,13 @@ class ValidateWidget(QWidget):
                 col_offset = 2
 
             for c, val in enumerate(vals):
-                self.table_widget.setItem(r, col_offset + c, _item(val, row_color))
+                header = display_headers[c + val_offset] if show_table_col else display_headers[c]
+                display_value = val
+                if header == "Statut":
+                    display_value = _status_label(str(val or ""))
+                elif header == "Type":
+                    display_value = _type_label(str(val or ""))
+                self.table_widget.setItem(r, col_offset + c, _item(display_value, row_color))
 
         self.table_widget.blockSignals(False)
 
@@ -573,7 +669,7 @@ class ValidateWidget(QWidget):
         if item.column() == 0:
             self._update_sel_count()
 
-    _EDITABLE_TABLES = frozenset({"emission_factors", "materials"})
+    _EDITABLE_TABLES = frozenset({"emission_factors", "materials", "commercial_products"})
 
     def _update_sel_count(self) -> None:
         checked = [
@@ -586,6 +682,7 @@ class ValidateWidget(QWidget):
         self.sel_count_label.setText(f"{n} sélectionné(e)s")
         self.btn_validate.setEnabled(n > 0)
         self.btn_reject.setEnabled(n > 0)
+        self.btn_quality.setEnabled(n > 0)
         can_edit = (
             n == 1 and
             checked[0].data(Qt.ItemDataRole.UserRole) is not None and
@@ -600,6 +697,47 @@ class ValidateWidget(QWidget):
             if item and item.checkState() == Qt.CheckState.Checked:
                 result.append(item.data(Qt.ItemDataRole.UserRole))
         return result
+
+    def _quality_issues_for_selection(self) -> list:
+        entries = self._selected_entries()
+        return self._quality_issues_for_entries(entries)
+
+    def _quality_issues_for_entries(self, entries: list[tuple[str, str]]) -> list:
+        if not entries:
+            return []
+        conn = sqlite3.connect(self.sqlite_path)
+        try:
+            by_entry = check_entries_quality(conn, entries)
+        finally:
+            conn.close()
+        return [issue for issues in by_entry.values() for issue in issues]
+
+    def _busy_dialog(self, text: str) -> QProgressDialog:
+        dialog = QProgressDialog(text, "", 0, 0, self)
+        dialog.setCancelButton(None)
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dialog.setMinimumDuration(0)
+        dialog.show()
+        QApplication.processEvents()
+        return dialog
+
+    def _on_quality_check(self) -> None:
+        issues = self._quality_issues_for_selection()
+        if not issues:
+            QMessageBox.information(self, "Contrôle qualité", "Aucune anomalie détectée sur la sélection.")
+            return
+        errors = blocking_issues(issues)
+        title = "Contrôle qualité - erreurs bloquantes" if errors else "Contrôle qualité - avertissements"
+        icon = QMessageBox.Icon.Critical if errors else QMessageBox.Icon.Warning
+        box = QMessageBox(self)
+        box.setIcon(icon)
+        box.setWindowTitle(title)
+        box.setText(
+            f"{len(errors)} erreur(s) bloquante(s), "
+            f"{len(issues) - len(errors)} avertissement(s)."
+        )
+        box.setDetailedText(format_admin_issues(issues, max_items=80))
+        box.exec()
 
     def _show_selected_detail(self) -> None:
         current_row = self.table_widget.currentRow()
@@ -666,6 +804,34 @@ class ValidateWidget(QWidget):
         entries = self._selected_entries()
         if not entries:
             return
+        progress = self._busy_dialog(f"Contrôle qualité de {len(entries)} entrée(s)…")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            issues = self._quality_issues_for_entries(entries)
+        finally:
+            QApplication.restoreOverrideCursor()
+            progress.close()
+        errors = blocking_issues(issues)
+        if errors:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Critical)
+            box.setWindowTitle("Validation bloquée")
+            box.setText("La sélection contient des erreurs qualité bloquantes.")
+            box.setInformativeText("Corrigez ces entrées avant de les valider.")
+            box.setDetailedText(format_admin_issues(errors, max_items=80))
+            box.exec()
+            return
+        warnings = [issue for issue in issues if issue.severity != "ERROR"]
+        if warnings:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("Avertissements qualité")
+            box.setText(f"{len(warnings)} avertissement(s) non bloquant(s) sur la sélection.")
+            box.setInformativeText("Valider quand même ces entrées ?")
+            box.setDetailedText(format_admin_issues(warnings, max_items=80))
+            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if box.exec() != QMessageBox.StandardButton.Yes:
+                return
         validator_id = self._resolve_validator_id()
         if not validator_id:
             QMessageBox.warning(self, "Validateur manquant",
@@ -678,15 +844,19 @@ class ValidateWidget(QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        progress = self._busy_dialog(f"Validation de {len(entries)} entrée(s)…")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            conn = sqlite3.connect(self.sqlite_path)
-            for db_table, row_id in entries:
-                validate_entry(conn, db_table, row_id, validator_id)
-            conn.commit()
-            conn.close()
+            with sqlite3.connect(self.sqlite_path) as conn:
+                validate_entries(conn, entries, validator_id)
+                conn.commit()
         except Exception as e:
+            QApplication.restoreOverrideCursor()
+            progress.close()
             QMessageBox.critical(self, "Erreur", f"Impossible de valider : {e}")
             return
+        QApplication.restoreOverrideCursor()
+        progress.close()
         QMessageBox.information(self, "Succès", f"{len(entries)} entrée(s) validée(s).")
         self.validated.emit()
         self._load_table()
@@ -702,15 +872,19 @@ class ValidateWidget(QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        progress = self._busy_dialog(f"Dépréciation de {len(entries)} entrée(s)…")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            conn = sqlite3.connect(self.sqlite_path)
-            for db_table, row_id in entries:
-                reject_entry(conn, db_table, row_id)
-            conn.commit()
-            conn.close()
+            with sqlite3.connect(self.sqlite_path) as conn:
+                reject_entries(conn, entries)
+                conn.commit()
         except Exception as e:
+            QApplication.restoreOverrideCursor()
+            progress.close()
             QMessageBox.critical(self, "Erreur", f"Impossible de rejeter : {e}")
             return
+        QApplication.restoreOverrideCursor()
+        progress.close()
         QMessageBox.information(self, "Succès", f"{len(entries)} entrée(s) rejetée(s).")
         self._load_table()
 

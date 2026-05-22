@@ -3,7 +3,7 @@ import_supplier_catalogue.py
 
 Importe un CSV de catalogue fournisseur (généré par parse_catalogue.py)
 dans la table supplier_catalogue, et crée les entrées manquantes dans
-commercial_products (status='pending', à valider manuellement).
+commercial_products en attente de traitement manuel.
 
 Prérequis :
     Migration v2 appliquée (migrate_v2_supplier_catalogue.py)
@@ -242,7 +242,7 @@ def run(csv_path: Path, dry_run: bool = False) -> None:
     print(f"Lignes ignorées (sans ref/prix)    : {stats['skipped']}")
     print(f"Insérées dans supplier_catalogue   : {stats['inserted_catalogue']}")
     print(f"Liées à un produit existant        : {stats['linked']}")
-    print(f"Nouveaux produits (status=pending) : {stats['created_pending']}")
+    print(f"Nouveaux produits en attente       : {stats['created_pending']}")
     print(f"{'─'*55}")
     if stats["created_pending"] and not dry_run:
         print(

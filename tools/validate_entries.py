@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Outil de validation des entrées draft pour le mainteneur LABeCO2.
+Outil de validation des entrées à valider pour le mainteneur LABeCO2.
 
 Usage :
     python tools/validate_entries.py [options]
@@ -9,7 +9,7 @@ Options :
     --db PATH             Chemin vers labeco2.sqlite  (défaut : private/labeco2.sqlite)
     --validator NAME|ID   Nom ou UUID du contributeur qui valide (obligatoire sauf --dry-run)
     --table TABLE,...     Filtrer par table(s)
-    --contributor NAME    Ne montrer que les drafts d'un contributeur donné
+    --contributor NAME    Ne montrer que les entrées à valider d'un contributeur donné
     --all                 Valider toutes les entrées sans confirmation interactive
     --reject-orphans      Déprécier les produits liquides sans facteur d'émission
     --dry-run             Afficher sans modifier
@@ -129,14 +129,14 @@ def print_detail(conn: sqlite3.Connection, table: str, entry_id: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validation des drafts LABeCO2")
+    parser = argparse.ArgumentParser(description="Validation des entrées à valider LABeCO2")
     parser.add_argument("--db", default=str(ROOT / "private" / "labeco2.sqlite"))
     parser.add_argument("--validator", default=None,
                         help="Nom ou UUID du contributeur validateur (obligatoire)")
     parser.add_argument("--table", default=None,
                         help="Table(s) à valider, séparées par des virgules")
     parser.add_argument("--contributor", default=None,
-                        help="Ne montrer que les drafts de ce contributeur")
+                        help="Ne montrer que les entrées à valider de ce contributeur")
     parser.add_argument("--all", dest="validate_all", action="store_true",
                         help="Valider toutes les entrées sans mode interactif")
     parser.add_argument("--reject-orphans", action="store_true",
@@ -175,7 +175,7 @@ def main() -> None:
             continue
 
         print(f"\n{'='*60}")
-        print(f"  {table}  —  {len(drafts)} entrée(s) draft")
+        print(f"  {table}  —  {len(drafts)} entrée(s) à valider")
         print(f"{'='*60}")
 
         for entry in drafts:
@@ -200,7 +200,7 @@ def main() -> None:
             elif action == "r":
                 reject_entry(conn, table, entry_id, args.dry_run)
                 stats["rejected"] += 1
-                print("    ✗ rejeté (deprecated)")
+                print("    ✗ rejeté (déprécié)")
             elif action == "q":
                 print("  Arrêt.")
                 break

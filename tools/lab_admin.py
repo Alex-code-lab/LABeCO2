@@ -3,7 +3,7 @@
 LABeCO2 — Outil d'administration des bases de données.
 
 Lance une application Qt indépendante avec trois onglets :
-  1. Validation   — valider ou rejeter les entrées draft
+  1. Validation   — valider ou rejeter les entrées à valider
   2. Fusion       — fusionner deux bases SQLite, résoudre les conflits
   3. Qualité      — audit complet de la base
 
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -51,6 +52,21 @@ from tools.contribution_io import (
 from ui.validate_window import ValidateWidget
 from ui.quality_check import check_database
 from ui.nacres_metadata import load_nacres_options
+from tools.admin.catalogue_import import (
+    apply_catalogue_import,
+    format_preview_summary,
+    preview_catalogue_import,
+)
+from tools.admin.merge_analyzer import (
+    IMPORTABLE_KINDS,
+    classify_index,
+    payload_index as admin_payload_index,
+    sqlite_index as admin_sqlite_index,
+)
+from tools.admin.workflow import (
+    format_issues as format_admin_issues,
+    promote_pending_products,
+)
 
 
 # ============================================================
@@ -78,25 +94,41 @@ class ValidationTab(QWidget):
         from ui.data_mass_window import DataMassWindow
 
         factor_id = row_id
-        if table == "materials":
-            try:
-                with sqlite3.connect(self.db_path) as conn:
+        product_prefill = None
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                if table == "materials":
                     r = conn.execute(
                         "SELECT emission_factor_id FROM materials WHERE id = ?", (row_id,)
                     ).fetchone()
                     if r and r[0]:
                         factor_id = r[0]
-            except Exception:
-                pass
+                elif table == "commercial_products":
+                    r = conn.execute(
+                        "SELECT code_nacres, name, product_type FROM commercial_products WHERE id = ?",
+                        (row_id,),
+                    ).fetchone()
+                    if r:
+                        product_prefill = dict(r)
+        except Exception:
+            pass
 
         win = DataMassWindow(
             parent=self,
             base_path=str(ROOT),
             user_path=str(ROOT),
-            mode_filter="factor",
+            mode_filter="consumable" if table == "commercial_products" else "factor",
             sqlite_path=self.db_path,
         )
-        win.prefill_factor_from_sqlite(factor_id)
+        if product_prefill:
+            win.prefill_consumable(
+                product_prefill.get("code_nacres") or "",
+                product_prefill.get("name") or "",
+                source="liquid" if product_prefill.get("product_type") == "liquid" else "solid",
+            )
+        else:
+            win.prefill_factor_from_sqlite(factor_id)
         win.data_added.connect(self._widget._load_table)
         win.show()
         self._edit_window = win
@@ -117,6 +149,35 @@ _TABLE_LABEL = {
     "product_components": "Composants",
     "transport_factors": "Transport",
 }
+_STATUS_LABEL = {
+    "pending": "En attente",
+    "draft": "À valider",
+    "validated": "Validé",
+    "deprecated": "Déprécié",
+}
+_PRODUCT_TYPE_LABEL = {
+    "solid": "Solide",
+    "liquid": "Liquide",
+    "material": "Matériau",
+    "transport": "Transport",
+    "spend": "Achat",
+}
+_MERGE_KIND_LABEL = {
+    "NOUVEAU": "Nouveau",
+    "DEPENDANCE": "Dépendance",
+    "CONFLIT_ID": "Conflit d'identifiant",
+    "DOUBLON_METIER": "Doublon métier",
+    "NON_VALIDE_DES_DEUX_COTES": "Non validé des deux côtés",
+    "REVISION_POSSIBLE": "Révision possible",
+    "IDENTIQUE": "Identique",
+    "CONFLIT": "Conflit",
+    "DOUBLON": "Doublon",
+}
+_SEVERITY_LABEL = {
+    "ERROR": "Erreur",
+    "WARNING": "Avertissement",
+    "INFO": "Info",
+}
 _NAME_COL = {
     "emission_factors": "name",
     "materials": "name",
@@ -128,8 +189,11 @@ _NAME_COL = {
 
 _SEV_COLOR = {
     "NOUVEAU":   QColor(213, 245, 213),
-    "CONFLIT":   QColor(255, 243, 178),
-    "DOUBLON":   QColor(255, 220, 180),
+    "DEPENDANCE": QColor(225, 245, 254),
+    "CONFLIT_ID":   QColor(255, 243, 178),
+    "DOUBLON_METIER":   QColor(255, 220, 180),
+    "NON_VALIDE_DES_DEUX_COTES": QColor(255, 205, 210),
+    "REVISION_POSSIBLE": QColor(255, 236, 179),
 }
 
 
@@ -194,6 +258,18 @@ def _fmt_number(value) -> str:
         return f"{float(value):g}"
     except (TypeError, ValueError):
         return str(value or "")
+
+
+def _status_label(status: str) -> str:
+    return _STATUS_LABEL.get(str(status or ""), str(status or ""))
+
+
+def _product_type_label(value: str) -> str:
+    return _PRODUCT_TYPE_LABEL.get(str(value or ""), str(value or ""))
+
+
+def _merge_kind_label(kind: str) -> str:
+    return _MERGE_KIND_LABEL.get(str(kind or ""), str(kind or ""))
 
 
 class MergeTab(QWidget):
@@ -355,7 +431,7 @@ class MergeTab(QWidget):
         self._entries = []
         self._payloads = {}
         self._source_indexes = {}
-        self._ref_index = _sqlite_index(self.ref_path)
+        self._ref_index = admin_sqlite_index(self.ref_path)
         try:
             for source in self._sources:
                 if source["path"].suffix == ".json":
@@ -371,61 +447,34 @@ class MergeTab(QWidget):
         payload = load_contribution_payload(source["path"])
         source_key = source["key"]
         self._payloads[source_key] = payload
-        self._source_indexes[source_key] = _payload_index(payload)
-        results = []
-        for entry in self._filtered_payload_entries(payload, source["tables"]):
-            table = entry.get("table")
-            data  = entry.get("data", {})
-            if table not in _MERGE_TABLES:
-                continue
-            eid = data.get("id", "")
-            label = _entry_label(table, data, self._source_indexes[source_key])
-            existing = self._ref_index.get(table, {}).get(eid)
-
-            if existing is None:
-                kind = "NOUVEAU"
-                diffs = []
-            else:
-                diffs = diff_rows(dict(existing), data)
-                kind = "CONFLIT" if diffs else None
-            if kind:
-                results.append({"kind": kind, "table": table, "id": eid,
-                                 "label": label, "data": data,
-                                 "existing": existing or {},
-                                 "diffs": diffs,
-                                 "source_key": source_key,
-                                 "source_label": f"{source['path'].name} [{source['scope']}]",
-                                 "source_path": str(source["path"])})
-        # Chercher doublons de nom dans la référence
-        self._flag_name_duplicates(results)
-        return results
+        full_index = admin_payload_index(payload)
+        self._source_indexes[source_key] = full_index
+        selected_index = self._selected_rows_from_index(full_index, source["tables"])
+        return self._classifications_to_entries(source, source_key, selected_index)
 
     def _analyze_sqlite(self, source: dict) -> list[dict]:
         source_key = source["key"]
-        self._source_indexes[source_key] = _sqlite_index(source["path"])
+        full_index = admin_sqlite_index(source["path"])
+        self._source_indexes[source_key] = full_index
+        selected_index = self._selected_rows_from_index(full_index, source["tables"])
+        return self._classifications_to_entries(source, source_key, selected_index)
+
+    def _classifications_to_entries(
+        self,
+        source: dict,
+        source_key: str,
+        selected_index: dict[str, dict[str, dict]],
+    ) -> list[dict]:
         results = []
-        for table, rows in self._filtered_sqlite_rows(source).items():
-            try:
-                ref_rows = self._ref_index.get(table, {})
-            except Exception:
-                continue
-            for eid, cont_data in rows.items():
-                label = _entry_label(table, cont_data, self._source_indexes[source_key])
-                if eid not in ref_rows:
-                    kind = "NOUVEAU"
-                    diffs = []
-                else:
-                    diffs = diff_rows(ref_rows[eid], cont_data)
-                    kind = "CONFLIT" if diffs else None
-                if kind:
-                    results.append({"kind": kind, "table": table, "id": eid,
-                                     "label": label, "data": cont_data,
-                                     "existing": ref_rows.get(eid, {}),
-                                     "diffs": diffs,
-                                     "source_key": source_key,
-                                     "source_label": f"{source['path'].name} [{source['scope']}]",
-                                     "source_path": str(source["path"])})
-        self._flag_name_duplicates(results)
+        for classification in classify_index(selected_index, self._ref_index):
+            entry = classification.to_entry()
+            entry.update({
+                "label": _entry_label(entry["table"], entry["data"], self._source_indexes[source_key]),
+                "source_key": source_key,
+                "source_label": f"{source['path'].name} [{source['scope']}]",
+                "source_path": str(source["path"]),
+            })
+            results.append(entry)
         return results
 
     def _filtered_payload_entries(
@@ -593,25 +642,25 @@ class MergeTab(QWidget):
         note_text = data.get("note") or ""
 
         if table == "emission_factors":
-            type_value = data.get("factor_type") or ""
+            type_value = _product_type_label(data.get("factor_type") or "")
             factor_text = data.get("name") or ""
             co2 = data.get("co2_factor")
             unit = data.get("co2_unit") or "kgCO2e/kg"
             co2_text = "" if co2 is None else f"{_fmt_number(co2)} {unit}"
         elif table == "materials":
-            type_value = "material"
+            type_value = _product_type_label("material")
             factor_text, co2_text = self._factor_summary(entry, data.get("emission_factor_id"))
         elif table == "commercial_products":
-            type_value = data.get("product_type") or ""
+            type_value = _product_type_label(data.get("product_type") or "")
             packaging_count = _fmt_number(data.get("units_per_sold_packaging"))
-            if type_value == "liquid":
+            if data.get("product_type") == "liquid":
                 factor_text, co2_text = self._factor_summary(entry, data.get("emission_factor_id"))
             else:
                 factor_text, _ = self._product_components_summary(entry, data.get("id", ""))
         elif table == "product_components":
             product = self._lookup(entry, "commercial_products", data.get("product_id"))
             nacres = product.get("code_nacres") or ""
-            type_value = product.get("product_type") or ""
+            type_value = _product_type_label(product.get("product_type") or "")
             packaging_count = _fmt_number(product.get("units_per_sold_packaging"))
             factor_text = self._component_text(entry, data)
         elif table == "transport_factors":
@@ -625,7 +674,7 @@ class MergeTab(QWidget):
             type_value = data.get("team") or data.get("lab") or ""
 
         return [
-            entry["kind"],
+            _merge_kind_label(entry["kind"]),
             entry.get("source_label", ""),
             _TABLE_LABEL.get(table, table),
             nacres,
@@ -636,7 +685,7 @@ class MergeTab(QWidget):
             co2_text,
             source_text,
             note_text,
-            data.get("status", ""),
+            _status_label(data.get("status", "")),
         ]
 
     def _populate_table(self) -> None:
@@ -690,10 +739,12 @@ class MergeTab(QWidget):
         self._update_sel_count()
         n = len(self._entries)
         n_new  = sum(1 for e in self._entries if e["kind"] == "NOUVEAU")
-        n_conf = sum(1 for e in self._entries if e["kind"] == "CONFLIT")
-        n_dup  = sum(1 for e in self._entries if e["kind"] == "DOUBLON")
+        n_conf = sum(1 for e in self._entries if e["kind"] in {"CONFLIT_ID", "NON_VALIDE_DES_DEUX_COTES"})
+        n_dup  = sum(1 for e in self._entries if e["kind"] == "DOUBLON_METIER")
+        n_rev  = sum(1 for e in self._entries if e["kind"] == "REVISION_POSSIBLE")
         self.diff_view.setPlaceholderText(
-            f"Analyse : {n} différences  |  {n_new} nouveaux  |  {n_conf} conflits  |  {n_dup} doublons"
+            f"Analyse : {n} différences  |  {n_new} nouveaux  |  "
+            f"{n_conf} conflits  |  {n_dup} doublons  |  {n_rev} révisions possibles"
         )
 
     def _show_diff(self) -> None:
@@ -708,7 +759,7 @@ class MergeTab(QWidget):
         data = entry["data"]
         values = self._display_values(entry)
         lines = [
-            f"[{entry['kind']}]  {_TABLE_LABEL.get(table, table)}  -  {entry['label']}",
+            f"[{_merge_kind_label(entry['kind'])}]  {_TABLE_LABEL.get(table, table)}  -  {entry['label']}",
             f"Fichier : {entry.get('source_label', '')}",
             f"ID : {entry.get('id', '')}",
             f"NACRES : {values[3]}",
@@ -730,6 +781,10 @@ class MergeTab(QWidget):
             lines.extend(entry["diffs"])
         elif entry["kind"] == "NOUVEAU":
             lines.append("\nEntrée absente de la base de référence.")
+        if entry.get("reason"):
+            lines.extend(["", f"Décision : {entry['reason']}"])
+        if entry["kind"] not in IMPORTABLE_KINDS:
+            lines.append("Cette ligne n'est pas importable automatiquement.")
         self.diff_view.setPlainText("\n".join(lines))
 
     def _on_check_changed(self, item: QTableWidgetItem) -> None:
@@ -846,16 +901,29 @@ class MergeTab(QWidget):
         if not selected_idx:
             return
         entries = [self._entries[i] for i in selected_idx]
-        conflicts = [e for e in entries if e["kind"] == "CONFLIT"]
-        msg = f"Importer {len(entries)} entrée(s) dans la base de référence ?"
-        if conflicts:
-            msg += f"\n\n⚠  {len(conflicts)} conflit(s) : la version de la contribution écrasera la référence."
+        blocked = [entry for entry in entries if entry["kind"] not in IMPORTABLE_KINDS]
+        if blocked:
+            details = "\n".join(
+                f"- {_merge_kind_label(entry['kind'])} [{_TABLE_LABEL.get(entry['table'], entry['table'])}] "
+                f"{entry.get('label') or entry.get('id')}"
+                for entry in blocked[:20]
+            )
+            QMessageBox.warning(
+                self,
+                "Import bloqué",
+                "La sélection contient des conflits ou doublons qui demandent une décision manuelle.\n"
+                "Aucune entrée existante ne sera écrasée automatiquement.\n\n"
+                f"{details}",
+            )
+            return
+
+        msg = f"Importer {len(entries)} entrée(s) nouvelle(s) ou dépendance(s) dans la base de référence ?"
         reply = QMessageBox.question(self, "Confirmer l'import", msg,
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
-            self._ref_index = _sqlite_index(self.ref_path)
+            self._ref_index = admin_sqlite_index(self.ref_path)
             entries, auto_dependencies = self._expand_entries_for_import(entries)
             conn = sqlite3.connect(self.ref_path)
             conn.execute("PRAGMA foreign_keys = ON")
@@ -945,7 +1013,7 @@ class QualityTab(QWidget):
             f"  {n_err} erreur(s)  |  {n_warn} avertissement(s)  |  {n_info} info(s)"
         )
 
-        headers = ["Sévérité", "Table", "Règle", "Entrée", "Détail"]
+        headers = ["Sévérité", "Table", "Message", "Entrée", "Détail"]
         _colors = {"ERROR": QColor(255, 205, 210), "WARNING": QColor(255, 243, 178),
                    "INFO": QColor(232, 245, 233)}
 
@@ -958,9 +1026,17 @@ class QualityTab(QWidget):
 
         for r, issue in enumerate(visible):
             color = _colors.get(issue.severity, QColor(255, 255, 255))
-            for c, val in enumerate([issue.severity, issue.table, issue.rule,
-                                      issue.entry, issue.detail]):
+            values = [
+                _SEVERITY_LABEL.get(issue.severity, issue.severity),
+                _TABLE_LABEL.get(issue.table, issue.table),
+                issue.message,
+                issue.entry,
+                issue.detail,
+            ]
+            for c, val in enumerate(values):
                 item = QTableWidgetItem(str(val or ""))
+                if c == 2 and issue.rule:
+                    item.setToolTip(issue.rule)
                 item.setBackground(color)
                 self.table.setItem(r, c, item)
         self.table.blockSignals(False)
@@ -1101,17 +1177,18 @@ def suggest_nacres(name: str) -> tuple[str, str]:
 _COL_CHK     = 0   # checkbox (cocher pour sélectionner)
 _COL_ID      = 1   # hidden product id
 _COL_SUPPL   = 2
-_COL_CODE    = 3   # code fournisseur (ex: A0602.0100 Duchefa, 08-212 IJM)
-_COL_NAME    = 4
-_COL_BRAND   = 5
-_COL_CONDT   = 6
-_COL_PRICE   = 7
-_COL_TYPE    = 8
-_COL_NACRES  = 9   # QComboBox pour les pending, read-only sinon
-_COL_STATUS  = 10
+_COL_DATE    = 3
+_COL_CODE    = 4   # code fournisseur (ex: A0602.0100 Duchefa, 08-212 IJM)
+_COL_NAME    = 5
+_COL_BRAND   = 6
+_COL_CONDT   = 7
+_COL_PRICE   = 8
+_COL_TYPE    = 9
+_COL_NACRES  = 10  # QComboBox pour les lignes en attente, lecture seule sinon
+_COL_STATUS  = 11
 
 _CATALOGUE_HEADERS = [
-    "", "id", "Fournisseur", "Code catalogue", "Désignation", "Marque",
+    "", "id", "Fournisseur", "Version", "Code catalogue", "Désignation", "Marque",
     "Conditionnement", "Prix HT (€)", "Type", "Code NACRES", "Statut",
 ]
 
@@ -1159,7 +1236,7 @@ class _NacresPrefixFilterProxy(QSortFilterProxyModel):
 
 
 class CatalogueTab(QWidget):
-    """Onglet d'assignation des codes NACRES aux produits importés (status=pending)."""
+    """Onglet d'assignation des codes NACRES aux produits importés en attente."""
 
     def __init__(self, db_path: Path):
         super().__init__()
@@ -1192,10 +1269,17 @@ class CatalogueTab(QWidget):
         self.supplier_combo.currentIndexChanged.connect(self._apply_filter)
         filter_bar.addWidget(self.supplier_combo)
 
+        filter_bar.addWidget(QLabel("  Version :"))
+        self.catalogue_date_combo = QComboBox()
+        self.catalogue_date_combo.addItem("Toutes", "")
+        self.catalogue_date_combo.currentIndexChanged.connect(self._apply_filter)
+        filter_bar.addWidget(self.catalogue_date_combo)
+
         filter_bar.addWidget(QLabel("  Afficher :"))
         self.show_combo = QComboBox()
-        self.show_combo.addItem("En attente (pending)", "pending")
+        self.show_combo.addItem("En attente", "pending")
         self.show_combo.addItem("Sans NACRES seulement", "missing")
+        self.show_combo.addItem("Nouveaux NACRES sans FE", "new_no_fe")
         self.show_combo.addItem("Tous (IJM + Duchefa + ...)", "all")
         self.show_combo.currentIndexChanged.connect(self._apply_filter)
         filter_bar.addWidget(self.show_combo)
@@ -1212,6 +1296,10 @@ class CatalogueTab(QWidget):
         filter_bar.addStretch()
         self.count_label = QLabel("")
         filter_bar.addWidget(self.count_label)
+
+        btn_import_catalogue = QPushButton("Importer un catalogue…")
+        btn_import_catalogue.clicked.connect(self._import_catalogue)
+        filter_bar.addWidget(btn_import_catalogue)
 
         btn_reload = QPushButton("↺  Recharger")
         btn_reload.clicked.connect(self._load)
@@ -1297,10 +1385,10 @@ class CatalogueTab(QWidget):
         self.btn_suggest.clicked.connect(self._auto_suggest)
         act_bar.addWidget(self.btn_suggest)
 
-        self.btn_promote = QPushButton("Passer en draft (validation)")
+        self.btn_promote = QPushButton("Passer en validation")
         self.btn_promote.setToolTip(
-            "Les produits avec un code NACRES passent en statut 'draft'\n"
-            "et apparaissent dans l'onglet Validation pour être validés."
+            "Les produits complets avec un code NACRES passent en statut « à valider »\n"
+            "et apparaissent dans l'onglet Validation."
         )
         self.btn_promote.setStyleSheet(
             "QPushButton{background:#2e7d32;color:white;font-weight:bold;padding:6px 16px;}"
@@ -1314,6 +1402,94 @@ class CatalogueTab(QWidget):
     # ------------------------------------------------------------------
     # Chargement
     # ------------------------------------------------------------------
+
+    def _import_catalogue(self) -> None:
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            "Importer un catalogue fournisseur parsé",
+            str(ROOT / "data" / "catalogues"),
+            "Catalogues (*.csv *.xlsx *.xls);;Tous (*)",
+        )
+        if not path_str:
+            return
+        path = Path(path_str)
+
+        supplier, ok = QInputDialog.getText(
+            self,
+            "Fournisseur",
+            "Fournisseur à utiliser si le fichier ne contient pas de colonne fournisseur :",
+        )
+        if not ok:
+            return
+        catalogue_date, ok = QInputDialog.getText(
+            self,
+            "Version catalogue",
+            "Version/date du catalogue à utiliser si absente du fichier :",
+        )
+        if not ok:
+            return
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            preview = preview_catalogue_import(
+                conn,
+                path,
+                supplier_override=supplier,
+                catalogue_date_override=catalogue_date,
+            )
+        except Exception as e:
+            conn.close()
+            QMessageBox.critical(self, "Erreur d'import catalogue", str(e))
+            return
+
+        details = []
+        for item in preview.items:
+            if item.action in {"ambiguous", "ignored"} or item.price_changed or item.packaging_changed:
+                markers = [item.action]
+                if item.price_changed:
+                    markers.append("prix changé")
+                if item.packaging_changed:
+                    markers.append("conditionnement changé")
+                details.append(
+                    f"Ligne {item.row.row_number} [{', '.join(markers)}] "
+                    f"{item.row.code_fournisseur} - {item.row.designation}: {item.reason}"
+                )
+        if len(details) > 80:
+            details = details[:80] + [f"... {len(details) - 80} autre(s) ligne(s)"]
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Prévisualisation catalogue")
+        box.setText("Importer ce catalogue dans la base de travail ?")
+        box.setInformativeText(format_preview_summary(preview))
+        if details:
+            box.setDetailedText("\n".join(details))
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if box.exec() != QMessageBox.StandardButton.Yes:
+            conn.close()
+            return
+
+        try:
+            conn.execute("BEGIN")
+            stats = apply_catalogue_import(conn, preview)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            QMessageBox.critical(self, "Erreur d'import catalogue", str(e))
+            return
+        conn.close()
+
+        QMessageBox.information(
+            self,
+            "Catalogue importé",
+            (
+                f"{stats['inserted_catalogue']} ligne(s) catalogue insérée(s).\n"
+                f"{stats['created_pending']} nouveau(x) produit(s) en attente.\n"
+                f"{stats['linked']} produit(s) existant(s) lié(s)."
+            ),
+        )
+        self._load()
 
     def _load(self) -> None:
         self._pending_changes = {}
@@ -1330,6 +1506,7 @@ class CatalogueTab(QWidget):
                 SELECT
                     cp.id,
                     COALESCE(sc.supplier, ijm.source_catalogue, 'Inconnu') AS supplier,
+                    COALESCE(sc.catalogue_date, '') AS catalogue_date,
                     COALESCE(sc.code_fournisseur, ijm.code_ijm, cp.reference) AS code_catalogue,
                     cp.name,
                     cp.brand,
@@ -1347,6 +1524,7 @@ class CatalogueTab(QWidget):
             """).fetchall()
 
             suppliers = sorted({r["supplier"] for r in rows if r["supplier"]})
+            catalogue_dates = sorted({r["catalogue_date"] for r in rows if r["catalogue_date"]})
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger les données : {e}")
@@ -1363,6 +1541,17 @@ class CatalogueTab(QWidget):
         if idx >= 0:
             self.supplier_combo.setCurrentIndex(idx)
         self.supplier_combo.blockSignals(False)
+
+        self.catalogue_date_combo.blockSignals(True)
+        current_date = self.catalogue_date_combo.currentData()
+        self.catalogue_date_combo.clear()
+        self.catalogue_date_combo.addItem("Toutes", "")
+        for value in catalogue_dates:
+            self.catalogue_date_combo.addItem(value, value)
+        idx = self.catalogue_date_combo.findData(current_date)
+        if idx >= 0:
+            self.catalogue_date_combo.setCurrentIndex(idx)
+        self.catalogue_date_combo.blockSignals(False)
 
         # Remplir le tableau
         self.table.blockSignals(True)
@@ -1388,7 +1577,7 @@ class CatalogueTab(QWidget):
                     it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 return it
 
-            # Checkbox (sélection pour promotion) — uniquement pour les pending
+            # Checkbox (sélection pour promotion) — uniquement pour les lignes en attente
             chk = QTableWidgetItem()
             chk.setBackground(color)
             if is_pending:
@@ -1400,25 +1589,29 @@ class CatalogueTab(QWidget):
             self.table.setItem(r, _COL_CHK,    chk)
             self.table.setItem(r, _COL_ID,     _item(row["id"]))
             self.table.setItem(r, _COL_SUPPL,  _item(row["supplier"]))
+            self.table.setItem(r, _COL_DATE,   _item(row["catalogue_date"]))
             self.table.setItem(r, _COL_CODE,   _item(row["code_catalogue"]))
             self.table.setItem(r, _COL_NAME,   _item(row["name"]))
             self.table.setItem(r, _COL_BRAND,  _item(row["brand"]))
             self.table.setItem(r, _COL_CONDT,  _item(row["conditionnement"]))
             price = row["price_ht"]
             self.table.setItem(r, _COL_PRICE,  _item(f"{price:.2f}" if price else ""))
-            self.table.setItem(r, _COL_TYPE,   _item(row["product_type"]))
+            self.table.setItem(r, _COL_TYPE,   _item(_product_type_label(row["product_type"])))
             # NACRES : item texte léger. Le QComboBox est créé au double-clic.
             nacres_cell = _item(nacres)
             if is_pending:
                 nacres_cell.setToolTip("Double-cliquer pour ouvrir la liste NACRES.")
             self.table.setItem(r, _COL_NACRES, nacres_cell)
-            self.table.setItem(r, _COL_STATUS, _item(status))
+            status_cell = _item(_status_label(status))
+            status_cell.setData(Qt.ItemDataRole.UserRole, status)
+            self.table.setItem(r, _COL_STATUS, status_cell)
 
         self.table.blockSignals(False)
         self._apply_filter()
 
     def _apply_filter(self) -> None:
         supplier_filter = self.supplier_combo.currentData() or ""
+        catalogue_date_filter = self.catalogue_date_combo.currentData() or ""
         show_mode = self.show_combo.currentData()
         needle = self.search_edit.text().strip().lower()
 
@@ -1426,18 +1619,23 @@ class CatalogueTab(QWidget):
         visible = 0
         for r in range(total):
             supplier_item = self.table.item(r, _COL_SUPPL)
+            date_item     = self.table.item(r, _COL_DATE)
             nacres_item   = self.table.item(r, _COL_NACRES)
             if not supplier_item:
                 self.table.setRowHidden(r, True)
                 continue
 
             supplier_val = supplier_item.text()
-            # Pour les pending, lire la valeur depuis l'item caché (maintenu par les handlers)
+            date_val     = (date_item.text() if date_item else "").strip()
+            # Pour les lignes en attente, lire la valeur depuis l'item caché (maintenu par les handlers)
             nacres_val   = (nacres_item.text() if nacres_item else "").strip()
             status_item  = self.table.item(r, _COL_STATUS)
-            status_val   = (status_item.text() if status_item else "").strip()
+            status_val   = (status_item.data(Qt.ItemDataRole.UserRole) if status_item else "") or ""
 
             if supplier_filter and supplier_val != supplier_filter:
+                self.table.setRowHidden(r, True)
+                continue
+            if catalogue_date_filter and date_val != catalogue_date_filter:
                 self.table.setRowHidden(r, True)
                 continue
             if show_mode == "pending" and status_val != "pending":
@@ -1446,6 +1644,11 @@ class CatalogueTab(QWidget):
             if show_mode == "missing" and nacres_val:
                 self.table.setRowHidden(r, True)
                 continue
+            if show_mode == "new_no_fe":
+                option = self._nacres_by_code.get(nacres_val)
+                if not option or not option.is_new_without_labo1point5_fe:
+                    self.table.setRowHidden(r, True)
+                    continue
             if needle:
                 match = any(
                     (item := self.table.item(r, c)) is not None
@@ -1469,7 +1672,8 @@ class CatalogueTab(QWidget):
         if column != _COL_NACRES:
             return
         status_item = self.table.item(row, _COL_STATUS)
-        if not status_item or status_item.text().strip() != "pending":
+        raw_status = (status_item.data(Qt.ItemDataRole.UserRole) if status_item else "") or ""
+        if raw_status != "pending":
             return
         if isinstance(self.table.cellWidget(row, _COL_NACRES), QComboBox):
             return
@@ -1604,7 +1808,7 @@ class CatalogueTab(QWidget):
         self._update_unsaved_label()
 
     # ------------------------------------------------------------------
-    # Édition NACRES (items directs — fallback, non-pending)
+    # Édition NACRES (items directs — fallback, hors lignes en attente)
     # ------------------------------------------------------------------
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
@@ -1631,7 +1835,7 @@ class CatalogueTab(QWidget):
             # Mise à jour de l'item caché
             nacres_item.setText(code)
             nacres_item.setToolTip(f"Suggestion automatique : {reason}")
-            # Mise à jour du QComboBox si présent (pending)
+            # Mise à jour du QComboBox si présent (ligne en attente)
             widget = self.table.cellWidget(r, _COL_NACRES)
             if isinstance(widget, QComboBox):
                 proxy = getattr(widget, "_nacres_proxy", None)
@@ -1728,35 +1932,6 @@ class CatalogueTab(QWidget):
                     and chk.checkState() == Qt.CheckState.Checked):
                 checked_ids.add(id_item.text())
 
-        try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT id, code_nacres FROM commercial_products WHERE status = 'pending'"
-            ).fetchall()
-            if checked_ids:
-                promotable = [
-                    r for r in rows
-                    if r["id"] in checked_ids and r["code_nacres"] and r["code_nacres"].strip()
-                ]
-            else:
-                promotable = [r for r in rows if r["code_nacres"] and r["code_nacres"].strip()]
-            conn.close()
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Impossible de lire la base : {e}")
-            return
-
-        if not promotable:
-            msg = (
-                "Les produits cochés n'ont pas de code NACRES.\n"
-                "Assignez des NACRES avant de promouvoir."
-                if checked_ids else
-                "Aucun produit pending n'a de code NACRES.\n"
-                "Assignez des NACRES avant de promouvoir."
-            )
-            QMessageBox.information(self, "Rien à faire", msg)
-            return
-
         if self._pending_changes:
             reply = QMessageBox.question(
                 self, "Modifications non sauvegardées",
@@ -1768,25 +1943,37 @@ class CatalogueTab(QWidget):
                 return
             self._save()
 
-        scope = f"les {len(promotable)} produit(s) cochés" if checked_ids else f"{len(promotable)} produit(s)"
+        try:
+            conn = sqlite3.connect(self.db_path)
+            preview = promote_pending_products(conn, checked_ids or None)
+            conn.rollback()
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de contrôler les produits : {e}")
+            return
+
+        if not preview.promoted:
+            all_issues = [issue for issues in preview.blocked.values() for issue in issues]
+            msg = "Aucun produit en attente n'est prêt à passer en validation."
+            if all_issues:
+                msg += "\n\n" + format_admin_issues(all_issues)
+            QMessageBox.information(self, "Rien à faire", msg)
+            return
+
+        scope = f"les {len(preview.promoted)} produit(s) cochés" if checked_ids else f"{len(preview.promoted)} produit(s)"
         reply = QMessageBox.question(
             self, "Confirmer",
-            f"Passer {scope} avec NACRES en statut 'draft' ?\n"
-            "Ils apparaîtront ensuite dans l'onglet Validation.",
+            f"Passer {scope} avec NACRES en validation ?\n"
+            "Ils apparaîtront ensuite dans l'onglet Validation.\n\n"
+            f"{len(preview.blocked)} produit(s) bloqué(s) par les règles qualité.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
         try:
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc).isoformat()
             conn = sqlite3.connect(self.db_path)
-            ids = [r["id"] for r in promotable]
-            conn.executemany(
-                "UPDATE commercial_products SET status = 'draft', updated_at = ? WHERE id = ?",
-                [(now, pid) for pid in ids],
-            )
+            result = promote_pending_products(conn, checked_ids or None)
             conn.commit()
             conn.close()
         except Exception as e:
@@ -1795,7 +1982,8 @@ class CatalogueTab(QWidget):
 
         QMessageBox.information(
             self, "Succès",
-            f"{len(promotable)} produit(s) passés en 'draft'.\n"
+            f"{len(result.promoted)} produit(s) passés en validation.\n"
+            f"{len(result.blocked)} produit(s) laissé(s) en attente.\n"
             "Ouvrez l'onglet Validation pour les valider."
         )
         self._load()

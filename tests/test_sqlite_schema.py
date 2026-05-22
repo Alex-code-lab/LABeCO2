@@ -26,6 +26,32 @@ def test_ensure_app_schema_adds_nacres_2026_status_column():
     assert "statut_maj_2026" in columns
 
 
+def test_ensure_app_schema_adds_admin_audit_tables_and_catalogue_columns():
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        """
+        CREATE TABLE commercial_products (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            status TEXT
+        )
+        """
+    )
+
+    ensure_app_schema(conn)
+
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    assert "admin_import_batches" in tables
+    assert "admin_merge_decisions" in tables
+
+    supplier_columns = {row[1] for row in conn.execute("PRAGMA table_info(supplier_catalogue)")}
+    assert "import_batch_id" in supplier_columns
+    assert "row_hash" in supplier_columns
+
+
 def test_load_nacres_options_flags_new_codes_without_purchase_factor():
     conn = sqlite3.connect(":memory:")
     conn.execute(

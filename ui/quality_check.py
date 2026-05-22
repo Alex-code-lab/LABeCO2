@@ -161,9 +161,67 @@ def _q(conn: sqlite3.Connection, sql: str) -> list[tuple]:
     return conn.execute(sql).fetchall()
 
 
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone() is not None
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    if not _table_exists(conn, table):
+        return set()
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
 def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
     """Audit qualité complet d'une base SQLite. Retourne toutes les anomalies."""
     issues: list[QualityIssue] = []
+
+    # Champs administratifs minimaux des produits
+    for row_id, name, reference, code, ptype in _q(conn, """
+        SELECT id, name, reference, code_nacres, product_type
+        FROM commercial_products
+        WHERE status != 'deprecated'
+          AND (
+              name IS NULL OR trim(name) = ''
+           OR reference IS NULL OR trim(reference) = ''
+           OR code_nacres IS NULL OR trim(code_nacres) = ''
+           OR product_type IS NULL OR trim(product_type) = ''
+          )
+        ORDER BY name
+    """):
+        missing = []
+        if not _clean(name):
+            missing.append("nom")
+        if not _clean(reference):
+            missing.append("référence")
+        if not _clean(code):
+            missing.append("NACRES")
+        if not _clean(ptype):
+            missing.append("type")
+        issues.append(QualityIssue(
+            severity="ERROR", table="commercial_products",
+            rule="product_missing_admin_fields",
+            message="Produit incomplet avant validation.",
+            entry=name or row_id, detail=", ".join(missing),
+        ))
+
+    if "statut_maj_2026" in _columns(conn, "nacres_codes"):
+        for name, code in _q(conn, """
+            SELECT cp.name, cp.code_nacres
+            FROM commercial_products cp
+            JOIN nacres_codes n ON n.code = cp.code_nacres
+            WHERE cp.status != 'deprecated'
+              AND n.statut_maj_2026 = 'a_ne_plus_utiliser'
+            ORDER BY cp.code_nacres, cp.name
+        """):
+            issues.append(QualityIssue(
+                severity="ERROR", table="commercial_products",
+                rule="deprecated_nacres",
+                message="Produit relié à un code NACRES à ne plus utiliser.",
+                entry=name, detail=code or "",
+            ))
 
     # Produits liquides sans facteur d'émission
     for name, code in _q(conn, """
@@ -218,6 +276,32 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             entry=name, detail=ftype or "",
         ))
 
+    if _table_exists(conn, "product_components"):
+        for comp_id, product_id in _q(conn, """
+            SELECT pc.id, pc.product_id
+            FROM product_components pc
+            LEFT JOIN commercial_products cp ON cp.id = pc.product_id
+            WHERE cp.id IS NULL
+        """):
+            issues.append(QualityIssue(
+                severity="ERROR", table="product_components",
+                rule="component_product_missing",
+                message="Composant pointant vers un produit absent.",
+                entry=comp_id, detail=product_id or "",
+            ))
+        for comp_id, material_id in _q(conn, """
+            SELECT pc.id, pc.material_id
+            FROM product_components pc
+            LEFT JOIN materials m ON m.id = pc.material_id
+            WHERE m.id IS NULL
+        """):
+            issues.append(QualityIssue(
+                severity="ERROR", table="product_components",
+                rule="component_material_missing",
+                message="Composant pointant vers un matériau absent.",
+                entry=comp_id, detail=material_id or "",
+            ))
+
     # Facteur CO2 aberrant
     for name, co2 in _q(conn, """
         SELECT name, co2_factor FROM emission_factors
@@ -258,7 +342,7 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             entry=name, detail=code or "",
         ))
 
-    # Entrées en draft (informatif)
+    # Entrées à valider (informatif)
     _name_col = {
         "commercial_products": "name",
         "emission_factors": "name",
@@ -273,7 +357,7 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             issues.append(QualityIssue(
                 severity="INFO", table=table,
                 rule="draft_entry",
-                message="Entrée non validée (statut draft).",
+                message="Entrée à valider.",
                 entry=name,
             ))
 
