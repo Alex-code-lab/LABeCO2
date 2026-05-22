@@ -29,11 +29,11 @@ def _warnings(issues):
 
 class TestCheckCommercialProduct(unittest.TestCase):
 
-    def test_liquid_missing_factor_is_error(self):
+    def test_liquid_missing_factor_is_warning(self):
         row = {"Consommable": "Éthanol 70 %", "Unité liquide": "mL",
                "Volume flacon (mL)": 500, "Prix du conditionnement": 12.0}
-        errs = _errors(check_commercial_product(row))
-        rules = [e.rule for e in errs]
+        warns = _warnings(check_commercial_product(row))
+        rules = [e.rule for e in warns]
         self.assertIn("liquid_missing_factor", rules)
 
     def test_liquid_with_factor_id_no_error(self):
@@ -194,7 +194,7 @@ def _make_db() -> sqlite3.Connection:
 
 class TestCheckDatabase(unittest.TestCase):
 
-    def test_liquid_product_without_factor_is_error(self):
+    def test_liquid_product_without_factor_is_warning(self):
         conn = _make_db()
         conn.execute("""
             INSERT INTO commercial_products (id, name, code_nacres, product_type, status)
@@ -202,9 +202,10 @@ class TestCheckDatabase(unittest.TestCase):
         """)
         conn.commit()
         issues = check_database(conn)
-        errs = [i for i in issues if i.rule == "liquid_missing_factor"]
-        self.assertEqual(len(errs), 1)
-        self.assertEqual(errs[0].entry, "Éthanol sans facteur")
+        warns = [i for i in issues if i.rule == "liquid_missing_factor"]
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].severity, "WARNING")
+        self.assertEqual(warns[0].entry, "Éthanol sans facteur")
 
     def test_liquid_product_with_factor_no_error(self):
         conn = _make_db()

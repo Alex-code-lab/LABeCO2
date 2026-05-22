@@ -145,6 +145,7 @@ def _solid_row(
     facteur_liquide='', unite_liquide='', volume_flacon=0,
     mat_emb='', masse_emb=0.0,
     mat_cond='', masse_cond=0.0,
+    conditionnement='',
 ):
     """Construit un DataFrame data_masse avec une seule ligne solide."""
     return pd.DataFrame([{
@@ -159,7 +160,31 @@ def _solid_row(
         'Masse emballage unitaire (g)': masse_emb,
         'Matériau conditionnement':  mat_cond,
         'Masse condionnement (g)':   masse_cond,
+        'condt_ijm':                 conditionnement,
     }])
+
+
+class _FakeCombo:
+    def __init__(self):
+        self.items = []
+        self.user_data = []
+        self.item_data = {}
+
+    def addItem(self, text, userData=None):
+        self.items.append(text)
+        self.user_data.append(userData)
+
+    def count(self):
+        return len(self.items)
+
+    def setItemData(self, index, value, role=None):
+        self.item_data[(index, role)] = value
+
+    def itemData(self, index):
+        return self.user_data[index]
+
+    def setCurrentIndex(self, index):
+        self.current_index = index
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -199,6 +224,24 @@ class TestConsumableNacresLookup(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row['subcategory'], 'Vie du laboratoire')
         self.assertEqual(row['subsubcategory'], 'AA01')
+
+    def test_affiche_le_conditionnement_dans_la_liste_consommables(self):
+        mw = _make_mw()
+        mw.conso_filtered_combo = _FakeCombo()
+
+        mw._add_consumable_combo_item("NA25", "Talc", "solid", "5 kg")
+
+        self.assertEqual(mw.conso_filtered_combo.items[0], "Talc - 5 kg")
+        self.assertEqual(mw.conso_filtered_combo.user_data[0]["consommable"], "Talc")
+        self.assertEqual(mw.conso_filtered_combo.user_data[0]["conditionnement"], "5 kg")
+
+    def test_recherche_consommable_indexe_le_conditionnement(self):
+        mw = _make_mw(data_masse=_solid_row(code='NA25', nom='Talc', conditionnement='5 kg'))
+        mw.data = pd.DataFrame()
+
+        mw._rebuild_search_indexes()
+
+        self.assertEqual(mw._consumable_code_prefixes("5 kg"), {"NA25"})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

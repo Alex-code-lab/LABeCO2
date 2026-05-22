@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from PySide6.QtCore import QModelIndex, QSortFilterProxyModel, Qt
+from PySide6.QtCore import QModelIndex, QSortFilterProxyModel, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QTableWidget,
@@ -89,6 +90,39 @@ class ValidationTab(QWidget):
         self._widget.sqlite_path = db_path
         self._widget._load_table()
 
+    def show_product(self, product_id: str) -> bool:
+        """Navigue vers le produit dans le widget de validation. Retourne True si trouvé."""
+        w = self._widget
+        # Montrer TOUS les statuts pour inclure les produits validés
+        all_status_idx = w.status_combo.findData("all")
+        if all_status_idx >= 0:
+            w.status_combo.blockSignals(True)
+            w.status_combo.setCurrentIndex(all_status_idx)
+            w.status_combo.blockSignals(False)
+        # Sélectionner la table commercial_products
+        idx = w.table_combo.findData("commercial_products")
+        if idx >= 0:
+            w.table_combo.blockSignals(True)
+            w.table_combo.setCurrentIndex(idx)
+            w.table_combo.blockSignals(False)
+        # Vider les filtres texte AVANT le chargement (pour éviter que _filter_rows les applique)
+        w.search_edit.blockSignals(True)
+        w.search_edit.clear()
+        w.search_edit.blockSignals(False)
+        # Charger la table avec les nouveaux filtres
+        w._load_table()
+        # Chercher la ligne par son row_id (stocké comme UserRole = (table, id))
+        for r in range(w.table_widget.rowCount()):
+            item = w.table_widget.item(r, 0)
+            if item:
+                data = item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(data, tuple) and len(data) >= 2 and data[1] == product_id:
+                    w.table_widget.clearSelection()
+                    w.table_widget.selectRow(r)
+                    w.table_widget.scrollToItem(item)
+                    return True
+        return False
+
     def _on_edit_requested(self, table: str, row_id: str) -> None:
         import sqlite3
         from ui.data_mass_window import DataMassWindow
@@ -139,7 +173,7 @@ class ValidationTab(QWidget):
 # ============================================================
 
 _MERGE_TABLES = TABLES_ORDER
-_CONTEXT_TABLES = TABLES_ORDER
+_CONTEXT_TABLES = TABLES_ORDER + ["supplier_catalogue", "catalogue_ijm"]
 _TABLE_LABEL = {
     "contributors": "Contributeurs",
     "sources": "Sources",
@@ -630,6 +664,80 @@ class MergeTab(QWidget):
         details = "\n".join(f"  - {self._component_text(entry, comp)}" for comp in components)
         return summary, details
 
+    def _catalogue_summary(self, entry: dict, data: dict) -> tuple[str, str]:
+        supplier = data.get("supplier") or ""
+        version = data.get("catalogue_date") or data.get("version") or ""
+
+        supplier_catalogue_id = data.get("supplier_catalogue_id")
+        if supplier_catalogue_id:
+            catalogue = self._lookup(entry, "supplier_catalogue", supplier_catalogue_id)
+            supplier = supplier or catalogue.get("supplier") or ""
+            version = version or catalogue.get("catalogue_date") or ""
+
+        ijm_catalogue_id = data.get("ijm_catalogue_id")
+        if ijm_catalogue_id:
+            catalogue = self._lookup(entry, "catalogue_ijm", ijm_catalogue_id)
+            supplier = supplier or catalogue.get("source_catalogue") or ""
+            version = version or catalogue.get("imported_at") or ""
+
+        return supplier, version
+
+    def _product_decision_fields(self, entry: dict, data: dict) -> dict[str, str]:
+        supplier, version = self._catalogue_summary(entry, data)
+        volume = data.get("sold_unit_volume_ml")
+        if volume in (None, ""):
+            volume = data.get("capacity_volume_ml")
+        price = data.get("price_sold_packaging")
+        if price in (None, ""):
+            price = data.get("price_ht")
+        return {
+            "brand": data.get("brand") or "",
+            "reference": data.get("reference") or "",
+            "packaging": data.get("sold_packaging_label") or data.get("conditionnement") or "",
+            "price": _fmt_number(price),
+            "volume": _fmt_number(volume),
+            "supplier": supplier,
+            "version": version,
+        }
+
+    def _solid_co2_per_kg(self, entry: dict, product_id: str) -> str:
+        """Calcule kg CO₂e/kg pour un produit solide depuis ses composants.
+        Retourne une chaîne numérique formatée, ou '' si le calcul est impossible
+        (masse ou facteur manquant pour au moins un composant).
+        """
+        index = self._source_indexes.get(entry.get("source_key", ""), {})
+        components = _component_rows(index, product_id)
+        if not components:
+            components = _component_rows(self._ref_index, product_id)
+        if not components:
+            return ""
+
+        total_mass_g = 0.0
+        total_co2_weighted = 0.0
+        for comp in components:
+            mass_g = comp.get("mass_g")
+            if mass_g is None:
+                return ""
+            divisor = comp.get("units_divisor") or 1
+            eff_mass = mass_g / divisor
+
+            material = self._lookup(entry, "materials", comp.get("material_id"))
+            ef_id = material.get("emission_factor_id") if material else None
+            if not ef_id:
+                return ""
+            ef = self._lookup(entry, "emission_factors", ef_id)
+            co2_factor = ef.get("co2_factor") if ef else None
+            if co2_factor is None:
+                return ""
+
+            total_mass_g += eff_mass
+            total_co2_weighted += eff_mass * co2_factor  # g × kgCO₂e/kg → les g s'annulent
+
+        if total_mass_g == 0:
+            return ""
+
+        return f"{total_co2_weighted / total_mass_g:.4g}"
+
     def _display_values(self, entry: dict) -> list[str]:
         table = entry["table"]
         data = entry["data"]
@@ -640,6 +748,15 @@ class MergeTab(QWidget):
         source_text = self._source_title(entry, data)
         packaging_count = ""
         note_text = data.get("note") or ""
+        product_fields = {
+            "brand": "",
+            "reference": "",
+            "packaging": "",
+            "price": "",
+            "volume": "",
+            "supplier": "",
+            "version": "",
+        }
 
         if table == "emission_factors":
             type_value = _product_type_label(data.get("factor_type") or "")
@@ -652,15 +769,19 @@ class MergeTab(QWidget):
             factor_text, co2_text = self._factor_summary(entry, data.get("emission_factor_id"))
         elif table == "commercial_products":
             type_value = _product_type_label(data.get("product_type") or "")
+            product_fields = self._product_decision_fields(entry, data)
             packaging_count = _fmt_number(data.get("units_per_sold_packaging"))
             if data.get("product_type") == "liquid":
                 factor_text, co2_text = self._factor_summary(entry, data.get("emission_factor_id"))
             else:
                 factor_text, _ = self._product_components_summary(entry, data.get("id", ""))
+                co2_val = self._solid_co2_per_kg(entry, data.get("id", ""))
+                co2_text = f"{co2_val} kg CO₂e/kg" if co2_val else ""
         elif table == "product_components":
             product = self._lookup(entry, "commercial_products", data.get("product_id"))
             nacres = product.get("code_nacres") or ""
             type_value = _product_type_label(product.get("product_type") or "")
+            product_fields = self._product_decision_fields(entry, product)
             packaging_count = _fmt_number(product.get("units_per_sold_packaging"))
             factor_text = self._component_text(entry, data)
         elif table == "transport_factors":
@@ -680,9 +801,16 @@ class MergeTab(QWidget):
             nacres,
             type_value,
             entry["label"],
+            product_fields["brand"],
+            product_fields["reference"],
+            product_fields["packaging"],
+            product_fields["price"],
+            product_fields["volume"],
             packaging_count,
             factor_text,
             co2_text,
+            product_fields["supplier"],
+            product_fields["version"],
             source_text,
             note_text,
             _status_label(data.get("status", "")),
@@ -697,9 +825,16 @@ class MergeTab(QWidget):
             "NACRES",
             "Solide / liquide",
             "Nom / Origine",
+            "Marque",
+            "Référence",
+            "Conditionnement",
+            "Prix (€)",
+            "Volume (mL)",
             "Nbr cond.",
             "FE / comp.",
-            "CO₂",
+            "kg CO₂e/kg",
+            "Fournisseur",
+            "Version catalogue",
             "Source",
             "Lien / Note",
             "Statut source",
@@ -714,11 +849,32 @@ class MergeTab(QWidget):
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.setColumnWidth(0, 28)
-        for col, width in ((7, 80), (8, 150)):
-            self.table.horizontalHeader().setSectionResizeMode(
-                col, QHeaderView.ResizeMode.Interactive
-            )
-            self.table.setColumnWidth(col, width)
+        widths = {
+            "NACRES": 80,
+            "Solide / liquide": 95,
+            "Nom / Origine": 230,
+            "Marque": 130,
+            "Référence": 110,
+            "Conditionnement": 140,
+            "Prix (€)": 80,
+            "Volume (mL)": 95,
+            "Nbr cond.": 80,
+            "FE / comp.": 180,
+            "kg CO₂e/kg": 115,
+            "Fournisseur": 110,
+            "Version catalogue": 120,
+        }
+        for header, width in widths.items():
+            if header in headers:
+                col = headers.index(header)
+                self.table.horizontalHeader().setSectionResizeMode(
+                    col, QHeaderView.ResizeMode.Interactive
+                )
+                self.table.setColumnWidth(col, width)
+
+        _COL_TABLE_MERGE = headers.index("Table")
+        _COL_CO2_MERGE   = headers.index("kg CO₂e/kg")
+        _GREY = QColor(210, 210, 210)
 
         for r, entry in enumerate(self._entries):
             chk = QTableWidgetItem()
@@ -733,6 +889,21 @@ class MergeTab(QWidget):
                 item = QTableWidgetItem(str(val or ""))
                 item.setBackground(color)
                 self.table.setItem(r, c + 1, item)
+
+            # Griser la cellule CO₂e pour les solides sans facteur calculable
+            if (entry["table"] == "commercial_products"
+                    and entry["data"].get("product_type") != "liquid"):
+                co2_item = self.table.item(r, _COL_CO2_MERGE)
+                if co2_item and not co2_item.text():
+                    co2_item.setBackground(_GREY)
+                    co2_item.setToolTip("Calcul impossible : masse ou facteur manquant pour un composant")
+
+        # Masquer la colonne "Table" si toutes les entrées sont du même type
+        all_tables = {e["table"] for e in self._entries}
+        if len(all_tables) <= 1:
+            self.table.hideColumn(_COL_TABLE_MERGE)
+        else:
+            self.table.showColumn(_COL_TABLE_MERGE)
 
         self.table.blockSignals(False)
         self.table.itemChanged.connect(self._on_check_changed)
@@ -758,17 +929,43 @@ class MergeTab(QWidget):
         table = entry["table"]
         data = entry["data"]
         values = self._display_values(entry)
+        (
+            kind_label,
+            file_label,
+            table_label,
+            nacres_value,
+            type_label,
+            entry_label,
+            brand,
+            reference,
+            packaging,
+            price,
+            volume,
+            packaging_count,
+            factor_summary,
+            co2_summary,
+            supplier,
+            version,
+            source,
+            note,
+            _status,
+        ) = values
         lines = [
-            f"[{_merge_kind_label(entry['kind'])}]  {_TABLE_LABEL.get(table, table)}  -  {entry['label']}",
-            f"Fichier : {entry.get('source_label', '')}",
+            f"[{kind_label}]  {table_label}  -  {entry_label}",
+            f"Fichier : {file_label}",
             f"ID : {entry.get('id', '')}",
-            f"NACRES : {values[3]}",
-            f"Type : {values[4]}",
-            f"Nbr conditionnement : {values[6]}",
-            f"FE / composants : {values[7]}",
-            f"CO2 : {values[8]}",
-            f"Source : {values[9]}",
-            f"Lien / Note : {values[10]}",
+            f"NACRES : {nacres_value}",
+            f"Type : {type_label}",
+            f"Marque / référence : {brand} / {reference}".rstrip(" /"),
+            f"Conditionnement : {packaging}",
+            f"Prix : {price}",
+            f"Volume : {volume}",
+            f"Nbr conditionnement : {packaging_count}",
+            f"FE / composants : {factor_summary}",
+            f"kg CO₂e/kg : {co2_summary}",
+            f"Fournisseur / version : {supplier} / {version}".rstrip(" /"),
+            f"Source : {source}",
+            f"Lien / Note : {note}",
         ]
         if table == "commercial_products" and data.get("product_type") != "liquid":
             _, details = self._product_components_summary(entry, data.get("id", ""))
@@ -965,15 +1162,27 @@ class MergeTab(QWidget):
 # ============================================================
 
 class QualityTab(QWidget):
+    navigate_to = Signal(str)   # émis avec product_id quand l'utilisateur double-clique
+
+    _CHK = 0
+    _SEV = 1
+    _TBL = 2
+    _MSG = 3
+    _ENT = 4
+    _DET = 5
+    _HEADERS = ["", "Sévérité", "Table", "Message", "Entrée", "Détail"]
+
     def __init__(self, db_path: Path):
         super().__init__()
         self.db_path = db_path
+        self._nacres_options: list = []
         self._build_ui()
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setSpacing(6)
 
+        # Barre principale
         top = QHBoxLayout()
         self.btn_run = QPushButton("Lancer l'audit")
         self.btn_run.clicked.connect(self._run)
@@ -983,13 +1192,81 @@ class QualityTab(QWidget):
         top.addStretch()
         root.addLayout(top)
 
+        # Barre de sélection
+        sel_bar = QHBoxLayout()
+        sel_bar.addWidget(QLabel("Cocher :"))
+        btn_err = QPushButton("Erreurs")
+        btn_err.setMaximumWidth(80)
+        btn_err.clicked.connect(lambda: self._select_by_severity("ERROR"))
+        sel_bar.addWidget(btn_err)
+        btn_warn = QPushButton("Avertissements")
+        btn_warn.setMaximumWidth(120)
+        btn_warn.clicked.connect(lambda: self._select_by_severity("WARNING"))
+        sel_bar.addWidget(btn_warn)
+        btn_none = QPushButton("Aucun")
+        btn_none.setMaximumWidth(70)
+        btn_none.clicked.connect(self._select_none)
+        sel_bar.addWidget(btn_none)
+        sel_bar.addStretch()
+        hint = QLabel("Double-clic → accéder au produit dans Catalogue fournisseurs")
+        hint.setStyleSheet("color: gray; font-style: italic; font-size: 11px;")
+        sel_bar.addWidget(hint)
+        root.addLayout(sel_bar)
+
+        # Table
         self.table = QTableWidget()
-        self.table.setAlternatingRowColors(True)
+        self.table.setAlternatingRowColors(False)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setStretchLastSection(True)
+        self.table.cellDoubleClicked.connect(self._on_double_click)
+        self.table.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.table)
+
+        # Barre d'action groupée
+        action_bar = QHBoxLayout()
+        self.checked_label = QLabel("0 ligne(s) cochée(s)")
+        action_bar.addWidget(self.checked_label)
+        action_bar.addWidget(QLabel("  |  Changer NACRES :"))
+
+        self.nacres_filter_edit = QLineEdit()
+        self.nacres_filter_edit.setPlaceholderText("Filtrer (ex: ADN)…")
+        self.nacres_filter_edit.setMaximumWidth(150)
+        self.nacres_filter_edit.textChanged.connect(self._filter_nacres_qual)
+        action_bar.addWidget(self.nacres_filter_edit)
+
+        self._nacres_model_qual = QStandardItemModel(self)
+        self._nacres_proxy_qual = QSortFilterProxyModel(self)
+        self._nacres_proxy_qual.setSourceModel(self._nacres_model_qual)
+        self._nacres_proxy_qual.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._nacres_proxy_qual.setFilterRole(Qt.ItemDataRole.DisplayRole)
+
+        self.nacres_combo = QComboBox()
+        self.nacres_combo.setMinimumWidth(320)
+        self.nacres_combo.setModel(self._nacres_proxy_qual)
+        self.nacres_combo.view().setMinimumWidth(520)
+        self.nacres_combo.currentIndexChanged.connect(self._update_action_bar)
+        action_bar.addWidget(self.nacres_combo)
+
+        self.btn_apply = QPushButton("Appliquer à la sélection")
+        self.btn_apply.setEnabled(False)
+        self.btn_apply.clicked.connect(self._apply_nacres_bulk)
+        action_bar.addWidget(self.btn_apply)
+
+        sep = QLabel(" | ")
+        sep.setStyleSheet("color: gray;")
+        action_bar.addWidget(sep)
+
+        self.btn_delete_orphans = QPushButton("Supprimer les composants orphelins sélectionnés")
+        self.btn_delete_orphans.setEnabled(False)
+        self.btn_delete_orphans.setStyleSheet("color: darkred;")
+        self.btn_delete_orphans.clicked.connect(self._delete_orphan_components)
+        action_bar.addWidget(self.btn_delete_orphans)
+
+        action_bar.addStretch()
+        root.addLayout(action_bar)
 
     def reload(self, db_path: Path) -> None:
         self.db_path = db_path
@@ -1000,11 +1277,25 @@ class QualityTab(QWidget):
     def _run(self) -> None:
         try:
             conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
             issues = check_database(conn)
+            self._nacres_options = load_nacres_options(conn)
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", str(e))
             return
+
+        self.nacres_combo.blockSignals(True)
+        self._nacres_model_qual.clear()
+        placeholder = QStandardItem("— choisir un code NACRES —")
+        placeholder.setData("", Qt.ItemDataRole.UserRole)
+        self._nacres_model_qual.appendRow(placeholder)
+        for opt in self._nacres_options:
+            label = f"{opt.code} — {opt.label}" if opt.label else opt.code
+            item = QStandardItem(label)
+            item.setData(opt.code, Qt.ItemDataRole.UserRole)
+            self._nacres_model_qual.appendRow(item)
+        self.nacres_combo.blockSignals(False)
 
         n_err  = sum(1 for i in issues if i.severity == "ERROR")
         n_warn = sum(1 for i in issues if i.severity == "WARNING")
@@ -1013,19 +1304,37 @@ class QualityTab(QWidget):
             f"  {n_err} erreur(s)  |  {n_warn} avertissement(s)  |  {n_info} info(s)"
         )
 
-        headers = ["Sévérité", "Table", "Message", "Entrée", "Détail"]
-        _colors = {"ERROR": QColor(255, 205, 210), "WARNING": QColor(255, 243, 178),
-                   "INFO": QColor(232, 245, 233)}
+        _colors = {"ERROR": QColor(255, 180, 180), "WARNING": QColor(255, 235, 140)}
+        _black = QColor(0, 0, 0)
 
         self.table.blockSignals(True)
         self.table.clearContents()
         visible = [i for i in issues if i.severity != "INFO"]
         self.table.setRowCount(len(visible))
-        self.table.setColumnCount(len(headers))
-        self.table.setHorizontalHeaderLabels(headers)
+        self.table.setColumnCount(len(self._HEADERS))
+        self.table.setHorizontalHeaderLabels(self._HEADERS)
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(self._CHK, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(self._CHK, 28)
 
         for r, issue in enumerate(visible):
             color = _colors.get(issue.severity, QColor(255, 255, 255))
+            navigable = bool(
+                issue.row_id and (
+                    issue.table == "commercial_products"
+                    or issue.rule == "component_material_missing"
+                )
+            )
+
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            chk.setCheckState(Qt.CheckState.Unchecked)
+            chk.setData(Qt.ItemDataRole.UserRole,     issue.row_id)
+            chk.setData(Qt.ItemDataRole.UserRole + 1, issue.severity)
+            chk.setData(Qt.ItemDataRole.UserRole + 2, issue.aux_id)
+            chk.setBackground(color)
+            self.table.setItem(r, self._CHK, chk)
+
             values = [
                 _SEVERITY_LABEL.get(issue.severity, issue.severity),
                 _TABLE_LABEL.get(issue.table, issue.table),
@@ -1033,13 +1342,159 @@ class QualityTab(QWidget):
                 issue.entry,
                 issue.detail,
             ]
-            for c, val in enumerate(values):
+            for offset, val in enumerate(values):
+                c = offset + 1
                 item = QTableWidgetItem(str(val or ""))
-                if c == 2 and issue.rule:
-                    item.setToolTip(issue.rule)
                 item.setBackground(color)
+                item.setForeground(_black)
+                if c == self._MSG:
+                    tip = issue.rule or ""
+                    if navigable:
+                        tip = (tip + "\n" if tip else "") + "Double-clic → ouvrir dans Catalogue fournisseurs"
+                    if tip:
+                        item.setToolTip(tip)
+                if navigable:
+                    f = item.font()
+                    f.setUnderline(c == self._ENT)
+                    item.setFont(f)
                 self.table.setItem(r, c, item)
+
         self.table.blockSignals(False)
+        self._update_action_bar()
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        if item.column() == self._CHK:
+            self._update_action_bar()
+
+    def _update_action_bar(self) -> None:
+        n = 0
+        n_orphans = 0
+        for r in range(self.table.rowCount()):
+            chk = self.table.item(r, self._CHK)
+            if chk and chk.checkState() == Qt.CheckState.Checked:
+                n += 1
+                if chk.data(Qt.ItemDataRole.UserRole + 2):
+                    n_orphans += 1
+        self.checked_label.setText(f"{n} ligne(s) cochée(s)")
+        self.btn_apply.setEnabled(n > 0 and bool(self.nacres_combo.currentData()))
+        self.btn_delete_orphans.setEnabled(n_orphans > 0)
+        if n_orphans > 0:
+            self.btn_delete_orphans.setText(
+                f"Supprimer {n_orphans} composant(s) orphelin(s) sélectionné(s)"
+            )
+        else:
+            self.btn_delete_orphans.setText("Supprimer les composants orphelins sélectionnés")
+
+    def _select_by_severity(self, severity: str) -> None:
+        self.table.blockSignals(True)
+        for r in range(self.table.rowCount()):
+            chk = self.table.item(r, self._CHK)
+            if chk:
+                sev = chk.data(Qt.ItemDataRole.UserRole + 1)
+                chk.setCheckState(
+                    Qt.CheckState.Checked if sev == severity else Qt.CheckState.Unchecked
+                )
+        self.table.blockSignals(False)
+        self._update_action_bar()
+
+    def _select_none(self) -> None:
+        self.table.blockSignals(True)
+        for r in range(self.table.rowCount()):
+            chk = self.table.item(r, self._CHK)
+            if chk:
+                chk.setCheckState(Qt.CheckState.Unchecked)
+        self.table.blockSignals(False)
+        self._update_action_bar()
+
+    def _filter_nacres_qual(self, text: str) -> None:
+        self._nacres_proxy_qual.setFilterFixedString(text)
+
+    def _apply_nacres_bulk(self) -> None:
+        new_code = self.nacres_combo.currentData()
+        if not new_code:
+            QMessageBox.warning(self, "NACRES requis", "Sélectionnez un code NACRES dans la liste.")
+            return
+        product_ids = {
+            chk.data(Qt.ItemDataRole.UserRole)
+            for r in range(self.table.rowCount())
+            if (chk := self.table.item(r, self._CHK))
+            and chk.checkState() == Qt.CheckState.Checked
+            and chk.data(Qt.ItemDataRole.UserRole)
+        }
+        if not product_ids:
+            QMessageBox.information(self, "Aucune cible", "Aucune ligne cochée n'a de produit associé.")
+            return
+        reply = QMessageBox.question(
+            self, "Confirmer",
+            f"Appliquer le code NACRES «{new_code}» à {len(product_ids)} produit(s) ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
+            conn = sqlite3.connect(self.db_path)
+            for pid in product_ids:
+                conn.execute(
+                    "UPDATE commercial_products SET code_nacres = ?, updated_at = ? WHERE id = ?",
+                    (new_code, now, pid),
+                )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de sauvegarder : {e}")
+            return
+        QMessageBox.information(
+            self, "Modifié",
+            f"Code NACRES «{new_code}» appliqué à {len(product_ids)} produit(s).\n"
+            "Relancez l'audit pour rafraîchir.",
+        )
+
+    def _delete_orphan_components(self) -> None:
+        comp_ids = {
+            chk.data(Qt.ItemDataRole.UserRole + 2)
+            for r in range(self.table.rowCount())
+            if (chk := self.table.item(r, self._CHK))
+            and chk.checkState() == Qt.CheckState.Checked
+            and chk.data(Qt.ItemDataRole.UserRole + 2)
+        }
+        if not comp_ids:
+            return
+        reply = QMessageBox.question(
+            self, "Confirmer la suppression",
+            f"Supprimer {len(comp_ids)} composant(s) orphelin(s) de la base ?\n\n"
+            "Cette action est irréversible.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            conn = sqlite3.connect(self.db_path)
+            placeholders = ",".join("?" * len(comp_ids))
+            conn.execute(
+                f"DELETE FROM product_components WHERE id IN ({placeholders})",
+                list(comp_ids),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de supprimer : {e}")
+            return
+        QMessageBox.information(
+            self, "Supprimé",
+            f"{len(comp_ids)} composant(s) orphelin(s) supprimé(s).\n"
+            "L'audit est relancé automatiquement.",
+        )
+        self._run()
+
+    def _on_double_click(self, row: int, _: int) -> None:
+        chk = self.table.item(row, self._CHK)
+        if not chk:
+            return
+        row_id = chk.data(Qt.ItemDataRole.UserRole)
+        if row_id:
+            self.navigate_to.emit(str(row_id))
 
 
 # ============================================================
@@ -1184,12 +1639,13 @@ _COL_BRAND   = 6
 _COL_CONDT   = 7
 _COL_PRICE   = 8
 _COL_TYPE    = 9
-_COL_NACRES  = 10  # QComboBox pour les lignes en attente, lecture seule sinon
-_COL_STATUS  = 11
+_COL_LIQ_FE  = 10
+_COL_NACRES  = 11  # QComboBox pour les lignes en attente, lecture seule sinon
+_COL_STATUS  = 12
 
 _CATALOGUE_HEADERS = [
     "", "id", "Fournisseur", "Version", "Code catalogue", "Désignation", "Marque",
-    "Conditionnement", "Prix HT (€)", "Type", "Code NACRES", "Statut",
+    "Conditionnement", "Prix HT (€)", "Type", "FE liquide", "Code NACRES", "Statut",
 ]
 
 _COLOR_PENDING    = QColor(255, 243, 180)   # jaune : en attente de validation
@@ -1241,7 +1697,10 @@ class CatalogueTab(QWidget):
     def __init__(self, db_path: Path):
         super().__init__()
         self.db_path = db_path
-        self._pending_changes: dict[str, str] = {}   # product_id → new nacres
+        self._pending_changes: dict[str, str] = {}              # product_id → new nacres
+        self._pending_fe_changes: dict[str, str | None] = {}    # product_id → emission_factor_id
+        self._pending_product_changes: dict[str, dict] = {}     # product_id → {field: value}
+        self._liquid_factors: list[tuple[str, str, float | None, str]] = []  # (id, name, co2, unit)
         self._nacres_options = []
         self._nacres_by_code = {}
         self._nacres_model = QStandardItemModel(self)
@@ -1251,7 +1710,28 @@ class CatalogueTab(QWidget):
     def reload(self, db_path: Path) -> None:
         self.db_path = db_path
         self._pending_changes = {}
+        self._pending_fe_changes = {}
+        self._pending_product_changes = {}
         self._load()
+
+    def show_product(self, product_id: str) -> bool:
+        """Sélectionne le produit dans la table. Retourne True si trouvé, False sinon."""
+        all_idx = self.show_combo.findData("all")
+        if all_idx >= 0:
+            self.show_combo.blockSignals(True)
+            self.show_combo.setCurrentIndex(all_idx)
+            self.show_combo.blockSignals(False)
+            self._apply_filter()
+
+        for r in range(self.table.rowCount()):
+            id_item = self.table.item(r, _COL_ID)
+            if id_item and id_item.text() == product_id:
+                self.table.setRowHidden(r, False)
+                self.table.clearSelection()
+                self.table.selectRow(r)
+                self.table.scrollToItem(self.table.item(r, _COL_NAME) or id_item)
+                return True
+        return False
 
     # ------------------------------------------------------------------
     # UI
@@ -1261,50 +1741,68 @@ class CatalogueTab(QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(6)
 
-        # Barre de filtre
-        filter_bar = QHBoxLayout()
-        filter_bar.addWidget(QLabel("Fournisseur :"))
+        # Filtres : deux lignes pour laisser de la place aux champs de recherche.
+        filters = QVBoxLayout()
+        filters.setSpacing(6)
+
+        filter_row_main = QHBoxLayout()
+        filter_row_main.addWidget(QLabel("Fournisseur :"))
         self.supplier_combo = QComboBox()
         self.supplier_combo.addItem("Tous", "")
         self.supplier_combo.currentIndexChanged.connect(self._apply_filter)
-        filter_bar.addWidget(self.supplier_combo)
+        self.supplier_combo.setMinimumWidth(170)
+        filter_row_main.addWidget(self.supplier_combo)
 
-        filter_bar.addWidget(QLabel("  Version :"))
+        filter_row_main.addWidget(QLabel("Version :"))
         self.catalogue_date_combo = QComboBox()
         self.catalogue_date_combo.addItem("Toutes", "")
         self.catalogue_date_combo.currentIndexChanged.connect(self._apply_filter)
-        filter_bar.addWidget(self.catalogue_date_combo)
+        self.catalogue_date_combo.setMinimumWidth(145)
+        filter_row_main.addWidget(self.catalogue_date_combo)
 
-        filter_bar.addWidget(QLabel("  Afficher :"))
+        filter_row_main.addWidget(QLabel("Afficher :"))
         self.show_combo = QComboBox()
         self.show_combo.addItem("En attente", "pending")
         self.show_combo.addItem("Sans NACRES seulement", "missing")
         self.show_combo.addItem("Nouveaux NACRES sans FE", "new_no_fe")
         self.show_combo.addItem("Tous (IJM + Duchefa + ...)", "all")
         self.show_combo.currentIndexChanged.connect(self._apply_filter)
-        filter_bar.addWidget(self.show_combo)
+        self.show_combo.setMinimumWidth(220)
+        filter_row_main.addWidget(self.show_combo)
 
-        filter_bar.addSpacing(12)
-        filter_bar.addWidget(QLabel("Recherche :"))
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Filtrer…")
-        self.search_edit.setClearButtonEnabled(True)
-        self.search_edit.setMinimumWidth(200)
-        self.search_edit.textChanged.connect(self._apply_filter)
-        filter_bar.addWidget(self.search_edit)
+        filter_row_main.addWidget(QLabel("Type produit :"))
+        self.product_type_combo = QComboBox()
+        self.product_type_combo.addItem("Tous", "all")
+        self.product_type_combo.addItem("Solides", "solid")
+        self.product_type_combo.addItem("Liquides", "liquid")
+        self.product_type_combo.currentIndexChanged.connect(self._apply_filter)
+        self.product_type_combo.setMinimumWidth(130)
+        filter_row_main.addWidget(self.product_type_combo)
 
-        filter_bar.addStretch()
+        filter_row_main.addStretch()
         self.count_label = QLabel("")
-        filter_bar.addWidget(self.count_label)
+        filter_row_main.addWidget(self.count_label)
 
         btn_import_catalogue = QPushButton("Importer un catalogue…")
         btn_import_catalogue.clicked.connect(self._import_catalogue)
-        filter_bar.addWidget(btn_import_catalogue)
+        filter_row_main.addWidget(btn_import_catalogue)
 
         btn_reload = QPushButton("↺  Recharger")
         btn_reload.clicked.connect(self._load)
-        filter_bar.addWidget(btn_reload)
-        root.addLayout(filter_bar)
+        filter_row_main.addWidget(btn_reload)
+        filters.addLayout(filter_row_main)
+
+        filter_row_search = QHBoxLayout()
+        filter_row_search.addWidget(QLabel("Recherche :"))
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Filtrer…")
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setMinimumWidth(420)
+        self.search_edit.textChanged.connect(self._apply_filter)
+        filter_row_search.addWidget(self.search_edit, 1)
+        filters.addLayout(filter_row_search)
+
+        root.addLayout(filters)
 
         # Légende
         legend = QHBoxLayout()
@@ -1330,19 +1828,17 @@ class CatalogueTab(QWidget):
         self.table.setColumnCount(len(_CATALOGUE_HEADERS))
         self.table.setHorizontalHeaderLabels(_CATALOGUE_HEADERS)
         self.table.hideColumn(_COL_ID)
-        self.table.setColumnWidth(_COL_CHK, 28)
-        self.table.setColumnWidth(_COL_NACRES, 260)
-        self.table.horizontalHeader().setSectionResizeMode(
-            _COL_CHK, QHeaderView.ResizeMode.Fixed
-        )
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(
-            _COL_CHK, QHeaderView.ResizeMode.Fixed
-        )
-        self.table.horizontalHeader().setSectionResizeMode(
-            _COL_NACRES, QHeaderView.ResizeMode.Interactive
-        )
-        self.table.horizontalHeader().setStretchLastSection(True)
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(_COL_CHK,    QHeaderView.ResizeMode.Fixed)
+        hdr.setSectionResizeMode(_COL_LIQ_FE, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(_COL_NACRES,  QHeaderView.ResizeMode.Interactive)
+        hdr.setStretchLastSection(False)
+        hdr.setSectionsMovable(True)
+        self.table.setColumnWidth(_COL_CHK,    28)
+        self.table.setColumnWidth(_COL_LIQ_FE, 190)
+        self.table.setColumnWidth(_COL_NACRES,  270)
+        self.table.setSortingEnabled(True)
         self.table.itemChanged.connect(self._on_item_changed)
         self.table.cellDoubleClicked.connect(self._activate_nacres_editor)
         root.addWidget(self.table)
@@ -1363,7 +1859,7 @@ class CatalogueTab(QWidget):
         act_bar.addWidget(btn_check_none)
         act_bar.addStretch()
 
-        self.btn_save = QPushButton("Sauvegarder les NACRES")
+        self.btn_save = QPushButton("Sauvegarder les modifications")
         self.btn_save.setEnabled(False)
         self.btn_save.setStyleSheet(
             "QPushButton{background:#1565c0;color:white;font-weight:bold;padding:6px 16px;}"
@@ -1493,6 +1989,8 @@ class CatalogueTab(QWidget):
 
     def _load(self) -> None:
         self._pending_changes = {}
+        self._pending_fe_changes = {}
+        self._pending_product_changes = {}
         self._update_unsaved_label()
 
         try:
@@ -1501,6 +1999,16 @@ class CatalogueTab(QWidget):
             self._nacres_options = load_nacres_options(conn)
             self._nacres_by_code = {option.code: option for option in self._nacres_options}
             self._rebuild_nacres_model()
+            lf_rows = conn.execute("""
+                SELECT id, name, co2_factor, co2_unit
+                FROM emission_factors
+                WHERE factor_type = 'liquid' AND (status IS NULL OR status != 'deprecated')
+                ORDER BY name
+            """).fetchall()
+            self._liquid_factors = [
+                (r["id"], r["name"] or r["id"], r["co2_factor"], r["co2_unit"] or "kg CO₂e/kg")
+                for r in lf_rows
+            ]
 
             rows = conn.execute("""
                 SELECT
@@ -1510,12 +2018,15 @@ class CatalogueTab(QWidget):
                     COALESCE(sc.code_fournisseur, ijm.code_ijm, cp.reference) AS code_catalogue,
                     cp.name,
                     cp.brand,
-                    COALESCE(sc.conditionnement, ijm.conditionnement, cp.sold_packaging_label) AS conditionnement,
-                    COALESCE(sc.price_ht, ijm.price_ht, cp.price_sold_packaging) AS price_ht,
+                    COALESCE(NULLIF(TRIM(COALESCE(cp.sold_packaging_label,'')), ''), sc.conditionnement, ijm.conditionnement) AS conditionnement,
+                    COALESCE(cp.price_sold_packaging, sc.price_ht, ijm.price_ht) AS price_ht,
                     cp.product_type,
+                    cp.emission_factor_id,
+                    ef.name AS liquid_factor_name,
                     COALESCE(cp.code_nacres, '') AS code_nacres,
                     cp.status
                 FROM commercial_products cp
+                LEFT JOIN emission_factors ef ON ef.id = cp.emission_factor_id
                 LEFT JOIN supplier_catalogue sc  ON sc.id  = cp.supplier_catalogue_id
                 LEFT JOIN catalogue_ijm      ijm ON ijm.id = cp.ijm_catalogue_id
                 WHERE cp.status NOT IN ('deprecated')
@@ -1555,6 +2066,7 @@ class CatalogueTab(QWidget):
 
         # Remplir le tableau
         self.table.blockSignals(True)
+        self.table.setSortingEnabled(False)
         self.table.clearContents()
         self.table.setRowCount(len(rows))
 
@@ -1591,12 +2103,38 @@ class CatalogueTab(QWidget):
             self.table.setItem(r, _COL_SUPPL,  _item(row["supplier"]))
             self.table.setItem(r, _COL_DATE,   _item(row["catalogue_date"]))
             self.table.setItem(r, _COL_CODE,   _item(row["code_catalogue"]))
-            self.table.setItem(r, _COL_NAME,   _item(row["name"]))
-            self.table.setItem(r, _COL_BRAND,  _item(row["brand"]))
-            self.table.setItem(r, _COL_CONDT,  _item(row["conditionnement"]))
+            self.table.setItem(r, _COL_NAME,   _item(row["name"],  editable=is_pending))
+            self.table.setItem(r, _COL_BRAND,  _item(row["brand"], editable=is_pending))
+            self.table.setItem(r, _COL_CONDT,  _item(row["conditionnement"], editable=is_pending))
             price = row["price_ht"]
-            self.table.setItem(r, _COL_PRICE,  _item(f"{price:.2f}" if price else ""))
+            self.table.setItem(r, _COL_PRICE,  _item(f"{price:.2f}" if price else "", editable=is_pending))
             self.table.setItem(r, _COL_TYPE,   _item(_product_type_label(row["product_type"])))
+            fe_text = ""
+            fe_tooltip = ""
+            if row["product_type"] == "liquid":
+                if row["emission_factor_id"]:
+                    fe_text = row["liquid_factor_name"] or row["emission_factor_id"]
+                    fe_tooltip = "Facteur liquide lié pour les calculs au volume."
+                else:
+                    fe_text = "Non lié"
+                    fe_tooltip = (
+                        "Aucun facteur liquide n'est lié à ce produit.\n"
+                        "Ce n'est pas bloquant pour passer en validation : le calcul prix/NACRES reste possible,\n"
+                        "mais le calcul au volume sera indisponible tant qu'un FE liquide n'est pas relié."
+                    )
+            else:
+                fe_text = "—"
+                fe_tooltip = "Non applicable aux consommables solides."
+            fe_cell = _item(fe_text)
+            fe_cell.setData(Qt.ItemDataRole.UserRole, row["emission_factor_id"])  # raw id pour l'éditeur
+            if fe_tooltip:
+                fe_cell.setToolTip(fe_tooltip)
+            if is_pending and row["product_type"] == "liquid" and not row["emission_factor_id"]:
+                fe_cell.setToolTip(
+                    "Double-cliquer pour lier un facteur d'émission liquide.\n"
+                    + (fe_cell.toolTip() or "")
+                )
+            self.table.setItem(r, _COL_LIQ_FE, fe_cell)
             # NACRES : item texte léger. Le QComboBox est créé au double-clic.
             nacres_cell = _item(nacres)
             if is_pending:
@@ -1606,6 +2144,7 @@ class CatalogueTab(QWidget):
             status_cell.setData(Qt.ItemDataRole.UserRole, status)
             self.table.setItem(r, _COL_STATUS, status_cell)
 
+        self.table.setSortingEnabled(True)
         self.table.blockSignals(False)
         self._apply_filter()
 
@@ -1613,6 +2152,7 @@ class CatalogueTab(QWidget):
         supplier_filter = self.supplier_combo.currentData() or ""
         catalogue_date_filter = self.catalogue_date_combo.currentData() or ""
         show_mode = self.show_combo.currentData()
+        product_type_filter = self.product_type_combo.currentData() if hasattr(self, "product_type_combo") else "all"
         needle = self.search_edit.text().strip().lower()
 
         total = self.table.rowCount()
@@ -1621,12 +2161,14 @@ class CatalogueTab(QWidget):
             supplier_item = self.table.item(r, _COL_SUPPL)
             date_item     = self.table.item(r, _COL_DATE)
             nacres_item   = self.table.item(r, _COL_NACRES)
+            type_item     = self.table.item(r, _COL_TYPE)
             if not supplier_item:
                 self.table.setRowHidden(r, True)
                 continue
 
             supplier_val = supplier_item.text()
             date_val     = (date_item.text() if date_item else "").strip()
+            type_val     = (type_item.text() if type_item else "").strip().lower()
             # Pour les lignes en attente, lire la valeur depuis l'item caché (maintenu par les handlers)
             nacres_val   = (nacres_item.text() if nacres_item else "").strip()
             status_item  = self.table.item(r, _COL_STATUS)
@@ -1636,6 +2178,12 @@ class CatalogueTab(QWidget):
                 self.table.setRowHidden(r, True)
                 continue
             if catalogue_date_filter and date_val != catalogue_date_filter:
+                self.table.setRowHidden(r, True)
+                continue
+            if product_type_filter == "solid" and type_val not in {"solid", "solide"}:
+                self.table.setRowHidden(r, True)
+                continue
+            if product_type_filter == "liquid" and type_val not in {"liquid", "liquide"}:
                 self.table.setRowHidden(r, True)
                 continue
             if show_mode == "pending" and status_val != "pending":
@@ -1669,6 +2217,12 @@ class CatalogueTab(QWidget):
     # ------------------------------------------------------------------
 
     def _activate_nacres_editor(self, row: int, column: int) -> None:
+        if column == _COL_LIQ_FE:
+            self._activate_fe_editor(row)
+            return
+        if column == _COL_TYPE:
+            self._activate_type_editor(row)
+            return
         if column != _COL_NACRES:
             return
         status_item = self.table.item(row, _COL_STATUS)
@@ -1773,6 +2327,121 @@ class CatalogueTab(QWidget):
         )
         return combo
 
+    # ------------------------------------------------------------------
+    # FE liquide — éditeur
+    # ------------------------------------------------------------------
+
+    def _activate_fe_editor(self, row: int) -> None:
+        status_item = self.table.item(row, _COL_STATUS)
+        raw_status = (status_item.data(Qt.ItemDataRole.UserRole) if status_item else "") or ""
+        if raw_status != "pending":
+            return
+        type_item = self.table.item(row, _COL_TYPE)
+        type_text = (type_item.text() if type_item else "").lower()
+        if "liquid" not in type_text and "liquide" not in type_text:
+            return
+        if isinstance(self.table.cellWidget(row, _COL_LIQ_FE), QComboBox):
+            return
+        fe_item = self.table.item(row, _COL_LIQ_FE)
+        factor_id = (fe_item.data(Qt.ItemDataRole.UserRole) if fe_item else None) or ""
+        color = fe_item.background().color() if fe_item else _COLOR_PENDING
+        combo = self._make_fe_combo(row, factor_id, color)
+        self.table.setCellWidget(row, _COL_LIQ_FE, combo)
+        combo.setFocus()
+        combo.showPopup()
+
+    def _make_fe_combo(self, row: int, factor_id: str, color: QColor) -> QComboBox:
+        combo = QComboBox()
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        combo.view().setMinimumWidth(440)
+        combo.lineEdit().setPlaceholderText("Sélectionner un facteur…")
+        combo.setStyleSheet(_combo_stylesheet(color))
+        combo.addItem("— Non lié —", "")
+        for fid, fname, co2, unit in self._liquid_factors:
+            label = f"{fname}  ({_fmt_number(co2)} {unit})" if co2 is not None else fname
+            combo.addItem(label, fid)
+        idx = combo.findData(factor_id) if factor_id else 0
+        combo.setCurrentIndex(max(idx, 0))
+        combo.activated.connect(
+            lambda _, r=row, c=combo: self._on_fe_combo_changed(r, c.currentData() or "")
+        )
+        return combo
+
+    def _on_fe_combo_changed(self, row: int, factor_id: str) -> None:
+        id_item = self.table.item(row, _COL_ID)
+        if not id_item:
+            return
+        product_id = id_item.text()
+
+        # Mise à jour du texte affiché dans la cellule cachée
+        if factor_id:
+            factor_name = next(
+                (name for fid, name, _, _ in self._liquid_factors if fid == factor_id),
+                factor_id,
+            )
+        else:
+            factor_name = "Non lié"
+        fe_item = self.table.item(row, _COL_LIQ_FE)
+        if fe_item:
+            self.table.blockSignals(True)
+            fe_item.setText(factor_name)
+            fe_item.setData(Qt.ItemDataRole.UserRole, factor_id or None)
+            self.table.blockSignals(False)
+
+        self._pending_fe_changes[product_id] = factor_id or None
+        self._update_unsaved_label()
+
+    # ------------------------------------------------------------------
+    # Type produit (liquid / solid) — éditeur
+    # ------------------------------------------------------------------
+
+    def _activate_type_editor(self, row: int) -> None:
+        status_item = self.table.item(row, _COL_STATUS)
+        raw_status = (status_item.data(Qt.ItemDataRole.UserRole) if status_item else "") or ""
+        if raw_status != "pending":
+            return
+        if isinstance(self.table.cellWidget(row, _COL_TYPE), QComboBox):
+            return
+        type_item = self.table.item(row, _COL_TYPE)
+        type_text = (type_item.text() if type_item else "").lower()
+        current_type = "liquid" if ("liquid" in type_text or "liquide" in type_text) else "solid"
+        color = type_item.background().color() if type_item else _COLOR_PENDING
+        combo = QComboBox()
+        combo.addItem("Solide", "solid")
+        combo.addItem("Liquide", "liquid")
+        combo.setCurrentIndex(combo.findData(current_type))
+        combo.setStyleSheet(f"background: {color.name()};")
+        combo.activated.connect(
+            lambda _, r=row, c=combo: self._on_type_combo_changed(r, c.currentData())
+        )
+        self.table.setCellWidget(row, _COL_TYPE, combo)
+        combo.setFocus()
+        combo.showPopup()
+
+    def _on_type_combo_changed(self, row: int, product_type: str) -> None:
+        id_item = self.table.item(row, _COL_ID)
+        if not id_item:
+            return
+        product_id = id_item.text()
+        type_item = self.table.item(row, _COL_TYPE)
+        if type_item:
+            self.table.blockSignals(True)
+            type_item.setText(_product_type_label(product_type))
+            self.table.blockSignals(False)
+        # Mettre à jour la cellule FE selon le nouveau type
+        fe_item = self.table.item(row, _COL_LIQ_FE)
+        if fe_item:
+            self.table.blockSignals(True)
+            if product_type == "solid":
+                fe_item.setText("—")
+                fe_item.setData(Qt.ItemDataRole.UserRole, None)
+            elif not fe_item.data(Qt.ItemDataRole.UserRole):
+                fe_item.setText("Non lié")
+            self.table.blockSignals(False)
+        self._pending_product_changes.setdefault(product_id, {})["product_type"] = product_type
+        self._update_unsaved_label()
+
     def _on_nacres_combo_changed(self, row: int, text: str) -> None:
         code = self._nacres_code_from_text(text)
         if code and code not in self._nacres_by_code:
@@ -1811,8 +2480,37 @@ class CatalogueTab(QWidget):
     # Édition NACRES (items directs — fallback, hors lignes en attente)
     # ------------------------------------------------------------------
 
+    _EDITABLE_FIELDS = {
+        _COL_NAME:  "name",
+        _COL_BRAND: "brand",
+        _COL_CONDT: "sold_packaging_label",
+        _COL_PRICE: "price_sold_packaging",
+    }
+
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
-        pass  # NACRES pendants gérés par _on_nacres_combo_changed; autres colonnes en lecture seule
+        col = item.column()
+        field = self._EDITABLE_FIELDS.get(col)
+        if field is None:
+            return
+        r = item.row()
+        status_item = self.table.item(r, _COL_STATUS)
+        raw_status = (status_item.data(Qt.ItemDataRole.UserRole) if status_item else "") or ""
+        if raw_status != "pending":
+            return
+        id_item = self.table.item(r, _COL_ID)
+        if not id_item:
+            return
+        product_id = id_item.text()
+        raw = item.text().strip()
+        if field == "price_sold_packaging":
+            try:
+                value: object = float(raw.replace(",", ".")) if raw else None
+            except ValueError:
+                return
+        else:
+            value = raw or None
+        self._pending_product_changes.setdefault(product_id, {})[field] = value
+        self._update_unsaved_label()
 
     def _auto_suggest(self) -> None:
         """Remplit les NACRES manquants par règles mots-clés (suggestions en bleu)."""
@@ -1875,7 +2573,7 @@ class CatalogueTab(QWidget):
         )
 
     def _update_unsaved_label(self) -> None:
-        n = len(self._pending_changes)
+        n = len(self._pending_changes) + len(self._pending_fe_changes) + len(self._pending_product_changes)
         if n:
             self.unsaved_label.setText(f"  {n} modification(s) non sauvegardée(s)")
             self.btn_save.setEnabled(True)
@@ -1898,8 +2596,12 @@ class CatalogueTab(QWidget):
     # Sauvegarde
     # ------------------------------------------------------------------
 
+    _ALLOWED_PRODUCT_FIELDS = frozenset(
+        {"name", "brand", "sold_packaging_label", "price_sold_packaging", "product_type"}
+    )
+
     def _save(self) -> None:
-        if not self._pending_changes:
+        if not self._pending_changes and not self._pending_fe_changes and not self._pending_product_changes:
             return
         try:
             conn = sqlite3.connect(self.db_path)
@@ -1910,16 +2612,42 @@ class CatalogueTab(QWidget):
                     "UPDATE commercial_products SET code_nacres = ?, updated_at = ? WHERE id = ?",
                     (nacres or None, now, product_id),
                 )
+            for product_id, factor_id in self._pending_fe_changes.items():
+                conn.execute(
+                    "UPDATE commercial_products SET emission_factor_id = ?, updated_at = ? WHERE id = ?",
+                    (factor_id or None, now, product_id),
+                )
+            for product_id, changes in self._pending_product_changes.items():
+                clean = {k: v for k, v in changes.items() if k in self._ALLOWED_PRODUCT_FIELDS}
+                if not clean:
+                    continue
+                set_clauses = ", ".join(f"{k} = ?" for k in clean)
+                values = list(clean.values()) + [now, product_id]
+                conn.execute(
+                    f"UPDATE commercial_products SET {set_clauses}, updated_at = ? WHERE id = ?",
+                    values,
+                )
             conn.commit()
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de sauvegarder : {e}")
             return
 
-        n = len(self._pending_changes)
+        n_nacres = len(self._pending_changes)
+        n_fe = len(self._pending_fe_changes)
+        n_prod = len(self._pending_product_changes)
         self._pending_changes = {}
+        self._pending_fe_changes = {}
+        self._pending_product_changes = {}
         self._update_unsaved_label()
-        QMessageBox.information(self, "Sauvegardé", f"{n} code(s) NACRES mis à jour.")
+        parts = []
+        if n_nacres:
+            parts.append(f"{n_nacres} code(s) NACRES")
+        if n_fe:
+            parts.append(f"{n_fe} facteur(s) liquide")
+        if n_prod:
+            parts.append(f"{n_prod} fiche(s) produit")
+        QMessageBox.information(self, "Sauvegardé", f"{' + '.join(parts)} mis à jour.")
 
     def _promote_to_draft(self) -> None:
         # Récupérer les IDs cochés (seulement les lignes visibles et cochées)
@@ -1999,6 +2727,9 @@ class AdminWindow(QMainWindow):
         self.db_path = db_path
         self.setWindowTitle(f"LABeCO2 Admin — {db_path.name}")
         self.resize(1200, 750)
+        self.setMinimumSize(900, 560)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.statusBar().setSizeGripEnabled(True)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -2022,6 +2753,7 @@ class AdminWindow(QMainWindow):
 
         # Onglets
         self.tabs = QTabWidget()
+        self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.tab_validate  = ValidationTab(self.db_path)
         self.tab_merge     = MergeTab(self.db_path)
         self.tab_quality   = QualityTab(self.db_path)
@@ -2031,6 +2763,19 @@ class AdminWindow(QMainWindow):
         self.tabs.addTab(self.tab_quality,   "Qualite")
         self.tabs.addTab(self.tab_catalogue, "Catalogue fournisseurs")
         root.addWidget(self.tabs)
+
+        self.tab_quality.navigate_to.connect(self._navigate_to_product)
+
+    def _navigate_to_product(self, product_id: str) -> None:
+        if self.tab_catalogue.show_product(product_id):
+            self.tabs.setCurrentWidget(self.tab_catalogue)
+        elif self.tab_validate.show_product(product_id):
+            self.tabs.setCurrentWidget(self.tab_validate)
+        else:
+            QMessageBox.information(
+                self, "Produit introuvable",
+                f"Le produit (id: {product_id[:8]}…) n'a pas été trouvé dans le catalogue ni dans la validation.",
+            )
 
     def _change_db(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

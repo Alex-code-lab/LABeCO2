@@ -20,6 +20,8 @@ class QualityIssue:
     message: str        # message lisible
     entry: str = ""     # nom / identifiant de l'entrée concernée
     detail: str = ""    # valeur problématique ou complément
+    row_id: str = ""    # ID primaire pour la navigation (ex: commercial_products.id)
+    aux_id: str = ""    # ID secondaire (ex: product_components.id pour suppression)
 
 
 def _clean(value: Any) -> str:
@@ -55,9 +57,9 @@ def check_commercial_product(row: dict[str, Any]) -> list[QualityIssue]:
 
     if is_liquid and not factor_id and not factor_name:
         issues.append(QualityIssue(
-            severity="ERROR", table="commercial_products",
+            severity="WARNING", table="commercial_products",
             rule="liquid_missing_factor",
-            message="Produit liquide sans facteur d'émission lié.",
+            message="Produit liquide sans facteur liquide lié : calcul volume indisponible, calcul prix/NACRES possible.",
             entry=name,
         ))
 
@@ -179,7 +181,7 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
     issues: list[QualityIssue] = []
 
     # Champs administratifs minimaux des produits
-    for row_id, name, reference, code, ptype in _q(conn, """
+    for prod_id, name, reference, code, ptype in _q(conn, """
         SELECT id, name, reference, code_nacres, product_type
         FROM commercial_products
         WHERE status != 'deprecated'
@@ -204,12 +206,13 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             severity="ERROR", table="commercial_products",
             rule="product_missing_admin_fields",
             message="Produit incomplet avant validation.",
-            entry=name or row_id, detail=", ".join(missing),
+            entry=name or prod_id, detail=", ".join(missing),
+            row_id=prod_id or "",
         ))
 
     if "statut_maj_2026" in _columns(conn, "nacres_codes"):
-        for name, code in _q(conn, """
-            SELECT cp.name, cp.code_nacres
+        for name, code, prod_id in _q(conn, """
+            SELECT cp.name, cp.code_nacres, cp.id
             FROM commercial_products cp
             JOIN nacres_codes n ON n.code = cp.code_nacres
             WHERE cp.status != 'deprecated'
@@ -217,43 +220,46 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             ORDER BY cp.code_nacres, cp.name
         """):
             issues.append(QualityIssue(
-                severity="ERROR", table="commercial_products",
+                severity="WARNING", table="commercial_products",
                 rule="deprecated_nacres",
-                message="Produit relié à un code NACRES à ne plus utiliser.",
+                message="Code NACRES à remplacer (obsolète 2026, non bloquant).",
                 entry=name, detail=code or "",
+                row_id=prod_id or "",
             ))
 
     # Produits liquides sans facteur d'émission
-    for name, code in _q(conn, """
-        SELECT name, code_nacres FROM commercial_products
+    for name, code, prod_id in _q(conn, """
+        SELECT name, code_nacres, id FROM commercial_products
         WHERE product_type = 'liquid'
           AND (emission_factor_id IS NULL OR emission_factor_id = '')
         ORDER BY code_nacres, name
     """):
         issues.append(QualityIssue(
-            severity="ERROR", table="commercial_products",
+            severity="WARNING", table="commercial_products",
             rule="liquid_missing_factor",
-            message="Produit liquide sans facteur d'émission lié.",
+            message="Produit liquide sans facteur liquide lié : calcul volume indisponible, calcul prix/NACRES possible.",
             entry=name, detail=code or "",
+            row_id=prod_id or "",
         ))
 
     # Produits liquides sans volume vendu
-    for name, code in _q(conn, """
-        SELECT name, code_nacres FROM commercial_products
+    for name, code, prod_id in _q(conn, """
+        SELECT name, code_nacres, id FROM commercial_products
         WHERE product_type = 'liquid'
           AND (sold_unit_volume_ml IS NULL OR sold_unit_volume_ml <= 0)
         ORDER BY code_nacres, name
     """):
         issues.append(QualityIssue(
-            severity="ERROR", table="commercial_products",
+            severity="WARNING", table="commercial_products",
             rule="liquid_missing_volume",
             message="Produit liquide sans volume vendu par unité.",
             entry=name, detail=code or "",
+            row_id=prod_id or "",
         ))
 
     # Prix négatifs
-    for name, price in _q(conn, """
-        SELECT name, price_sold_packaging FROM commercial_products
+    for name, price, prod_id in _q(conn, """
+        SELECT name, price_sold_packaging, id FROM commercial_products
         WHERE price_sold_packaging IS NOT NULL AND price_sold_packaging < 0
     """):
         issues.append(QualityIssue(
@@ -261,6 +267,7 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             rule="negative_price",
             message="Prix négatif.",
             entry=name, detail=str(price),
+            row_id=prod_id or "",
         ))
 
     # Facteurs sans source
@@ -286,20 +293,34 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             issues.append(QualityIssue(
                 severity="ERROR", table="product_components",
                 rule="component_product_missing",
-                message="Composant pointant vers un produit absent.",
-                entry=comp_id, detail=product_id or "",
+                message="Composant orphelin (produit parent supprimé).",
+                entry=f"composant {comp_id[:8]}…", detail=f"product_id={product_id or '?'}",
+                aux_id=comp_id or "",
             ))
-        for comp_id, material_id in _q(conn, """
-            SELECT pc.id, pc.material_id
+        for comp_id, material_id, product_name, product_id in _q(conn, """
+            SELECT pc.id, pc.material_id,
+                   COALESCE(cp.name, pc.product_id) AS product_name,
+                   pc.product_id
             FROM product_components pc
             LEFT JOIN materials m ON m.id = pc.material_id
+            LEFT JOIN commercial_products cp ON cp.id = pc.product_id
             WHERE m.id IS NULL
+              AND NOT (pc.component_type = 'product' AND pc.material_id IS NULL)
         """):
+            if material_id is None:
+                detail = "composant sans matériau lié (données orphelines)"
+                msg = "Ligne de composition sans matériau associé (peut être supprimée)."
+            else:
+                detail = f"material_id introuvable : {material_id[:12]}…"
+                msg = "Composant pointant vers un matériau supprimé."
             issues.append(QualityIssue(
                 severity="ERROR", table="product_components",
                 rule="component_material_missing",
-                message="Composant pointant vers un matériau absent.",
-                entry=comp_id, detail=material_id or "",
+                message=msg,
+                entry=product_name or comp_id,
+                detail=detail,
+                row_id=product_id or "",
+                aux_id=comp_id or "",
             ))
 
     # Facteur CO2 aberrant

@@ -74,7 +74,7 @@ def _make_db() -> sqlite3.Connection:
     return conn
 
 
-def test_product_quality_blocks_deprecated_nacres():
+def test_product_quality_warns_deprecated_nacres_without_blocking():
     conn = _make_db()
     row = {
         "id": "p1",
@@ -89,7 +89,8 @@ def test_product_quality_blocks_deprecated_nacres():
 
     issues = check_entry_quality(conn, "commercial_products", row)
 
-    assert "deprecated_nacres" in {issue.rule for issue in issues if issue.severity == "ERROR"}
+    assert "deprecated_nacres" in {issue.rule for issue in issues if issue.severity == "WARNING"}
+    assert not [issue for issue in issues if issue.severity == "ERROR"]
 
 
 def test_new_nacres_without_fe_is_warning_not_blocking():
@@ -108,6 +109,63 @@ def test_new_nacres_without_fe_is_warning_not_blocking():
     issues = check_entry_quality(conn, "commercial_products", row)
 
     assert "new_nacres_without_fe" in {issue.rule for issue in issues if issue.severity == "WARNING"}
+    assert not [issue for issue in issues if issue.severity == "ERROR"]
+
+
+def test_liquid_without_linked_factor_is_warning_not_blocking():
+    conn = _make_db()
+    row = {
+        "id": "p1",
+        "name": "Liquide",
+        "reference": "REF",
+        "code_nacres": "NA25",
+        "product_type": "liquid",
+        "sold_packaging_label": "500 ml",
+        "sold_unit_volume_ml": 500,
+        "price_sold_packaging": 1.0,
+        "status": "pending",
+    }
+
+    issues = check_entry_quality(conn, "commercial_products", row)
+
+    assert "liquid_missing_factor" in {issue.rule for issue in issues if issue.severity == "WARNING"}
+    assert not [issue for issue in issues if issue.severity == "ERROR"]
+
+
+def test_product_without_packaging_is_warning_not_blocking():
+    conn = _make_db()
+    row = {
+        "id": "p1",
+        "name": "Produit sans conditionnement",
+        "reference": "REF",
+        "code_nacres": "NA25",
+        "product_type": "solid",
+        "price_sold_packaging": 1.0,
+        "status": "pending",
+    }
+
+    issues = check_entry_quality(conn, "commercial_products", row)
+
+    assert "missing_packaging" in {issue.rule for issue in issues if issue.severity == "WARNING"}
+    assert not [issue for issue in issues if issue.severity == "ERROR"]
+
+
+def test_product_with_units_per_pack_has_packaging_context():
+    conn = _make_db()
+    row = {
+        "id": "p1",
+        "name": "Produit avec unité",
+        "reference": "REF",
+        "code_nacres": "NA25",
+        "product_type": "solid",
+        "units_per_sold_packaging": 1,
+        "price_sold_packaging": 1.0,
+        "status": "pending",
+    }
+
+    issues = check_entry_quality(conn, "commercial_products", row)
+
+    assert "missing_packaging" not in {issue.rule for issue in issues}
     assert not [issue for issue in issues if issue.severity == "ERROR"]
 
 
@@ -137,4 +195,3 @@ def test_promote_pending_products_promotes_only_complete_rows():
     assert "bad" in result.blocked
     assert conn.execute("SELECT status FROM commercial_products WHERE id='ok'").fetchone()[0] == "draft"
     assert conn.execute("SELECT status FROM commercial_products WHERE id='bad'").fetchone()[0] == "pending"
-

@@ -121,7 +121,7 @@ def has_purchase_factor(conn: sqlite3.Connection, code: str) -> bool:
         SELECT 1
         FROM purchase_factors
         WHERE category = 'Achats'
-          AND subcategory = 'Consommables'
+          AND subcategory LIKE 'Consommables%'
           AND subsubcategory LIKE ?
         LIMIT 1
         """,
@@ -159,6 +159,7 @@ def check_entry_quality(conn: sqlite3.Connection, table: str, row: dict) -> list
         code = clean(row.get("code_nacres")).upper()
         product_type = clean(row.get("product_type"))
         packaging = clean(row.get("sold_packaging_label"))
+        units_per_pack = as_float(row.get("units_per_sold_packaging"))
         price = as_float(row.get("price_sold_packaging"))
 
         if not name:
@@ -167,14 +168,14 @@ def check_entry_quality(conn: sqlite3.Connection, table: str, row: dict) -> list
             issues.append(_issue("ERROR", table, "missing_reference", "Produit sans référence.", row))
         if not product_type:
             issues.append(_issue("ERROR", table, "missing_product_type", "Produit sans type solide/liquide.", row))
-        if not packaging:
-            issues.append(_issue("ERROR", table, "missing_packaging", "Produit sans conditionnement.", row))
+        if not packaging and not (units_per_pack is not None and units_per_pack > 0):
+            issues.append(_issue("WARNING", table, "missing_packaging", "Produit sans conditionnement.", row))
         if not code:
             issues.append(_issue("ERROR", table, "missing_nacres", "Produit sans code NACRES.", row))
         elif not nacres_exists(conn, code):
             issues.append(_issue("ERROR", table, "invalid_nacres", "Code NACRES inconnu ou invalide.", row, code))
         elif nacres_status(conn, code) == "a_ne_plus_utiliser":
-            issues.append(_issue("ERROR", table, "deprecated_nacres", "Code NACRES à ne plus utiliser.", row, code))
+            issues.append(_issue("WARNING", table, "deprecated_nacres", "Code NACRES à ne plus utiliser (non bloquant).", row, code))
         elif nacres_status(conn, code) == "nouveau" and not has_purchase_factor(conn, code):
             issues.append(_issue(
                 "WARNING",
@@ -187,7 +188,13 @@ def check_entry_quality(conn: sqlite3.Connection, table: str, row: dict) -> list
 
         if product_type == "liquid":
             if not clean(row.get("emission_factor_id")):
-                issues.append(_issue("ERROR", table, "liquid_missing_factor", "Produit liquide sans facteur d'émission.", row))
+                issues.append(_issue(
+                    "WARNING",
+                    table,
+                    "liquid_missing_factor",
+                    "Produit liquide sans facteur liquide lié : calcul volume indisponible, calcul prix/NACRES possible.",
+                    row,
+                ))
             if as_float(row.get("sold_unit_volume_ml")) is None:
                 issues.append(_issue("ERROR", table, "liquid_missing_volume", "Produit liquide sans volume vendu.", row))
         elif product_type == "solid":

@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QProgressDialog,
     QPushButton,
     QTableWidget,
@@ -80,6 +79,92 @@ def _type_label(value: str) -> str:
     return _TYPE_LABEL.get(str(value or ""), str(value or ""))
 
 
+def _admin_message(
+    parent: QWidget,
+    title: str,
+    text: str,
+    informative: str = "",
+    details: str = "",
+) -> None:
+    _admin_dialog(parent, title, text, informative, details, confirm=False)
+
+
+def _admin_confirm(
+    parent: QWidget,
+    title: str,
+    text: str,
+    informative: str = "",
+    details: str = "",
+) -> bool:
+    return _admin_dialog(parent, title, text, informative, details, confirm=True)
+
+
+def _admin_dialog(
+    parent: QWidget,
+    title: str,
+    text: str,
+    informative: str,
+    details: str,
+    *,
+    confirm: bool,
+) -> bool:
+    """Dialogue non natif : évite les réponses macOS -1002 des QMessageBox détaillées."""
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setModal(True)
+    dialog.setMinimumWidth(620)
+
+    layout = QVBoxLayout(dialog)
+    layout.setSpacing(10)
+
+    main = QLabel(text)
+    main.setWordWrap(True)
+    main_font = main.font()
+    main_font.setBold(True)
+    main.setFont(main_font)
+    layout.addWidget(main)
+
+    if informative:
+        info = QLabel(informative)
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+    if details:
+        detail_box = QTextEdit()
+        detail_box.setReadOnly(True)
+        detail_box.setPlainText(details)
+        detail_box.setMinimumHeight(180)
+        detail_box.setMaximumHeight(320)
+        layout.addWidget(detail_box)
+
+    selected = {"ok": False}
+    buttons = QHBoxLayout()
+    buttons.addStretch()
+
+    if confirm:
+        no_btn = QPushButton("Non")
+        yes_btn = QPushButton("Oui")
+        no_btn.clicked.connect(dialog.reject)
+
+        def accept() -> None:
+            selected["ok"] = True
+            dialog.accept()
+
+        yes_btn.clicked.connect(accept)
+        buttons.addWidget(no_btn)
+        buttons.addWidget(yes_btn)
+        yes_btn.setDefault(True)
+    else:
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(dialog.accept)
+        buttons.addWidget(ok_btn)
+        ok_btn.setDefault(True)
+
+    layout.addLayout(buttons)
+    dialog.exec()
+    return selected["ok"]
+
+
 # Les requêtes incluent toujours status AS "Statut" et utilisent {where}.
 TABLES_META = {
     "emission_factors": {
@@ -111,7 +196,18 @@ TABLES_META = {
             SELECT ef.id, ef.status AS "Statut",
                    CASE WHEN ef.revision_of_id IS NOT NULL AND ef.revision_of_id != ''
                         THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   ef.factor_type AS "Type",
+                   ef.code_nacres AS "NACRES",
                    ef.name AS "Nom",
+                   '' AS "Marque",
+                   '' AS "Référence",
+                   '' AS "Conditionnement",
+                   '' AS "Prix (€)",
+                   '' AS "Volume vendu (mL)",
+                   '' AS "FE lié",
+                   ef.co2_factor AS "CO₂",
+                   '' AS "Fournisseur",
+                   '' AS "Version catalogue",
                    s.title AS "Source", c.name AS "Contributeur", ef.created_at AS "Créé le"
             FROM emission_factors ef
             LEFT JOIN sources s ON s.id = ef.source_id
@@ -148,9 +244,21 @@ TABLES_META = {
             SELECT m.id, m.status AS "Statut",
                    CASE WHEN m.revision_of_id IS NOT NULL AND m.revision_of_id != ''
                         THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   'material' AS "Type",
+                   '' AS "NACRES",
                    m.name AS "Nom",
+                   '' AS "Marque",
+                   '' AS "Référence",
+                   '' AS "Conditionnement",
+                   '' AS "Prix (€)",
+                   '' AS "Volume vendu (mL)",
+                   COALESCE(ef.name, 'À relier') AS "FE lié",
+                   ef.co2_factor AS "CO₂",
+                   '' AS "Fournisseur",
+                   '' AS "Version catalogue",
                    s.title AS "Source", c.name AS "Contributeur", m.created_at AS "Créé le"
             FROM materials m
+            LEFT JOIN emission_factors ef ON ef.id = m.emission_factor_id
             LEFT JOIN sources s ON s.id = m.source_id
             LEFT JOIN contributors c ON c.id = m.contributor_id
             {where}
@@ -173,14 +281,16 @@ TABLES_META = {
                    cp.units_per_sold_packaging AS "Nbr cond.",
                    cp.sold_unit_volume_ml AS "Volume vendu (mL)",
                    cp.capacity_volume_ml AS "Capacité (mL)",
-                   sc.supplier AS "Fournisseur",
-                   sc.catalogue_date AS "Version catalogue",
+                   COALESCE(sc.supplier, ijm.source_catalogue, '') AS "Fournisseur",
+                   COALESCE(sc.catalogue_date, ijm.imported_at, '') AS "Version catalogue",
                    cp.note AS "Lien / Note / Remarque",
                    CASE WHEN cp.product_type = 'liquid'
                         THEN COALESCE(ef.name, 'À relier')
                         ELSE ''
                    END AS "FE liquide",
                    cp.emission_factor_id AS "FE liquide ID",
+                   ef.co2_factor AS "CO₂ FE",
+                   ef.co2_unit AS "Unité FE",
                    (SELECT COUNT(*) FROM product_components pc
                     WHERE pc.product_id = cp.id AND pc.mass_g IS NOT NULL) AS "Composants",
                    cp.ijm_catalogue_id AS "Catalogue IJM",
@@ -196,6 +306,7 @@ TABLES_META = {
             LEFT JOIN contributors c ON c.id = cp.contributor_id
             LEFT JOIN contributors v ON v.id = cp.validated_by_id
             LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
+            LEFT JOIN catalogue_ijm ijm ON ijm.id = cp.ijm_catalogue_id
             {where}
             ORDER BY cp.code_nacres, cp.name
         """,
@@ -203,11 +314,32 @@ TABLES_META = {
             SELECT cp.id, cp.status AS "Statut",
                    CASE WHEN cp.revision_of_id IS NOT NULL AND cp.revision_of_id != ''
                         THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   cp.product_type AS "Type",
+                   cp.code_nacres AS "NACRES",
                    cp.name AS "Nom",
+                   cp.brand AS "Marque",
+                   cp.reference AS "Référence",
+                   cp.sold_packaging_label AS "Conditionnement",
+                   cp.price_sold_packaging AS "Prix (€)",
+                   cp.sold_unit_volume_ml AS "Volume vendu (mL)",
+                   CASE WHEN cp.product_type = 'liquid'
+                        THEN COALESCE(ef.name, 'Non lié')
+                        ELSE (
+                            SELECT CAST(COUNT(*) AS TEXT) || ' composant(s)'
+                            FROM product_components pc
+                            WHERE pc.product_id = cp.id AND pc.mass_g IS NOT NULL
+                        )
+                   END AS "FE lié",
+                   ef.co2_factor AS "CO₂",
+                   COALESCE(sc.supplier, ijm.source_catalogue, '') AS "Fournisseur",
+                   COALESCE(sc.catalogue_date, ijm.imported_at, '') AS "Version catalogue",
                    s.title AS "Source", c.name AS "Contributeur", cp.created_at AS "Créé le"
             FROM commercial_products cp
+            LEFT JOIN emission_factors ef ON ef.id = cp.emission_factor_id
             LEFT JOIN sources s ON s.id = cp.source_id
             LEFT JOIN contributors c ON c.id = cp.contributor_id
+            LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
+            LEFT JOIN catalogue_ijm ijm ON ijm.id = cp.ijm_catalogue_id
             {where}
             ORDER BY cp.code_nacres, cp.name
         """,
@@ -239,7 +371,18 @@ TABLES_META = {
             SELECT tf.id, tf.status AS "Statut",
                    CASE WHEN tf.revision_of_id IS NOT NULL AND tf.revision_of_id != ''
                         THEN 'Modification' ELSE 'Nouvelle entrée' END AS "Nature",
+                   tf.mode AS "Type",
+                   '' AS "NACRES",
                    tf.origin AS "Nom",
+                   '' AS "Marque",
+                   '' AS "Référence",
+                   CASE WHEN tf.distance_km IS NOT NULL THEN CAST(tf.distance_km AS TEXT) || ' km' ELSE '' END AS "Conditionnement",
+                   '' AS "Prix (€)",
+                   '' AS "Volume vendu (mL)",
+                   '' AS "FE lié",
+                   tf.factor_kgco2e_per_kg AS "CO₂",
+                   '' AS "Fournisseur",
+                   '' AS "Version catalogue",
                    s.title AS "Source", c.name AS "Contributeur", tf.created_at AS "Créé le"
             FROM transport_factors tf
             LEFT JOIN sources s ON s.id = tf.source_id
@@ -251,7 +394,45 @@ TABLES_META = {
 }
 
 # Colonnes fixes pour la vue "Toutes les tables" (inclut Statut)
-_SUMMARY_HEADERS = ["Statut", "Nature", "Nom", "Source", "Contributeur", "Créé le"]
+_SUMMARY_HEADERS = [
+    "Statut",
+    "Nature",
+    "Type",
+    "NACRES",
+    "Nom",
+    "Marque",
+    "Référence",
+    "Conditionnement",
+    "Prix (€)",
+    "Volume vendu (mL)",
+    "FE lié",
+    "CO₂",
+    "Fournisseur",
+    "Version catalogue",
+    "Source",
+    "Contributeur",
+    "Créé le",
+]
+
+
+_CP_EDITABLE_FIELDS: dict[str, str] = {
+    "Nom":                  "name",
+    "Marque":               "brand",
+    "Référence":            "reference",
+    "NACRES":               "code_nacres",
+    "Conditionnement":      "sold_packaging_label",
+    "Prix (€)":             "price_sold_packaging",
+    "Volume vendu (mL)":    "sold_unit_volume_ml",
+    "Capacité (mL)":        "capacity_volume_ml",
+    "Nbr cond.":            "units_per_sold_packaging",
+    "Lien / Note / Remarque": "note",
+}
+_CP_NUMERIC_FIELDS = frozenset({
+    "price_sold_packaging", "sold_unit_volume_ml",
+    "capacity_volume_ml", "units_per_sold_packaging",
+})
+_CP_ALLOWED_FIELDS = frozenset(_CP_EDITABLE_FIELDS.values())
+_COLOR_EDITED = QColor(255, 240, 180)  # jaune clair : modification non sauvegardée
 
 
 class ValidateWidget(QWidget):
@@ -264,6 +445,8 @@ class ValidateWidget(QWidget):
         super().__init__(parent)
         self.sqlite_path = Path(sqlite_path)
         self._show_close = show_close
+        self._pending_edits: dict[tuple, dict[str, str]] = {}  # (db_table, row_id) → {field: val}
+        self._editable_col_to_field: dict[int, str] = {}       # col_index → db_field
         self._build_ui()
         self._load_table()
 
@@ -275,62 +458,81 @@ class ValidateWidget(QWidget):
         root = QVBoxLayout(self)
         root.setSpacing(8)
 
-        # Filtre table + statut
-        filter_bar = QHBoxLayout()
-        filter_bar.addWidget(QLabel("Table :"))
+        # Filtres : deux lignes pour garder des champs lisibles.
+        filters = QVBoxLayout()
+        filters.setSpacing(6)
+
+        filter_row_main = QHBoxLayout()
+        filter_row_main.addWidget(QLabel("Table :"))
         self.table_combo = QComboBox()
         self.table_combo.addItem("Toutes les tables", "all")
         for key, meta in TABLES_META.items():
             self.table_combo.addItem(meta["label"], key)
         self.table_combo.currentIndexChanged.connect(self._load_table)
-        filter_bar.addWidget(self.table_combo)
+        self.table_combo.setMinimumWidth(210)
+        filter_row_main.addWidget(self.table_combo)
 
-        filter_bar.addWidget(QLabel("  Statut :"))
+        filter_row_main.addWidget(QLabel("Statut :"))
         self.status_combo = QComboBox()
         self.status_combo.addItem("À valider", "draft")
         self.status_combo.addItem("Tous les statuts", "all")
         self.status_combo.currentIndexChanged.connect(self._load_table)
-        filter_bar.addWidget(self.status_combo)
+        self.status_combo.setMinimumWidth(160)
+        filter_row_main.addWidget(self.status_combo)
 
-        filter_bar.addWidget(QLabel("  Catégorie :"))
+        filter_row_main.addWidget(QLabel("Catégorie :"))
         self.category_combo = QComboBox()
         self.category_combo.addItem("Toutes", "all")
-        self.category_combo.addItem("Consommables solides", "product_solid")
-        self.category_combo.addItem("Consommables liquides", "product_liquid")
+        self.category_combo.addItem("Consommables", "commercial_products")
         self.category_combo.addItem("Facteurs", "emission_factors")
         self.category_combo.addItem("Matériaux", "materials")
         self.category_combo.addItem("Transport", "transport_factors")
         self.category_combo.addItem("Sources", "sources")
         self.category_combo.currentIndexChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
-        filter_bar.addWidget(self.category_combo)
+        self.category_combo.setMinimumWidth(180)
+        filter_row_main.addWidget(self.category_combo)
 
-        filter_bar.addWidget(QLabel("  NACRES :"))
+        filter_row_main.addWidget(QLabel("Type produit :"))
+        self.product_type_combo = QComboBox()
+        self.product_type_combo.addItem("Tous", "all")
+        self.product_type_combo.addItem("Solides", "solid")
+        self.product_type_combo.addItem("Liquides", "liquid")
+        self.product_type_combo.currentIndexChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
+        self.product_type_combo.setMinimumWidth(130)
+        filter_row_main.addWidget(self.product_type_combo)
+
+        filter_row_main.addStretch()
+        self.count_label = QLabel("")
+        filter_row_main.addWidget(self.count_label)
+        filters.addLayout(filter_row_main)
+
+        filter_row_search = QHBoxLayout()
+        filter_row_search.addWidget(QLabel("NACRES :"))
         self.nacres_filter_edit = QLineEdit()
         self.nacres_filter_edit.setPlaceholderText("NA25")
-        self.nacres_filter_edit.setMaximumWidth(90)
+        self.nacres_filter_edit.setMinimumWidth(120)
+        self.nacres_filter_edit.setMaximumWidth(180)
         self.nacres_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
-        filter_bar.addWidget(self.nacres_filter_edit)
+        filter_row_search.addWidget(self.nacres_filter_edit)
 
-        filter_bar.addWidget(QLabel("  Fournisseur :"))
+        filter_row_search.addWidget(QLabel("Fournisseur :"))
         self.supplier_filter_edit = QLineEdit()
         self.supplier_filter_edit.setPlaceholderText("DUCHEFA")
-        self.supplier_filter_edit.setMaximumWidth(140)
+        self.supplier_filter_edit.setMinimumWidth(180)
+        self.supplier_filter_edit.setMaximumWidth(260)
         self.supplier_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
-        filter_bar.addWidget(self.supplier_filter_edit)
+        filter_row_search.addWidget(self.supplier_filter_edit)
 
-        filter_bar.addSpacing(12)
-        filter_bar.addWidget(QLabel("Recherche :"))
+        filter_row_search.addWidget(QLabel("Recherche :"))
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("Filtrer les lignes…")
-        self.search_edit.setMinimumWidth(220)
+        self.search_edit.setMinimumWidth(360)
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(self._filter_rows)
-        filter_bar.addWidget(self.search_edit)
+        filter_row_search.addWidget(self.search_edit, 1)
+        filters.addLayout(filter_row_search)
 
-        filter_bar.addStretch()
-        self.count_label = QLabel("")
-        filter_bar.addWidget(self.count_label)
-        root.addLayout(filter_bar)
+        root.addLayout(filters)
 
         # Légende couleurs
         self.legend_bar = QHBoxLayout()
@@ -341,11 +543,12 @@ class ValidateWidget(QWidget):
         self.table_widget = QTableWidget()
         self.table_widget.setAlternatingRowColors(False)
         self.table_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
         self.table_widget.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
         self.table_widget.horizontalHeader().setStretchLastSection(True)
+        self.table_widget.setSortingEnabled(True)
         self.table_widget.itemSelectionChanged.connect(self._show_selected_detail)
         root.addWidget(self.table_widget)
 
@@ -380,6 +583,23 @@ class ValidateWidget(QWidget):
         validator_bar.addWidget(self.validator_combo)
         validator_bar.addStretch()
         root.addLayout(validator_bar)
+
+        # Barre de sauvegarde des modifications inline
+        save_bar = QHBoxLayout()
+        self.btn_save_edits = QPushButton("Sauvegarder les modifications")
+        self.btn_save_edits.setStyleSheet(
+            "QPushButton{background:#1565c0;color:white;font-weight:bold;padding:6px 16px;}"
+            "QPushButton:hover{background:#1976d2;}"
+            "QPushButton:disabled{background:#aaa;}"
+        )
+        self.btn_save_edits.setEnabled(False)
+        self.btn_save_edits.clicked.connect(self._save_pending_edits)
+        save_bar.addWidget(self.btn_save_edits)
+        self.pending_edits_label = QLabel("")
+        self.pending_edits_label.setStyleSheet("color: #b45309; font-style: italic;")
+        save_bar.addWidget(self.pending_edits_label)
+        save_bar.addStretch()
+        root.addLayout(save_bar)
 
         # Actions
         action_bar = QHBoxLayout()
@@ -469,6 +689,20 @@ class ValidateWidget(QWidget):
         return ""
 
     def _load_table(self) -> None:
+        # Avertir si des modifications non sauvegardées vont être perdues
+        if self._pending_edits:
+            if _admin_confirm(
+                self,
+                "Modifications non sauvegardées",
+                f"{len(self._pending_edits)} produit(s) ont des modifications non sauvegardées.\n"
+                "Sauvegarder avant de recharger ?",
+            ):
+                self._save_pending_edits()
+                # _save_pending_edits ne recharge pas la table → on continue
+            else:
+                self._pending_edits.clear()
+                self._update_pending_label()
+
         self._refresh_legend()
         selected_key = self.table_combo.currentData()
         try:
@@ -529,6 +763,7 @@ class ValidateWidget(QWidget):
         """Masque les lignes ne contenant pas le texte cherché."""
         needle = text.strip().lower()
         category = self.category_combo.currentData() if hasattr(self, "category_combo") else "all"
+        product_type = self.product_type_combo.currentData() if hasattr(self, "product_type_combo") else "all"
         nacres_prefix = self.nacres_filter_edit.text().strip().upper() if hasattr(self, "nacres_filter_edit") else ""
         supplier_filter = self.supplier_filter_edit.text().strip().lower() if hasattr(self, "supplier_filter_edit") else ""
         nacres_col = self._column_index("NACRES")
@@ -549,6 +784,19 @@ class ValidateWidget(QWidget):
                 or (category == "product_solid" and db_table == "commercial_products" and row_type in {"solid", "solide"})
                 or (category == "product_liquid" and db_table == "commercial_products" and row_type in {"liquid", "liquide"})
             )
+            type_match = (
+                product_type in ("", "all")
+                or (
+                    product_type == "solid"
+                    and db_table == "commercial_products"
+                    and row_type in {"solid", "solide"}
+                )
+                or (
+                    product_type == "liquid"
+                    and db_table == "commercial_products"
+                    and row_type in {"liquid", "liquide"}
+                )
+            )
             nacres_match = not nacres_prefix or row_nacres.startswith(nacres_prefix)
             supplier_match = not supplier_filter or supplier_filter in row_supplier
             text_match = not needle or any(
@@ -556,12 +804,13 @@ class ValidateWidget(QWidget):
                 and needle in item.text().lower()
                 for c in range(self.table_widget.columnCount())
             )
-            match = category_match and nacres_match and supplier_match and text_match
+            match = category_match and type_match and nacres_match and supplier_match and text_match
             self.table_widget.setRowHidden(r, not match)
             if match:
                 visible += 1
         has_structured_filter = (
             category not in ("", "all")
+            or product_type not in ("", "all")
             or bool(nacres_prefix)
             or bool(supplier_filter)
         )
@@ -584,6 +833,7 @@ class ValidateWidget(QWidget):
         show_table_col: bool,
     ) -> None:
         self.table_widget.blockSignals(True)
+        self.table_widget.setSortingEnabled(False)
         self.table_widget.clearContents()
         self.table_widget.setRowCount(len(rows_all))
         self.table_widget.setColumnCount(1 + len(display_headers))
@@ -592,7 +842,28 @@ class ValidateWidget(QWidget):
             0, QHeaderView.ResizeMode.Fixed
         )
         self.table_widget.setColumnWidth(0, 28)
-        for header, width in (("Nbr cond.", 80), ("FE liquide", 150)):
+        column_widths = (
+            ("Type", 95),
+            ("NACRES", 80),
+            ("Nom", 230),
+            ("Marque", 130),
+            ("Référence", 110),
+            ("Conditionnement", 145),
+            ("Prix (€)", 80),
+            ("Volume vendu (mL)", 115),
+            ("Capacité (mL)", 105),
+            ("Nbr cond.", 80),
+            ("FE lié", 180),
+            ("FE liquide", 180),
+            ("FE matériau", 180),
+            ("CO₂", 90),
+            ("CO₂ FE", 90),
+            ("Fournisseur", 115),
+            ("Version catalogue", 120),
+            ("Source", 180),
+            ("Lien / Note / Remarque", 220),
+        )
+        for header, width in column_widths:
             if header in display_headers:
                 col = 1 + display_headers.index(header)
                 self.table_widget.horizontalHeader().setSectionResizeMode(
@@ -612,6 +883,14 @@ class ValidateWidget(QWidget):
 
         # Offset pour accéder aux vals[] (les display_headers incluent "Table" si show_table_col)
         val_offset = 1 if show_table_col else 0
+
+        # Construire la carte col_index → db_field pour les cellules éditables (single-table uniquement)
+        self._editable_col_to_field = {}
+        if not show_table_col:
+            for i, header in enumerate(display_headers):
+                field = _CP_EDITABLE_FIELDS.get(header)
+                if field:
+                    self._editable_col_to_field[1 + i] = field  # +1 pour la col CHK
 
         for r, (db_table, row_id, vals) in enumerate(rows_all):
             status_val = ""
@@ -643,8 +922,16 @@ class ValidateWidget(QWidget):
                     display_value = _status_label(str(val or ""))
                 elif header == "Type":
                     display_value = _type_label(str(val or ""))
-                self.table_widget.setItem(r, col_offset + c, _item(display_value, row_color))
+                cell = _item(display_value, row_color)
+                table_col = col_offset + c
+                if (db_table == "commercial_products"
+                        and not show_table_col
+                        and table_col in self._editable_col_to_field):
+                    cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
+                    cell.setToolTip("Double-clic pour modifier")
+                self.table_widget.setItem(r, table_col, cell)
 
+        self.table_widget.setSortingEnabled(True)
         self.table_widget.blockSignals(False)
 
     # ------------------------------------------------------------------
@@ -666,8 +953,91 @@ class ValidateWidget(QWidget):
         self._update_sel_count()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
-        if item.column() == 0:
+        col = item.column()
+        if col == 0:
             self._update_sel_count()
+            return
+        field = self._editable_col_to_field.get(col)
+        if field is None:
+            return
+        chk = self.table_widget.item(item.row(), 0)
+        if not chk:
+            return
+        user_data = chk.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(user_data, tuple) or len(user_data) < 2:
+            return
+        db_table, row_id = user_data
+        if db_table != "commercial_products":
+            return
+        key = (db_table, row_id)
+        self._pending_edits.setdefault(key, {})[field] = item.text()
+        item.setBackground(_COLOR_EDITED)
+        self._update_pending_label()
+
+    def _update_pending_label(self) -> None:
+        n = len(self._pending_edits)
+        if n:
+            self.pending_edits_label.setText(f"{n} produit(s) modifié(s) non sauvegardé(s)")
+            self.btn_save_edits.setEnabled(True)
+        else:
+            self.pending_edits_label.setText("")
+            self.btn_save_edits.setEnabled(False)
+
+    def _save_pending_edits(self) -> None:
+        if not self._pending_edits:
+            return
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            conn = sqlite3.connect(self.sqlite_path)
+            for (db_table, row_id), changes in self._pending_edits.items():
+                if db_table != "commercial_products":
+                    continue
+                clean = {k: v for k, v in changes.items() if k in _CP_ALLOWED_FIELDS}
+                if not clean:
+                    continue
+                params: dict = {}
+                for field, val in clean.items():
+                    if field in _CP_NUMERIC_FIELDS:
+                        try:
+                            params[field] = float(val.replace(",", ".")) if val.strip() else None
+                        except ValueError:
+                            params[field] = None
+                    else:
+                        params[field] = val or None
+                set_clauses = ", ".join(f"{k} = ?" for k in params)
+                values = list(params.values()) + [now, row_id]
+                conn.execute(
+                    f"UPDATE commercial_products SET {set_clauses}, updated_at = ? WHERE id = ?",
+                    values,
+                )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            _admin_message(self, "Erreur", f"Impossible de sauvegarder : {e}")
+            return
+        n = len(self._pending_edits)
+        # Réinitialiser les fonds jaunes sans recharger toute la table (évite le freeze)
+        self.table_widget.blockSignals(True)
+        for r in range(self.table_widget.rowCount()):
+            chk = self.table_widget.item(r, 0)
+            if not chk:
+                continue
+            data = chk.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(data, tuple) or len(data) < 2:
+                continue
+            key = (data[0], data[1])
+            if key not in self._pending_edits:
+                continue
+            orig_bg = chk.background()
+            for col in self._editable_col_to_field:
+                cell = self.table_widget.item(r, col)
+                if cell:
+                    cell.setBackground(orig_bg)
+        self.table_widget.blockSignals(False)
+        self._pending_edits.clear()
+        self._update_pending_label()
+        _admin_message(self, "Sauvegardé", f"{n} produit(s) mis à jour.")
 
     _EDITABLE_TABLES = frozenset({"emission_factors", "materials", "commercial_products"})
 
@@ -724,20 +1094,17 @@ class ValidateWidget(QWidget):
     def _on_quality_check(self) -> None:
         issues = self._quality_issues_for_selection()
         if not issues:
-            QMessageBox.information(self, "Contrôle qualité", "Aucune anomalie détectée sur la sélection.")
+            _admin_message(self, "Contrôle qualité", "Aucune anomalie détectée sur la sélection.")
             return
         errors = blocking_issues(issues)
         title = "Contrôle qualité - erreurs bloquantes" if errors else "Contrôle qualité - avertissements"
-        icon = QMessageBox.Icon.Critical if errors else QMessageBox.Icon.Warning
-        box = QMessageBox(self)
-        box.setIcon(icon)
-        box.setWindowTitle(title)
-        box.setText(
+        _admin_message(
+            self,
+            title,
             f"{len(errors)} erreur(s) bloquante(s), "
-            f"{len(issues) - len(errors)} avertissement(s)."
+            f"{len(issues) - len(errors)} avertissement(s).",
+            details=format_admin_issues(issues, max_items=80),
         )
-        box.setDetailedText(format_admin_issues(issues, max_items=80))
-        box.exec()
 
     def _show_selected_detail(self) -> None:
         current_row = self.table_widget.currentRow()
@@ -772,12 +1139,11 @@ class ValidateWidget(QWidget):
                 if existing_id:
                     return existing_id
 
-        reply = QMessageBox.question(
-            self, "Nouveau validateur",
+        if not _admin_confirm(
+            self,
+            "Nouveau validateur",
             f"Le contributeur « {text} » n'existe pas.\nCréer un nouveau contributeur ?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
+        ):
             return None
 
         new_id = str(uuid.uuid4())
@@ -790,7 +1156,7 @@ class ValidateWidget(QWidget):
             conn.commit()
             conn.close()
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Impossible de créer le contributeur : {e}")
+            _admin_message(self, "Erreur", f"Impossible de créer le contributeur : {e}")
             return None
 
         self.validator_combo.addItem(text, new_id)
@@ -813,36 +1179,33 @@ class ValidateWidget(QWidget):
             progress.close()
         errors = blocking_issues(issues)
         if errors:
-            box = QMessageBox(self)
-            box.setIcon(QMessageBox.Icon.Critical)
-            box.setWindowTitle("Validation bloquée")
-            box.setText("La sélection contient des erreurs qualité bloquantes.")
-            box.setInformativeText("Corrigez ces entrées avant de les valider.")
-            box.setDetailedText(format_admin_issues(errors, max_items=80))
-            box.exec()
+            _admin_message(
+                self,
+                "Validation bloquée",
+                "La sélection contient des erreurs qualité bloquantes.",
+                "Corrigez ces entrées avant de les valider.",
+                format_admin_issues(errors, max_items=80),
+            )
             return
         warnings = [issue for issue in issues if issue.severity != "ERROR"]
         if warnings:
-            box = QMessageBox(self)
-            box.setIcon(QMessageBox.Icon.Warning)
-            box.setWindowTitle("Avertissements qualité")
-            box.setText(f"{len(warnings)} avertissement(s) non bloquant(s) sur la sélection.")
-            box.setInformativeText("Valider quand même ces entrées ?")
-            box.setDetailedText(format_admin_issues(warnings, max_items=80))
-            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            if box.exec() != QMessageBox.StandardButton.Yes:
+            if not _admin_confirm(
+                self,
+                "Avertissements qualité",
+                f"{len(warnings)} avertissement(s) non bloquant(s) sur la sélection.",
+                "Valider quand même ces entrées ?",
+                format_admin_issues(warnings, max_items=80),
+            ):
                 return
         validator_id = self._resolve_validator_id()
         if not validator_id:
-            QMessageBox.warning(self, "Validateur manquant",
-                                "Renseignez un validateur avant de valider.")
+            _admin_message(self, "Validateur manquant", "Renseignez un validateur avant de valider.")
             return
-        reply = QMessageBox.question(
-            self, "Confirmer la validation",
+        if not _admin_confirm(
+            self,
+            "Confirmer la validation",
             f"Valider {len(entries)} entrée(s) sélectionnée(s) ?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
+        ):
             return
         progress = self._busy_dialog(f"Validation de {len(entries)} entrée(s)…")
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -853,24 +1216,87 @@ class ValidateWidget(QWidget):
         except Exception as e:
             QApplication.restoreOverrideCursor()
             progress.close()
-            QMessageBox.critical(self, "Erreur", f"Impossible de valider : {e}")
+            _admin_message(self, "Erreur", f"Impossible de valider : {e}")
             return
         QApplication.restoreOverrideCursor()
         progress.close()
-        QMessageBox.information(self, "Succès", f"{len(entries)} entrée(s) validée(s).")
+        _admin_message(self, "Succès", f"{len(entries)} entrée(s) validée(s).")
         self.validated.emit()
-        self._load_table()
+        self._refresh_after_validate(entries)
+
+    def _refresh_after_validate(self, validated_entries: list[tuple[str, str]]) -> None:
+        """Met à jour la table après validation sans recharger tous les widgets (évite le freeze)."""
+        validated_set = set(validated_entries)
+        status_filter = self.status_combo.currentData()
+        keep_in_view = status_filter in ("all", "validated")
+        status_col = self._column_index("Statut")
+        search_text = self.search_edit.text()
+
+        # Déconnecter itemChanged et couper le tri : modifier "Statut" peut déplacer
+        # les lignes si le tableau est trié, ce qui laisse des coches/edits fantômes.
+        try:
+            self.table_widget.itemChanged.disconnect(self._on_item_changed)
+        except (RuntimeError, TypeError):
+            pass
+
+        was_sorting = self.table_widget.isSortingEnabled()
+        self.table_widget.blockSignals(True)
+        self.table_widget.setSortingEnabled(False)
+        try:
+            self.table_widget.clearSelection()
+            rows_to_remove = []
+            for r in range(self.table_widget.rowCount()):
+                chk = self.table_widget.item(r, 0)
+                if not chk:
+                    continue
+                data = chk.data(Qt.ItemDataRole.UserRole)
+                if not isinstance(data, tuple) or len(data) < 2:
+                    continue
+                entry_key = (data[0], data[1])
+                if entry_key not in validated_set:
+                    continue
+                if keep_in_view:
+                    for col in range(self.table_widget.columnCount()):
+                        cell = self.table_widget.item(r, col)
+                        if cell:
+                            cell.setBackground(_COLOR_VALIDATED)
+                            cell.setForeground(_BLACK)
+                    if status_col >= 0:
+                        s_item = self.table_widget.item(r, status_col)
+                        if s_item:
+                            s_item.setText(_STATUS_LABEL.get("validated", "Validé"))
+                    chk.setCheckState(Qt.CheckState.Unchecked)
+                    chk.setSelected(False)
+                else:
+                    rows_to_remove.append(r)
+
+            for r in reversed(rows_to_remove):
+                self.table_widget.removeRow(r)
+
+            # Nettoyer les pending_edits des entrées qui viennent d'être validées
+            for entry in validated_set:
+                self._pending_edits.pop(entry, None)
+        finally:
+            self.table_widget.setSortingEnabled(was_sorting)
+            self.table_widget.blockSignals(False)
+
+        # Reconnecter itemChanged (garantit que le handler est actif après la mise à jour)
+        self.table_widget.itemChanged.connect(self._on_item_changed)
+
+        self.detail_view.clear()
+        self._filter_rows(search_text)
+        self._update_pending_label()
+        self._update_sel_count()
 
     def _on_reject(self) -> None:
         entries = self._selected_entries()
         if not entries:
             return
-        reply = QMessageBox.question(
-            self, "Confirmer le rejet",
+        if not _admin_confirm(
+            self,
+            "Confirmer le rejet",
             f"Rejeter (déprécier) {len(entries)} entrée(s) ?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
+        ):
             return
         progress = self._busy_dialog(f"Dépréciation de {len(entries)} entrée(s)…")
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -881,11 +1307,11 @@ class ValidateWidget(QWidget):
         except Exception as e:
             QApplication.restoreOverrideCursor()
             progress.close()
-            QMessageBox.critical(self, "Erreur", f"Impossible de rejeter : {e}")
+            _admin_message(self, "Erreur", f"Impossible de rejeter : {e}")
             return
         QApplication.restoreOverrideCursor()
         progress.close()
-        QMessageBox.information(self, "Succès", f"{len(entries)} entrée(s) rejetée(s).")
+        _admin_message(self, "Succès", f"{len(entries)} entrée(s) rejetée(s).")
         self._load_table()
 
     def _on_edit(self) -> None:

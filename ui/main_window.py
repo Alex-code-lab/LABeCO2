@@ -1143,10 +1143,11 @@ class MainWindow(QMainWindow):
                 prefix = normalize_nacres_prefix(full_code)
                 if not consommable or not prefix:
                     continue
+                packaging = self._consumable_packaging_label(row)
                 source = "liquid" if clean_text(row.get(unit_col)) else "solid"
-                search_text = normalize_search(f"{full_code} {consommable}")
+                search_text = normalize_search(f"{full_code} {consommable} {packaging}")
                 self._consumable_search_entries.append(
-                    (consommable.casefold(), full_code, consommable, source, search_text, prefix)
+                    (consommable.casefold(), full_code, consommable, source, search_text, prefix, packaging)
                 )
                 self._consumable_prefixes_all.add(prefix)
 
@@ -1194,22 +1195,59 @@ class MainWindow(QMainWindow):
             return True
         return False
 
-    def _add_consumable_combo_item(self, code_nacres, consommable, source="solid"):
+    def _consumable_packaging_label(self, row) -> str:
+        conditionnement = clean_text(row.get("condt_ijm", ""))
+        if conditionnement:
+            return conditionnement
+
+        volume = safe_float(
+            row.get(getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)")),
+            default=0.0,
+        )
+        unit = clean_text(row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")))
+        if volume > 0 and unit:
+            return f"{format_quantity(volume)} {unit}"
+
+        nb = safe_float(
+            row.get(getattr(self.data_manager, "NOMBRE_PAR_COND_COL", "Nbr par conditionnement")),
+            default=0.0,
+        )
+        if nb > 0:
+            return f"{format_quantity(nb)} unité(s)"
+
+        return ""
+
+    def _consumable_display_name(self, consommable: str, packaging: str) -> str:
+        name = clean_text(consommable)
+        pack = clean_text(packaging)
+        if not name:
+            return pack
+        if not pack:
+            return name
+        if normalize_search(pack) in normalize_search(name):
+            return name
+        return f"{name} - {pack}"
+
+    def _add_consumable_combo_item(self, code_nacres, consommable, source="solid", packaging=""):
         code = clean_text(code_nacres)
         name = clean_text(consommable)
         if not code and not name:
             return
-        display = name or code
+        pack = clean_text(packaging)
+        display = self._consumable_display_name(name or code, pack)
         metadata = {
             "code_nacres": code,
             "consommable": name,
             "source": source,
+            "conditionnement": pack,
         }
         self.conso_filtered_combo.addItem(display, userData=metadata)
         index = self.conso_filtered_combo.count() - 1
         tooltip = []
         if code:
             tooltip.append(f"Code NACRES : {code}")
+        if pack:
+            tooltip.append(f"Conditionnement : {pack}")
         if source == "liquid":
             tooltip.append("Consommable liquide")
         if tooltip:
@@ -1249,7 +1287,7 @@ class MainWindow(QMainWindow):
             return set(self._consumable_prefixes_all)
         return {
             prefix
-            for _, _, _, _, search_text, prefix in self._consumable_search_entries
+            for _, _, _, _, search_text, prefix, _ in self._consumable_search_entries
             if norm_filter in search_text
         }
 
@@ -1329,6 +1367,7 @@ class MainWindow(QMainWindow):
                     "code_nacres": code,
                     "consommable": name,
                     "source": clean_text(data.get("source")) or "solid",
+                    "conditionnement": clean_text(data.get("conditionnement")),
                 }
 
         text = clean_text(self.conso_filtered_combo.currentText())
@@ -1336,19 +1375,26 @@ class MainWindow(QMainWindow):
             return None
         if " - " in text:
             code, name = text.split(" - ", 1)
-            return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid"}
-        return {"code_nacres": "", "consommable": text, "source": "solid"}
+            if re.match(r"^[A-Za-z]{2}[0-9]{2}\b", clean_text(code)):
+                return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid", "conditionnement": ""}
+        return {"code_nacres": "", "consommable": text, "source": "solid", "conditionnement": ""}
 
-    def _select_consumable_item(self, code_nacres, consommable):
+    def _select_consumable_item(self, code_nacres, consommable, packaging=""):
         code_prefix = normalize_nacres_prefix(code_nacres)
         name = clean_text(consommable)
+        pack = clean_text(packaging)
         for index in range(self.conso_filtered_combo.count()):
             data = self.conso_filtered_combo.itemData(index)
             if not isinstance(data, dict):
                 continue
             item_name = clean_text(data.get("consommable"))
             item_code = clean_text(data.get("code_nacres"))
-            if item_name == name and normalize_nacres_prefix(item_code) == code_prefix:
+            item_pack = clean_text(data.get("conditionnement"))
+            if (
+                item_name == name and
+                normalize_nacres_prefix(item_code) == code_prefix and
+                (not pack or item_pack == pack)
+            ):
                 self.conso_filtered_combo.setCurrentIndex(index)
                 return True
         return False
@@ -2115,17 +2161,21 @@ class MainWindow(QMainWindow):
         filter_text = normalize_search(filter_text)
 
         entries = [
-            (sort_key, full_code, consommable, source)
-            for sort_key, full_code, consommable, source, search_text, _ in self._consumable_search_entries
+            (sort_key, full_code, consommable, source, packaging)
+            for sort_key, full_code, consommable, source, search_text, _, packaging in self._consumable_search_entries
             if not filter_text or filter_text in search_text
         ]
 
-        for _, code, name, source in sorted(entries):
-            self._add_consumable_combo_item(code, name, source)
+        for _, code, name, source, packaging in sorted(entries):
+            self._add_consumable_combo_item(code, name, source, packaging)
 
         self.conso_filtered_combo.blockSignals(False)
         if previous:
-            self._select_consumable_item(previous["code_nacres"], previous["consommable"])
+            self._select_consumable_item(
+                previous["code_nacres"],
+                previous["consommable"],
+                previous.get("conditionnement", ""),
+            )
         self.update_quantity_visibility()
         self.update_manage_consumable_button_state()
 
@@ -2178,8 +2228,8 @@ class MainWindow(QMainWindow):
             return
 
         filtered_items = [
-            (sort_key, full_code, consommable, source)
-            for sort_key, full_code, consommable, source, _, prefix in self._consumable_search_entries
+            (sort_key, full_code, consommable, source, packaging)
+            for sort_key, full_code, consommable, source, _, prefix, packaging in self._consumable_search_entries
             if prefix == code_nacres_4
         ]
 
@@ -2230,8 +2280,8 @@ class MainWindow(QMainWindow):
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
         self._add_direct_nacres_combo_item(code_nacres_4)
-        for _, code, name, source in sorted(filtered_items):
-            self._add_consumable_combo_item(code, name, source)
+        for _, code, name, source, packaging in sorted(filtered_items):
+            self._add_consumable_combo_item(code, name, source, packaging)
         self.conso_filtered_combo.blockSignals(False)
 
         if len(filtered_items) == 1:
