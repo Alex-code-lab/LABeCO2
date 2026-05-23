@@ -98,6 +98,11 @@ class TestCheckLiquidFactor(unittest.TestCase):
         warns = _warnings(check_liquid_factor(row))
         self.assertIn("co2_out_of_range", [w.rule for w in warns])
 
+    def test_missing_co2_is_warning(self):
+        row = {"Produit": "X", "Source": "Src"}
+        warns = _warnings(check_liquid_factor(row))
+        self.assertIn("missing_co2_factor", [w.rule for w in warns])
+
     def test_co2_zero_no_warning(self):
         row = {"Produit": "X", "Source": "Src",
                "Facteur CO₂ (kg CO₂e/kg)": 0.0}
@@ -133,6 +138,11 @@ class TestCheckMaterialFactor(unittest.TestCase):
                "Equivalent CO₂ (kg eCO₂/kg)": 1.2}
         errs = _errors(check_material_factor(row))
         self.assertEqual(errs, [])
+
+    def test_missing_co2_is_error(self):
+        row = {"Materiau": "Verre", "Source": "Base Empreinte"}
+        errs = _errors(check_material_factor(row))
+        self.assertIn("missing_co2_factor", [e.rule for e in errs])
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +269,32 @@ class TestCheckDatabase(unittest.TestCase):
         issues = check_database(conn)
         warns = [i for i in issues if i.rule == "co2_out_of_range"]
         self.assertEqual(len(warns), 1)
+
+    def test_liquid_factor_without_co2_is_warning(self):
+        conn = _make_db()
+        conn.execute("""
+            INSERT INTO emission_factors
+            (id, name, name_key, factor_type, source_id, status)
+            VALUES ('ef-liquid-no-co2', 'Liquide sans FE', 'liquide-sans-fe', 'liquid', 's1', 'validated')
+        """)
+        conn.commit()
+        issues = check_database(conn)
+        warns = [i for i in issues if i.rule == "missing_co2_factor"]
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].severity, "WARNING")
+
+    def test_material_factor_without_co2_is_error(self):
+        conn = _make_db()
+        conn.execute("""
+            INSERT INTO emission_factors
+            (id, name, name_key, factor_type, source_id, status)
+            VALUES ('ef-material-no-co2', 'Matériau sans FE', 'materiau-sans-fe', 'material', 's1', 'validated')
+        """)
+        conn.commit()
+        issues = check_database(conn)
+        errs = [i for i in issues if i.rule == "missing_co2_factor"]
+        self.assertEqual(len(errs), 1)
+        self.assertEqual(errs[0].severity, "ERROR")
 
     def test_solid_with_capacity_no_factor_ok(self):
         """Un solide avec capacity_volume_ml mais sans facteur n'est pas une erreur."""

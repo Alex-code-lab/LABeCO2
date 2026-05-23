@@ -217,7 +217,16 @@ def check_entry_quality(conn: sqlite3.Connection, table: str, row: dict) -> list
             issues.append(_issue("ERROR", table, "factor_missing_source", "Facteur sans source documentée.", row))
         co2 = as_float(row.get("co2_factor"))
         if co2 is None:
-            issues.append(_issue("ERROR", table, "missing_co2_factor", "Facteur sans valeur CO₂.", row))
+            if clean(row.get("factor_type")) == "liquid":
+                issues.append(_issue(
+                    "WARNING",
+                    table,
+                    "missing_co2_factor",
+                    "Facteur liquide sans valeur CO₂ : calcul volume indisponible, calcul prix/NACRES possible.",
+                    row,
+                ))
+            else:
+                issues.append(_issue("ERROR", table, "missing_co2_factor", "Facteur sans valeur CO₂.", row))
         elif co2 < 0 or co2 > 100:
             issues.append(_issue("WARNING", table, "co2_out_of_range", "Facteur CO₂ hors plage.", row, str(co2)))
 

@@ -78,6 +78,14 @@ class _FakeComboBox:
         pass
 
 
+class _FakeQColor:
+    def __init__(self, *args, **kwargs):
+        self._args = args
+
+    def name(self):
+        return "#000000"
+
+
 class _FakeQMessageBox:
     warning = MagicMock()
     information = MagicMock()
@@ -110,6 +118,7 @@ _qtcore.Signal = _FakeSignal
 _qtcore.Qt = types.SimpleNamespace()
 
 _qtgui = types.ModuleType("PySide6.QtGui")
+_qtgui.QColor = _FakeQColor
 _qtgui.QCursor = type("QCursor", (), {})
 _qtgui.QDoubleValidator = type("QDoubleValidator", (), {"__init__": lambda self, *a, **k: None})
 _qtgui.QIntValidator = type("QIntValidator", (), {"__init__": lambda self, *a, **k: None})

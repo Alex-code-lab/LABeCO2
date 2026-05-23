@@ -64,6 +64,7 @@ class CarbonCalculator:
 
         code_nacres    = data_dict.get('code_nacres', 'NA')
         consommable    = data_dict.get('consommable', 'NA')
+        conditionnement = clean_text(data_dict.get('conditionnement', ''))
         quantity       = self._safe_float(data_dict.get('quantity', 0), default=0.0)
         
         # Valeurs de sortie par défaut
@@ -165,10 +166,17 @@ class CarbonCalculator:
             product_row, linked_liq_row = (None, None)
             linked_lookup = getattr(self.dm, "get_consumable_liquid_factor_data", None)
             if callable(linked_lookup):
-                lookup_result = linked_lookup(code_nacres, consommable)
+                try:
+                    lookup_result = linked_lookup(code_nacres, consommable, conditionnement)
+                except TypeError:
+                    lookup_result = linked_lookup(code_nacres, consommable)
                 if isinstance(lookup_result, tuple) and len(lookup_result) == 2:
                     product_row, linked_liq_row = lookup_result
-            liq_row = linked_liq_row if linked_liq_row is not None else self.dm.get_liquid_data(code_nacres, consommable)
+            try:
+                fallback_liq_row = self.dm.get_liquid_data(code_nacres, consommable, conditionnement)
+            except TypeError:
+                fallback_liq_row = self.dm.get_liquid_data(code_nacres, consommable)
+            liq_row = linked_liq_row if linked_liq_row is not None else fallback_liq_row
             if liq_row is not None:
                 e_liq, m_liq, err_liq = self._calculate_liquid_emissions_from_row(liq_row, quantity)
                 # Facteur personnalisé (kg eCO₂/L) si aucun facteur en base
@@ -237,7 +245,7 @@ class CarbonCalculator:
             else:
                 # 2) Calcul classique pour consommables solides
                 e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
-                    code_nacres, consommable, quantity
+                    code_nacres, consommable, quantity, conditionnement
                 )
                 # Facteur personnalisé (kg eCO₂/kg) pour produits vrac sans matériau défini
                 if e_mass == 0.0 and custom_fe > 0.0:
@@ -262,7 +270,7 @@ class CarbonCalculator:
 
         return (ep, ep_err, em, em_err, tm, error_message)
 
-    def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity):
+    def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity, packaging=""):
         """
         Calcule l'empreinte carbone totale (produit + emballage + conditionnement)
         à partir des masses unitaires et des matériaux.
@@ -285,6 +293,12 @@ class CarbonCalculator:
             code_mask &
             (self.data_masse[self.dm.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
         ]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.dm, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in df_row.columns:
+            exact_pack = df_row[df_row[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                df_row = exact_pack
         if df_row.empty:
             return (0.0, 0.0, 0.0, [])
         row = df_row.iloc[0]
@@ -349,11 +363,14 @@ class CarbonCalculator:
         return (total_emission, total_mass_kg, total_unc, missing_materials)
     
 
-    def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None):
+    def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None, packaging=""):
         """
         Calcule l'empreinte carbone d'un consommable liquide via volume (mL).
         """
-        row = self.dm.get_liquid_data(code_nacres, consommable)
+        try:
+            row = self.dm.get_liquid_data(code_nacres, consommable, packaging)
+        except TypeError:
+            row = self.dm.get_liquid_data(code_nacres, consommable)
         if row is None:
             return (0.0, 0.0, 0.0)
         return self._calculate_liquid_emissions_from_row(row, volume_ml)

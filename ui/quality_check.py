@@ -106,6 +106,14 @@ def check_liquid_factor(row: dict[str, Any]) -> list[QualityIssue]:
             entry=name,
         ))
 
+    if co2 is None:
+        issues.append(QualityIssue(
+            severity="WARNING", table="emission_factors",
+            rule="missing_co2_factor",
+            message="Facteur liquide sans valeur CO₂ : calcul volume indisponible, calcul prix/NACRES possible.",
+            entry=name,
+        ))
+
     if co2 is not None and (co2 < 0 or co2 > 100):
         issues.append(QualityIssue(
             severity="WARNING", table="emission_factors",
@@ -141,6 +149,14 @@ def check_material_factor(row: dict[str, Any]) -> list[QualityIssue]:
             severity="ERROR", table="emission_factors",
             rule="factor_missing_source",
             message="Facteur matériau sans source documentée.",
+            entry=name,
+        ))
+
+    if co2 is None:
+        issues.append(QualityIssue(
+            severity="ERROR", table="emission_factors",
+            rule="missing_co2_factor",
+            message="Facteur matériau sans valeur CO₂.",
             entry=name,
         ))
 
@@ -324,6 +340,26 @@ def check_database(conn: sqlite3.Connection) -> list[QualityIssue]:
             ))
 
     # Facteur CO2 aberrant
+    for factor_id, name, factor_type in _q(conn, """
+        SELECT id, name, factor_type FROM emission_factors
+        WHERE co2_factor IS NULL
+        ORDER BY factor_type, name
+    """):
+        is_liquid = factor_type == "liquid"
+        issues.append(QualityIssue(
+            severity="WARNING" if is_liquid else "ERROR",
+            table="emission_factors",
+            rule="missing_co2_factor",
+            message=(
+                "Facteur liquide sans valeur CO₂ : calcul volume indisponible, calcul prix/NACRES possible."
+                if is_liquid
+                else "Facteur sans valeur CO₂."
+            ),
+            entry=name,
+            detail=factor_type or "",
+            row_id=factor_id or "",
+        ))
+
     for name, co2 in _q(conn, """
         SELECT name, co2_factor FROM emission_factors
         WHERE co2_factor IS NOT NULL AND (co2_factor < 0 OR co2_factor > 100)

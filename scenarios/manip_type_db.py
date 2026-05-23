@@ -81,6 +81,7 @@ class ManipsTypeDB:
             electricity_type TEXT,
             quantity REAL,
             consommable TEXT,
+            conditionnement TEXT,
             origine TEXT,
             FOREIGN KEY (manip_id) REFERENCES manips(id)
         );
@@ -95,6 +96,8 @@ class ManipsTypeDB:
             cursor.execute("ALTER TABLE manips_items ADD COLUMN code_nacres TEXT")
         if "origine" not in item_columns:
             cursor.execute("ALTER TABLE manips_items ADD COLUMN origine TEXT")
+        if "conditionnement" not in item_columns:
+            cursor.execute("ALTER TABLE manips_items ADD COLUMN conditionnement TEXT")
         self.conn.commit()
 
     def add_manip(self, manip_name, items_list, source=None):
@@ -137,8 +140,8 @@ class ManipsTypeDB:
         for item in items_list:
             cursor.execute("""
                 INSERT INTO manips_items
-                    (manip_id, category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable, origine)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (manip_id, category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable, conditionnement, origine)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 manip_id,
                 item.get("category", ""),
@@ -153,6 +156,7 @@ class ManipsTypeDB:
                 item.get("electricity_type", ""),
                 item.get("quantity", 0.0),
                 item.get("consommable", ""),
+                item.get("conditionnement", ""),
                 item.get("origine", "")
             ))
         self.conn.commit()
@@ -285,7 +289,7 @@ class ManipsTypeDB:
         manip_id = row["id"]
         # Maintenant on récupère tous les items associés à ce manip_id
         cursor.execute("""
-            SELECT category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable, origine
+            SELECT category, subcategory, subsubcategory, code_nacres, name, value, unit, days, year, electricity_type, quantity, consommable, conditionnement, origine
             FROM manips_items
             WHERE manip_id = ?
         """, (manip_id,))
@@ -306,6 +310,7 @@ class ManipsTypeDB:
                 "electricity_type": r["electricity_type"],
                 "quantity": r["quantity"],
                 "consommable": r["consommable"],
+                "conditionnement": r["conditionnement"],
                 "origine": r["origine"],
             })
         return items

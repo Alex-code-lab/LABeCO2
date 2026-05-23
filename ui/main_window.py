@@ -1653,6 +1653,7 @@ class MainWindow(QMainWindow):
                 "electricity_type": item.get("electricity_type", ""),
                 "consommable": item.get("consommable", ""),
                 "code_nacres": item.get("code_nacres", ""),
+                "conditionnement": item.get("conditionnement", ""),
                 "origine": item.get("origine", self.data_manager.TRANSPORT_DEFAULT),
             }
 
@@ -2438,8 +2439,13 @@ class MainWindow(QMainWindow):
 
         code_nacres_full = selected["code_nacres"]
         consommable_name = selected["consommable"]
+        conditionnement = selected.get("conditionnement", "")
 
-        prix_info = self.data_manager.get_prix_unitaire_info(code_nacres_full.strip(), consommable_name)
+        prix_info = self.data_manager.get_prix_unitaire_info(
+            code_nacres_full.strip(),
+            consommable_name,
+            conditionnement,
+        )
         if prix_info and prix_info.get("prix_unitaire") is not None:
             prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
@@ -2712,20 +2718,16 @@ class MainWindow(QMainWindow):
             return False
         if selected.get("source") == "liquid":
             return True
-        code_nacres = selected["code_nacres"]
-        consommable_name = selected["consommable"]
-        df = self.data_masse
-        mask = (
-            self._nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
-            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        solid_row = self._find_consumable_mass_row(
+            selected["code_nacres"],
+            selected["consommable"],
+            selected.get("conditionnement", ""),
         )
-        row = df[mask]
-        if row.empty:
+        if solid_row is None:
             return False
-        solid_row = row.iloc[0]
         if self._solid_row_liquid_factor(solid_row) is not None:
             return True
-        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
         return not (pd.isna(masse) or str(masse).strip() == "")
 
     def _should_show_origin_selector(self, selected):
@@ -2778,6 +2780,7 @@ class MainWindow(QMainWindow):
             liq_row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             unit = clean_text(liq_row.get("Unité", "") if liq_row is not None else "").casefold()
             is_volume_based = unit in {"ml", "millilitre", "millilitres"} or (
@@ -2813,16 +2816,12 @@ class MainWindow(QMainWindow):
 
         self.contenant_warning_label.setVisible(False)
 
-        code_nacres = selected["code_nacres"]
-        consommable_name = selected["consommable"]
-        df = self.data_masse
-        mask = (
-            self._nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
-            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        solid_row = self._find_consumable_mass_row(
+            selected["code_nacres"],
+            selected["consommable"],
+            selected.get("conditionnement", ""),
         )
-        row = df[mask]
-
-        if row.empty:
+        if solid_row is None:
             self.masse_manquante_label.setText(
                 "⚠  Masse non enregistrée pour ce consommable : le calcul CO₂ sera incomplet."
             )
@@ -2832,8 +2831,6 @@ class MainWindow(QMainWindow):
             )
             self.masse_manquante_label.setVisible(True)
             return
-
-        solid_row = row.iloc[0]
         if self._is_solid_liquid_product(solid_row):
             factor_row = self._solid_row_liquid_factor(solid_row)
             factor_name = clean_text(solid_row.get(
@@ -2979,6 +2976,7 @@ class MainWindow(QMainWindow):
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if row is None:
                 return
@@ -2991,6 +2989,7 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if solid_row is not None and self._is_solid_liquid_product(solid_row):
                 unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
@@ -3020,13 +3019,9 @@ class MainWindow(QMainWindow):
             return 0.0
         code = selected.get("code_nacres", "")
         name = selected.get("consommable", "")
-        df_row = self.data_masse[
-            self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code) &
-            (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == name.strip())
-        ]
-        if df_row.empty:
+        row = self._find_consumable_mass_row(code, name, selected.get("conditionnement", ""))
+        if row is None:
             return 0.0
-        row = df_row.iloc[0]
         if self._is_solid_liquid_product(row):
             return 0.0
         materiau = str(row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
@@ -3040,12 +3035,14 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             row = self._solid_row_liquid_factor(solid_row) if solid_row is not None else None
         else:
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
         if row is None:
             return False
@@ -3058,6 +3055,7 @@ class MainWindow(QMainWindow):
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             unit = "mL"
             if row is not None:
@@ -3077,6 +3075,7 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if solid_row is not None and self._is_solid_liquid_product(solid_row):
                 unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
@@ -3265,6 +3264,7 @@ class MainWindow(QMainWindow):
                     "unit": data.get("unit", ""),
                     "quantity": data.get("quantity", 0.0),
                     "consommable": data.get("consommable", ""),
+                    "conditionnement": data.get("conditionnement", ""),
                     "origine": data.get("origine", self.data_manager.TRANSPORT_DEFAULT),
                     "electricity_type": data.get("electricity_type", ""),
                 })
@@ -3347,6 +3347,7 @@ class MainWindow(QMainWindow):
         if selected_consumable:
             code_nacres = selected_consumable["code_nacres"] or code_nacres
             consommable = selected_consumable["consommable"] or "NA"
+        conditionnement = selected_consumable.get("conditionnement", "") if selected_consumable else ""
             
         # Lecture du champ input_field => c'est un nombre "km/jour" si Véhicules, "€" si Achats, etc.
         try:
@@ -3403,19 +3404,17 @@ class MainWindow(QMainWindow):
             'days': days,
             'code_nacres': code_nacres,
             'consommable': consommable,
+            'conditionnement': conditionnement,
             'quantity': quantity,
             'origine': self.origine_combo.currentText() if self.origine_combo and self.origine_combo.isVisible() else self.data_manager.TRANSPORT_DEFAULT,
             'custom_fe': custom_fe,
         }
 
         if category == 'Achats' and consommable and consommable != 'NA':
-            df_row = self.data_masse[
-                self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code_nacres) &
-                (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
-            ]
-            if not df_row.empty:
+            row = self._find_consumable_mass_row(code_nacres, consommable, conditionnement)
+            if row is not None:
                 data_dict['masse_unitaire'] = safe_float(
-                    df_row.iloc[0].get(self.data_manager.MASSE_G_COL, 0.0)
+                    row.get(self.data_manager.MASSE_G_COL, 0.0)
                 )
 
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
@@ -3441,6 +3440,7 @@ class MainWindow(QMainWindow):
             'total_mass': tm,
             'code_nacres': code_nacres,
             'consommable': consommable,
+            'conditionnement': conditionnement,
             'unit': self.current_unit,
             'quantity': quantity,
             'origine': data_dict['origine'],
@@ -3569,7 +3569,7 @@ class MainWindow(QMainWindow):
             _fmt("Consommables (méthode masse)", total_mass, mass_err),
         ]))
 
-    def _find_consumable_mass_row(self, code_nacres, consommable):
+    def _find_consumable_mass_row(self, code_nacres, consommable, packaging=""):
         if self.data_masse is None or self.data_masse.empty:
             return None
         mask = (
@@ -3577,9 +3577,15 @@ class MainWindow(QMainWindow):
             (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == clean_text(consommable))
         )
         rows = self.data_masse[mask]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in rows.columns:
+            exact_pack = rows[rows[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                rows = exact_pack
         return rows.iloc[0] if not rows.empty else None
 
-    def _find_liquid_row(self, code_nacres, consommable):
+    def _find_liquid_row(self, code_nacres, consommable, packaging=""):
         if self.data_liquides is None or self.data_liquides.empty:
             return None
         mask = self._nacres_code_mask(self.data_liquides[self.data_manager.CODE_NACRES_COL], code_nacres)
@@ -3587,16 +3593,23 @@ class MainWindow(QMainWindow):
         if product_col is not None and clean_text(consommable):
             mask &= product_col.astype(str).str.strip() == clean_text(consommable)
         rows = self.data_liquides[mask]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in rows.columns:
+            exact_pack = rows[rows[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                rows = exact_pack
         return rows.iloc[0] if not rows.empty else None
 
     def _mass_detail_lines(self, data):
         code_nacres = clean_text(data.get("code_nacres"))
         consommable = clean_text(data.get("consommable"))
+        conditionnement = clean_text(data.get("conditionnement"))
         quantity = safe_float(data.get("quantity"), default=0.0)
         if not code_nacres or code_nacres == "NA" or not consommable or consommable == "NA" or quantity <= 0:
             return []
 
-        solid_row = self._find_consumable_mass_row(code_nacres, consommable)
+        solid_row = self._find_consumable_mass_row(code_nacres, consommable, conditionnement)
         if solid_row is not None:
             factor_row = self._solid_row_liquid_factor(solid_row)
             if factor_row is not None:
@@ -3646,7 +3659,7 @@ class MainWindow(QMainWindow):
                 lines.append(f"Masse comptabilisée eCO₂ : {total_mass:.4f} kg")
             return lines
 
-        liquid_row = self._find_liquid_row(code_nacres, consommable)
+        liquid_row = self._find_liquid_row(code_nacres, consommable, conditionnement)
         if liquid_row is not None:
             unit = clean_text(liquid_row.get("Unité", "")) or "mL"
             unit_clean = unit.casefold()
@@ -3680,10 +3693,13 @@ class MainWindow(QMainWindow):
 
         code_nacres = clean_text(data.get("code_nacres"))
         consommable = clean_text(data.get("consommable"))
+        conditionnement = clean_text(data.get("conditionnement"))
         if code_nacres and code_nacres != "NA":
             lines.append(f"Code NACRES : {code_nacres}")
         if consommable and consommable != "NA":
             lines.append(f"Consommable : {consommable}")
+            if conditionnement:
+                lines.append(f"Conditionnement : {conditionnement}")
             lines.append(f"Quantité : {format_quantity(data.get('quantity'))}")
             unit = display_unit(data.get("unit")) or "€"
             lines.append(f"Valeur : {safe_float(data.get('value')):.2f} {unit}")
@@ -3708,6 +3724,7 @@ class MainWindow(QMainWindow):
         tm          = data.get('total_mass', 0.0)
         code_nacres = data.get('code_nacres', 'NA')
         consommable = data.get('consommable', 'NA')
+        conditionnement = clean_text(data.get('conditionnement', ''))
         quantity    = data.get('quantity', 0.0)
         subcategory_display, _ = format_subcategory_label(subcategory)
         is_consumable_item = (
@@ -3734,7 +3751,8 @@ class MainWindow(QMainWindow):
             parts = [p for p in (subcategory, code_nacres, name) if _valid(p)]
             element = " : ".join(parts)
         elif is_consumable_item:
-            element = f"{subcategory_display} : {consommable}"
+            suffix = f" - {conditionnement}" if conditionnement else ""
+            element = f"{subcategory_display} : {consommable}{suffix}"
         else:
             parts = [p for p in (subcategory_display[:20], code_nacres, name) if _valid(p)]
             element = " : ".join(parts)

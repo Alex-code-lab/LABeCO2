@@ -319,7 +319,21 @@ class DataManager:
             "validation": validation_label(),
         }
 
-    def _find_prix_unitaire_row(self, code_nacres, consommable_name=""):
+    def _row_packaging_label(self, row) -> str:
+        return self._clean_cell(row.get(self.CONDT_IJM_COL, ""))
+
+    def _filter_rows_by_packaging(self, rows, packaging):
+        pack = clean_text(packaging)
+        if not pack or rows.empty:
+            return rows
+        if self.CONDT_IJM_COL not in rows.columns:
+            return rows
+        exact_pack = rows[
+            rows[self.CONDT_IJM_COL].fillna("").astype(str).str.strip() == pack
+        ]
+        return exact_pack if not exact_pack.empty else rows
+
+    def _find_prix_unitaire_row(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne la ligne data_masse contenant le prix IJM le plus pertinent.
         Retourne None si aucun prix disponible.
@@ -341,6 +355,7 @@ class DataManager:
             exact = candidates[
                 candidates[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip()
             ]
+            exact = self._filter_rows_by_packaging(exact, packaging)
             if not exact.empty:
                 for _, row in exact.iterrows():
                     if self._row_has_price(row):
@@ -350,6 +365,7 @@ class DataManager:
         # Garder seulement les lignes avec un prix
         has_price = candidates.apply(self._row_has_price, axis=1)
         price_cands = candidates[has_price]
+        price_cands = self._filter_rows_by_packaging(price_cands, packaging)
         if price_cands.empty:
             return None
 
@@ -370,23 +386,23 @@ class DataManager:
 
         return best_row
 
-    def get_prix_unitaire_info(self, code_nacres, consommable_name=""):
+    def get_prix_unitaire_info(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne les métadonnées du produit IJM utilisé pour le prix unitaire.
         Retourne None si aucun prix disponible.
         """
-        row = self._find_prix_unitaire_row(code_nacres, consommable_name)
+        row = self._find_prix_unitaire_row(code_nacres, consommable_name, packaging)
         if row is None:
             return None
         return self._prix_info_from_row(row)
 
-    def get_prix_unitaire(self, code_nacres, consommable_name=""):
+    def get_prix_unitaire(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne (prix_unitaire, designation, condt) depuis data_masse.
         Recherche par Code NACRES (4 chars) puis fuzzy match sur le nom.
         Retourne (None, None, None) si aucun prix disponible.
         """
-        info = self.get_prix_unitaire_info(code_nacres, consommable_name)
+        info = self.get_prix_unitaire_info(code_nacres, consommable_name, packaging)
         if not info:
             return None, None, None
 
@@ -396,7 +412,7 @@ class DataManager:
             info["conditionnement"],
         )
 
-    def get_liquid_data(self, code_nacres, produit=None):
+    def get_liquid_data(self, code_nacres, produit=None, packaging=""):
         """
         Cherche un consommable liquide par code NACRES.
         Retourne la Series de la ligne si trouvée, sinon None.
@@ -409,9 +425,10 @@ class DataManager:
         if produit_clean and "Produit" in df.columns:
             mask &= df["Produit"].astype(str).str.strip() == produit_clean
         filtered = df[mask]
+        filtered = self._filter_rows_by_packaging(filtered, packaging)
         return filtered.iloc[0] if not filtered.empty else None
 
-    def get_consumable_row(self, code_nacres, consommable_name):
+    def get_consumable_row(self, code_nacres, consommable_name, packaging=""):
         if self.data_masse.empty:
             return None
         df = self.data_masse
@@ -420,9 +437,10 @@ class DataManager:
             (df[self.CONSOMMABLE_COL].astype(str).str.strip() == clean_text(consommable_name))
         )
         rows = df[mask]
+        rows = self._filter_rows_by_packaging(rows, packaging)
         return rows.iloc[0] if not rows.empty else None
 
-    def get_consumable_liquid_factor_data(self, code_nacres, consommable_name):
+    def get_consumable_liquid_factor_data(self, code_nacres, consommable_name, packaging=""):
         """
         Retourne (ligne consommable, ligne facteur liquide) pour un produit
         commercial stocké dans la base consommables mais lié à un facteur de
@@ -431,7 +449,7 @@ class DataManager:
         Résolution principale par emission_factor_id (stable au renommage),
         puis fallback par nom texte si l'identifiant est absent.
         """
-        product_row = self.get_consumable_row(code_nacres, consommable_name)
+        product_row = self.get_consumable_row(code_nacres, consommable_name, packaging)
         if product_row is None:
             return None, None
 

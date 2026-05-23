@@ -78,6 +78,7 @@ def _make_dm(
     dm.MASSE_CONDITIONNEMENT_COL  = 'Masse condionnement (g)'
     dm.MATERIAU_CONDITIONNEMENT_COL = 'Matériau conditionnement'
     dm.NOMBRE_PAR_COND_COL        = 'Nbr par conditionnement'
+    dm.CONDT_IJM_COL              = 'condt_ijm'
     dm.MASSE_G3_COL               = 'Masse unitaire troisième materiaux (g)'
     dm.MATERIAU3_COL              = 'Matériau troisième materiaux'
 
@@ -349,6 +350,55 @@ class TestMassBasedEmissions(unittest.TestCase):
             'ZZ99', 'Inconnu', quantity=5
         )
         self.assertEqual(emission, 0.0)
+        self.assertEqual(missing, [])
+
+    def test_conditionnement_choisit_la_bonne_ligne(self):
+        """Deux consommables de même nom doivent rester distingués par conditionnement."""
+        df = pd.DataFrame([
+            {
+                'Code NACRES': 'NA25',
+                'Consommable': 'Talc',
+                'Masse unitaire (g)': 1000.0,
+                'Matériau consommable': 'Matériau 1 kg',
+                'Masse unitaire deuxieme materiaux (g)': 0.0,
+                'Matériau deuxieme materiaux': '',
+                'Masse emballage unitaire (g)': 0.0,
+                'Matériau emballage': '',
+                'Masse condionnement (g)': 0.0,
+                'Matériau conditionnement': '',
+                'Nbr par conditionnement': 1,
+                'condt_ijm': '1 kg',
+            },
+            {
+                'Code NACRES': 'NA25',
+                'Consommable': 'Talc',
+                'Masse unitaire (g)': 5000.0,
+                'Matériau consommable': 'Matériau 5 kg',
+                'Masse unitaire deuxieme materiaux (g)': 0.0,
+                'Matériau deuxieme materiaux': '',
+                'Masse emballage unitaire (g)': 0.0,
+                'Matériau emballage': '',
+                'Masse condionnement (g)': 0.0,
+                'Matériau conditionnement': '',
+                'Nbr par conditionnement': 1,
+                'condt_ijm': '5 kg',
+            },
+        ])
+        dm = _make_dm(
+            data_masse=df,
+            material_map={
+                'Matériau 1 kg': (1.0, 0.0),
+                'Matériau 5 kg': (2.0, 0.0),
+            },
+        )
+        calc = CarbonCalculator(dm)
+
+        emission, masse, unc, missing = calc._calculate_mass_based_emissions_old(
+            'NA25', 'Talc', quantity=1, packaging='5 kg'
+        )
+
+        self.assertAlmostEqual(masse, 5.0)
+        self.assertAlmostEqual(emission, 10.0)
         self.assertEqual(missing, [])
 
 

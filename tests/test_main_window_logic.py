@@ -83,6 +83,7 @@ def _make_mock_dm():
     dm.FACTEUR_LIQUIDE_SOURCE_COL   = 'Facteur liquide source'
     dm.UNITE_LIQUIDE_COL            = 'Unité liquide'
     dm.VOLUME_FLACON_COL            = 'Volume flacon (mL)'
+    dm.CONDT_IJM_COL                = 'condt_ijm'
     dm.TRANSPORT_DEFAULT            = 'Inconnue (défaut)'
     dm.get_liquid_data.return_value  = None
     dm.get_prix_unitaire_info.return_value = None

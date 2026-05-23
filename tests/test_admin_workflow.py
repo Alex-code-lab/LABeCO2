@@ -26,6 +26,7 @@ def _make_db() -> sqlite3.Connection:
         CREATE TABLE emission_factors (
             id TEXT PRIMARY KEY,
             name TEXT,
+            factor_type TEXT,
             source_id TEXT,
             co2_factor REAL,
             status TEXT
@@ -167,6 +168,35 @@ def test_product_with_units_per_pack_has_packaging_context():
 
     assert "missing_packaging" not in {issue.rule for issue in issues}
     assert not [issue for issue in issues if issue.severity == "ERROR"]
+
+
+def test_liquid_factor_without_co2_is_warning_not_blocking():
+    conn = _make_db()
+    row = {
+        "id": "ef1",
+        "name": "Facteur liquide incomplet",
+        "factor_type": "liquid",
+        "source_id": "src1",
+    }
+
+    issues = check_entry_quality(conn, "emission_factors", row)
+
+    assert "missing_co2_factor" in {issue.rule for issue in issues if issue.severity == "WARNING"}
+    assert not [issue for issue in issues if issue.severity == "ERROR"]
+
+
+def test_material_factor_without_co2_is_blocking():
+    conn = _make_db()
+    row = {
+        "id": "ef1",
+        "name": "Facteur matériau incomplet",
+        "factor_type": "material",
+        "source_id": "src1",
+    }
+
+    issues = check_entry_quality(conn, "emission_factors", row)
+
+    assert "missing_co2_factor" in {issue.rule for issue in issues if issue.severity == "ERROR"}
 
 
 def test_promote_pending_products_promotes_only_complete_rows():

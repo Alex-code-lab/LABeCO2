@@ -206,6 +206,53 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
         self.assertEqual(info["source_catalogue"], "Catalogue IJM 2025")
         self.assertEqual(info["validation"], "Draft - modification")
 
+    def test_prix_unitaire_distingue_le_conditionnement(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Prix du conditionnement": 12.0,
+                "Nbr par conditionnement": 1,
+                "condt_ijm": "1 kg",
+            },
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Prix du conditionnement": 45.0,
+                "Nbr par conditionnement": 1,
+                "condt_ijm": "5 kg",
+            },
+        ])
+
+        info = dm.get_prix_unitaire_info("NA25", "Talc", "5 kg")
+
+        self.assertIsNotNone(info)
+        self.assertEqual(info["conditionnement"], "5 kg")
+        self.assertEqual(info["prix_ht"], 45.0)
+
+    def test_get_consumable_row_distingue_le_conditionnement(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Masse unitaire (g)": 1000,
+                "condt_ijm": "1 kg",
+            },
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Masse unitaire (g)": 5000,
+                "condt_ijm": "5 kg",
+            },
+        ])
+
+        row = dm.get_consumable_row("NA25", "Talc", "5 kg")
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["Masse unitaire (g)"], 5000)
+
     def test_ligne_manuelle_exacte_sans_prix_ne_fuzzy_match_pas(self):
         dm = _make_dm()
         dm.data_masse = pd.DataFrame([
