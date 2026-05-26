@@ -112,6 +112,7 @@ _qtwidgets.QFileDialog = type("QFileDialog", (), {})
 _qtwidgets.QToolTip = type("QToolTip", (), {})
 _qtwidgets.QScrollArea = type("QScrollArea", (), {})
 _qtwidgets.QSizePolicy = type("QSizePolicy", (), {})
+_qtwidgets.QListView = type("QListView", (), {})
 
 _qtcore = types.ModuleType("PySide6.QtCore")
 _qtcore.Signal = _FakeSignal

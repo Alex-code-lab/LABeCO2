@@ -24,6 +24,7 @@ from PySide6.QtGui import QColor, QFont, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -1171,6 +1172,11 @@ class QualityTab(QWidget):
     _ENT = 4
     _DET = 5
     _HEADERS = ["", "Sévérité", "Table", "Message", "Entrée", "Détail"]
+    _ROLE_ROW_ID = Qt.ItemDataRole.UserRole
+    _ROLE_SEVERITY = Qt.ItemDataRole.UserRole + 1
+    _ROLE_AUX_ID = Qt.ItemDataRole.UserRole + 2
+    _ROLE_RULE = Qt.ItemDataRole.UserRole + 3
+    _ROLE_RELATED_IDS = Qt.ItemDataRole.UserRole + 4
 
     def __init__(self, db_path: Path):
         super().__init__()
@@ -1207,8 +1213,12 @@ class QualityTab(QWidget):
         btn_none.setMaximumWidth(70)
         btn_none.clicked.connect(self._select_none)
         sel_bar.addWidget(btn_none)
+        self.btn_compare_duplicates = QPushButton("Comparer les occurrences")
+        self.btn_compare_duplicates.setEnabled(False)
+        self.btn_compare_duplicates.clicked.connect(self._compare_selected_occurrences)
+        sel_bar.addWidget(self.btn_compare_duplicates)
         sel_bar.addStretch()
-        hint = QLabel("Double-clic → accéder au produit dans Catalogue fournisseurs")
+        hint = QLabel("Double-clic → ouvrir/comparer")
         hint.setStyleSheet("color: gray; font-style: italic; font-size: 11px;")
         sel_bar.addWidget(hint)
         root.addLayout(sel_bar)
@@ -1222,6 +1232,7 @@ class QualityTab(QWidget):
         hdr.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         hdr.setStretchLastSection(True)
         self.table.cellDoubleClicked.connect(self._on_double_click)
+        self.table.itemSelectionChanged.connect(self._update_action_bar)
         self.table.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.table)
 
@@ -1324,14 +1335,17 @@ class QualityTab(QWidget):
                     issue.table == "commercial_products"
                     or issue.rule == "component_material_missing"
                 )
+                and issue.rule != "duplicate_product"
             )
 
             chk = QTableWidgetItem()
             chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             chk.setCheckState(Qt.CheckState.Unchecked)
-            chk.setData(Qt.ItemDataRole.UserRole,     issue.row_id)
-            chk.setData(Qt.ItemDataRole.UserRole + 1, issue.severity)
-            chk.setData(Qt.ItemDataRole.UserRole + 2, issue.aux_id)
+            chk.setData(self._ROLE_ROW_ID, issue.row_id)
+            chk.setData(self._ROLE_SEVERITY, issue.severity)
+            chk.setData(self._ROLE_AUX_ID, issue.aux_id)
+            chk.setData(self._ROLE_RULE, issue.rule)
+            chk.setData(self._ROLE_RELATED_IDS, list(issue.related_ids))
             chk.setBackground(color)
             self.table.setItem(r, self._CHK, chk)
 
@@ -1349,6 +1363,11 @@ class QualityTab(QWidget):
                 item.setForeground(_black)
                 if c == self._MSG:
                     tip = issue.rule or ""
+                    if issue.rule == "duplicate_product" and issue.related_ids:
+                        tip = (
+                            f"{tip}\n{len(issue.related_ids)} occurrence(s) détectée(s). "
+                            "Double-clic ou bouton → comparer."
+                        )
                     if navigable:
                         tip = (tip + "\n" if tip else "") + "Double-clic → ouvrir dans Catalogue fournisseurs"
                     if tip:
@@ -1369,15 +1388,21 @@ class QualityTab(QWidget):
     def _update_action_bar(self) -> None:
         n = 0
         n_orphans = 0
+        can_compare = False
         for r in range(self.table.rowCount()):
             chk = self.table.item(r, self._CHK)
             if chk and chk.checkState() == Qt.CheckState.Checked:
                 n += 1
-                if chk.data(Qt.ItemDataRole.UserRole + 2):
+                if chk.data(self._ROLE_AUX_ID):
                     n_orphans += 1
+                if self._duplicate_ids_for_row(r):
+                    can_compare = True
+        if not can_compare and self.table.currentRow() >= 0:
+            can_compare = bool(self._duplicate_ids_for_row(self.table.currentRow()))
         self.checked_label.setText(f"{n} ligne(s) cochée(s)")
         self.btn_apply.setEnabled(n > 0 and bool(self.nacres_combo.currentData()))
         self.btn_delete_orphans.setEnabled(n_orphans > 0)
+        self.btn_compare_duplicates.setEnabled(can_compare)
         if n_orphans > 0:
             self.btn_delete_orphans.setText(
                 f"Supprimer {n_orphans} composant(s) orphelin(s) sélectionné(s)"
@@ -1390,7 +1415,7 @@ class QualityTab(QWidget):
         for r in range(self.table.rowCount()):
             chk = self.table.item(r, self._CHK)
             if chk:
-                sev = chk.data(Qt.ItemDataRole.UserRole + 1)
+                sev = chk.data(self._ROLE_SEVERITY)
                 chk.setCheckState(
                     Qt.CheckState.Checked if sev == severity else Qt.CheckState.Unchecked
                 )
@@ -1415,11 +1440,11 @@ class QualityTab(QWidget):
             QMessageBox.warning(self, "NACRES requis", "Sélectionnez un code NACRES dans la liste.")
             return
         product_ids = {
-            chk.data(Qt.ItemDataRole.UserRole)
+            chk.data(self._ROLE_ROW_ID)
             for r in range(self.table.rowCount())
             if (chk := self.table.item(r, self._CHK))
             and chk.checkState() == Qt.CheckState.Checked
-            and chk.data(Qt.ItemDataRole.UserRole)
+            and chk.data(self._ROLE_ROW_ID)
         }
         if not product_ids:
             QMessageBox.information(self, "Aucune cible", "Aucune ligne cochée n'a de produit associé.")
@@ -1453,11 +1478,11 @@ class QualityTab(QWidget):
 
     def _delete_orphan_components(self) -> None:
         comp_ids = {
-            chk.data(Qt.ItemDataRole.UserRole + 2)
+            chk.data(self._ROLE_AUX_ID)
             for r in range(self.table.rowCount())
             if (chk := self.table.item(r, self._CHK))
             and chk.checkState() == Qt.CheckState.Checked
-            and chk.data(Qt.ItemDataRole.UserRole + 2)
+            and chk.data(self._ROLE_AUX_ID)
         }
         if not comp_ids:
             return
@@ -1489,12 +1514,173 @@ class QualityTab(QWidget):
         self._run()
 
     def _on_double_click(self, row: int, _: int) -> None:
+        if self._duplicate_ids_for_row(row):
+            self._show_occurrence_comparison(row)
+            return
         chk = self.table.item(row, self._CHK)
         if not chk:
             return
-        row_id = chk.data(Qt.ItemDataRole.UserRole)
+        row_id = chk.data(self._ROLE_ROW_ID)
         if row_id:
             self.navigate_to.emit(str(row_id))
+
+    def _selected_duplicate_row(self) -> int:
+        current = self.table.currentRow()
+        if current >= 0 and self._duplicate_ids_for_row(current):
+            return current
+        for r in range(self.table.rowCount()):
+            chk = self.table.item(r, self._CHK)
+            if chk and chk.checkState() == Qt.CheckState.Checked and self._duplicate_ids_for_row(r):
+                return r
+        return -1
+
+    def _duplicate_ids_for_row(self, row: int) -> list[str]:
+        if row < 0:
+            return []
+        chk = self.table.item(row, self._CHK)
+        if not chk or chk.data(self._ROLE_RULE) != "duplicate_product":
+            return []
+        ids = chk.data(self._ROLE_RELATED_IDS) or []
+        return [str(pid) for pid in ids if pid]
+
+    def _compare_selected_occurrences(self) -> None:
+        row = self._selected_duplicate_row()
+        if row < 0:
+            QMessageBox.information(
+                self,
+                "Aucun doublon sélectionné",
+                "Sélectionnez une ligne « Doublon probable » pour comparer les occurrences.",
+            )
+            return
+        self._show_occurrence_comparison(row)
+
+    def _show_occurrence_comparison(self, row: int) -> None:
+        product_ids = self._duplicate_ids_for_row(row)
+        if len(product_ids) < 2:
+            return
+        try:
+            rows = self._fetch_product_occurrences(product_ids)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger les occurrences : {e}")
+            return
+        if not rows:
+            QMessageBox.information(self, "Aucune occurrence", "Les produits concernés sont introuvables.")
+            return
+        self._show_occurrence_dialog(rows)
+
+    def _fetch_product_occurrences(self, product_ids: list[str]) -> list[sqlite3.Row]:
+        placeholders = ",".join("?" * len(product_ids))
+        order_expr = "CASE cp.id " + " ".join(
+            f"WHEN ? THEN {i}" for i, _ in enumerate(product_ids)
+        ) + " END"
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            return conn.execute(
+                f"""
+                SELECT cp.id, cp.name, cp.brand, cp.reference, cp.code_nacres,
+                       cp.product_type, cp.sold_packaging_label,
+                       cp.units_per_sold_packaging, cp.price_sold_packaging,
+                       cp.sold_unit_volume_ml, cp.capacity_volume_ml, cp.status,
+                       ef.name AS factor_name,
+                       s.title AS source_title,
+                       c.name AS contributor_name,
+                       (
+                           SELECT COUNT(*)
+                           FROM product_components pc
+                           WHERE pc.product_id = cp.id
+                             AND pc.mass_g IS NOT NULL
+                       ) AS component_count
+                FROM commercial_products cp
+                LEFT JOIN emission_factors ef ON ef.id = cp.emission_factor_id
+                LEFT JOIN sources s ON s.id = cp.source_id
+                LEFT JOIN contributors c ON c.id = cp.contributor_id
+                WHERE cp.id IN ({placeholders})
+                ORDER BY {order_expr}
+                """,
+                [*product_ids, *product_ids],
+            ).fetchall()
+        finally:
+            conn.close()
+
+    def _show_occurrence_dialog(self, rows: list[sqlite3.Row]) -> None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Comparer les occurrences possibles")
+        dlg.resize(1300, 420)
+        layout = QVBoxLayout(dlg)
+
+        label = QLabel(
+            f"{len(rows)} occurrence(s) possible(s). "
+            "Comparez référence, conditionnement, prix, type, FE et statut avant d'arbitrer."
+        )
+        label.setStyleSheet("color: #f2f2f2;")
+        layout.addWidget(label)
+
+        headers = [
+            "Nom", "Marque", "Référence", "NACRES", "Type", "Conditionnement",
+            "Unités", "Prix (€)", "Volume vendu", "Capacité", "FE lié",
+            "Composants", "Statut", "Source", "Contributeur", "ID",
+        ]
+        table = QTableWidget(len(rows), len(headers), dlg)
+        table.setHorizontalHeaderLabels(headers)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setStyleSheet(
+            "QTableWidget { background: #ffffff; color: #111111; gridline-color: #c8c8c8; }"
+            "QHeaderView::section { background: #eeeeee; color: #111111; }"
+            "QTableWidget::item:selected { background: #d6ebff; color: #111111; }"
+        )
+
+        for r, product in enumerate(rows):
+            values = [
+                product["name"],
+                product["brand"],
+                product["reference"],
+                product["code_nacres"],
+                product["product_type"],
+                product["sold_packaging_label"],
+                product["units_per_sold_packaging"],
+                product["price_sold_packaging"],
+                product["sold_unit_volume_ml"],
+                product["capacity_volume_ml"],
+                product["factor_name"],
+                product["component_count"],
+                product["status"],
+                product["source_title"],
+                product["contributor_name"],
+                product["id"],
+            ]
+            for c, value in enumerate(values):
+                item = QTableWidgetItem("" if value is None else str(value))
+                item.setForeground(QColor(0, 0, 0))
+                item.setBackground(QColor(255, 255, 255))
+                table.setItem(r, c, item)
+
+        table.resizeColumnsToContents()
+        table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(table)
+
+        buttons = QHBoxLayout()
+        btn_open = QPushButton("Ouvrir la ligne sélectionnée")
+        btn_close = QPushButton("Fermer")
+        buttons.addStretch()
+        buttons.addWidget(btn_open)
+        buttons.addWidget(btn_close)
+        layout.addLayout(buttons)
+
+        def open_selected() -> None:
+            current = table.currentRow()
+            if current < 0:
+                return
+            product_id_item = table.item(current, len(headers) - 1)
+            if product_id_item:
+                dlg.accept()
+                self.navigate_to.emit(product_id_item.text())
+
+        table.cellDoubleClicked.connect(lambda *_: open_selected())
+        btn_open.clicked.connect(open_selected)
+        btn_close.clicked.connect(dlg.accept)
+        dlg.exec()
 
 
 # ============================================================

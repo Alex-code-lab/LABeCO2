@@ -688,6 +688,18 @@ class ValidateWidget(QWidget):
             return f"WHERE {alias}.status = 'draft'"
         return ""
 
+    def _disconnect_item_changed(self) -> None:
+        """Supprime toutes les connexions connues vers _on_item_changed."""
+        for _ in range(8):
+            try:
+                self.table_widget.itemChanged.disconnect(self._on_item_changed)
+            except (RuntimeError, TypeError):
+                break
+
+    def _connect_item_changed_once(self) -> None:
+        self._disconnect_item_changed()
+        self.table_widget.itemChanged.connect(self._on_item_changed)
+
     def _load_table(self) -> None:
         # Avertir si des modifications non sauvegardées vont être perdues
         if self._pending_edits:
@@ -705,10 +717,7 @@ class ValidateWidget(QWidget):
 
         self._refresh_legend()
         selected_key = self.table_combo.currentData()
-        try:
-            self.table_widget.itemChanged.disconnect()
-        except RuntimeError:
-            pass
+        self._disconnect_item_changed()
 
         conn = sqlite3.connect(self.sqlite_path)
         conn.row_factory = sqlite3.Row
@@ -721,7 +730,7 @@ class ValidateWidget(QWidget):
 
         conn.close()
         self.detail_view.clear()
-        self.table_widget.itemChanged.connect(self._on_item_changed)
+        self._connect_item_changed_once()
         self._filter_rows(self.search_edit.text())
         self._update_sel_count()
 
@@ -832,107 +841,105 @@ class ValidateWidget(QWidget):
         display_headers: list[str],
         show_table_col: bool,
     ) -> None:
+        was_sorting = self.table_widget.isSortingEnabled()
         self.table_widget.blockSignals(True)
         self.table_widget.setSortingEnabled(False)
-        self.table_widget.clearContents()
-        self.table_widget.setRowCount(len(rows_all))
-        self.table_widget.setColumnCount(1 + len(display_headers))
-        self.table_widget.setHorizontalHeaderLabels([""] + display_headers)
-        self.table_widget.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Fixed
-        )
-        self.table_widget.setColumnWidth(0, 28)
-        column_widths = (
-            ("Type", 95),
-            ("NACRES", 80),
-            ("Nom", 230),
-            ("Marque", 130),
-            ("Référence", 110),
-            ("Conditionnement", 145),
-            ("Prix (€)", 80),
-            ("Volume vendu (mL)", 115),
-            ("Capacité (mL)", 105),
-            ("Nbr cond.", 80),
-            ("FE lié", 180),
-            ("FE liquide", 180),
-            ("FE matériau", 180),
-            ("CO₂", 90),
-            ("CO₂ FE", 90),
-            ("Fournisseur", 115),
-            ("Version catalogue", 120),
-            ("Source", 180),
-            ("Lien / Note / Remarque", 220),
-        )
-        for header, width in column_widths:
-            if header in display_headers:
-                col = 1 + display_headers.index(header)
-                self.table_widget.horizontalHeader().setSectionResizeMode(
-                    col, QHeaderView.ResizeMode.Interactive
-                )
-                self.table_widget.setColumnWidth(col, width)
-
-        # Index des colonnes "Statut" et "Source" dans les valeurs affichées
         try:
-            status_col_idx = display_headers.index("Statut")
-        except ValueError:
-            status_col_idx = -1
-        try:
-            src_col_idx = display_headers.index("Source")
-        except ValueError:
-            src_col_idx = -1
+            self.table_widget.clearContents()
+            self.table_widget.setRowCount(len(rows_all))
+            self.table_widget.setColumnCount(1 + len(display_headers))
+            self.table_widget.setHorizontalHeaderLabels([""] + display_headers)
+            self.table_widget.horizontalHeader().setSectionResizeMode(
+                0, QHeaderView.ResizeMode.Fixed
+            )
+            self.table_widget.setColumnWidth(0, 28)
+            column_widths = (
+                ("Type", 95),
+                ("NACRES", 80),
+                ("Nom", 230),
+                ("Marque", 130),
+                ("Référence", 110),
+                ("Conditionnement", 145),
+                ("Prix (€)", 80),
+                ("Volume vendu (mL)", 115),
+                ("Capacité (mL)", 105),
+                ("Nbr cond.", 80),
+                ("FE lié", 180),
+                ("FE liquide", 180),
+                ("FE matériau", 180),
+                ("CO₂", 90),
+                ("CO₂ FE", 90),
+                ("Fournisseur", 115),
+                ("Version catalogue", 120),
+                ("Source", 180),
+                ("Lien / Note / Remarque", 220),
+            )
+            for header, width in column_widths:
+                if header in display_headers:
+                    col = 1 + display_headers.index(header)
+                    self.table_widget.horizontalHeader().setSectionResizeMode(
+                        col, QHeaderView.ResizeMode.Interactive
+                    )
+                    self.table_widget.setColumnWidth(col, width)
 
-        # Offset pour accéder aux vals[] (les display_headers incluent "Table" si show_table_col)
-        val_offset = 1 if show_table_col else 0
+            try:
+                status_col_idx = display_headers.index("Statut")
+            except ValueError:
+                status_col_idx = -1
+            try:
+                src_col_idx = display_headers.index("Source")
+            except ValueError:
+                src_col_idx = -1
 
-        # Construire la carte col_index → db_field pour les cellules éditables (single-table uniquement)
-        self._editable_col_to_field = {}
-        if not show_table_col:
-            for i, header in enumerate(display_headers):
-                field = _CP_EDITABLE_FIELDS.get(header)
-                if field:
-                    self._editable_col_to_field[1 + i] = field  # +1 pour la col CHK
+            val_offset = 1 if show_table_col else 0
 
-        for r, (db_table, row_id, vals) in enumerate(rows_all):
-            status_val = ""
-            source_val = ""
-            if status_col_idx >= 0:
-                status_val = str(vals[status_col_idx - val_offset] or "")
-            if src_col_idx >= 0:
-                source_val = str(vals[src_col_idx - val_offset] or "")
-            row_color = _row_color(status_val or "draft", bool(source_val.strip()))
+            self._editable_col_to_field = {}
+            if not show_table_col:
+                for i, header in enumerate(display_headers):
+                    field = _CP_EDITABLE_FIELDS.get(header)
+                    if field:
+                        self._editable_col_to_field[1 + i] = field
 
-            # Checkbox
-            chk = _item("", row_color)
-            chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            chk.setCheckState(Qt.CheckState.Unchecked)
-            chk.setData(Qt.ItemDataRole.UserRole, (db_table, row_id))
-            self.table_widget.setItem(r, 0, chk)
+            for r, (db_table, row_id, vals) in enumerate(rows_all):
+                status_val = ""
+                source_val = ""
+                if status_col_idx >= 0:
+                    status_val = str(vals[status_col_idx - val_offset] or "")
+                if src_col_idx >= 0:
+                    source_val = str(vals[src_col_idx - val_offset] or "")
+                row_color = _row_color(status_val or "draft", bool(source_val.strip()))
 
-            col_offset = 1
-            if show_table_col:
-                tbl_item = _item(TABLES_META[db_table]["label"], row_color)
-                tbl_item.setFont(QFont("", -1, QFont.Weight.Bold))
-                self.table_widget.setItem(r, 1, tbl_item)
-                col_offset = 2
+                chk = _item("", row_color)
+                chk.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+                chk.setCheckState(Qt.CheckState.Unchecked)
+                chk.setData(Qt.ItemDataRole.UserRole, (db_table, row_id))
+                self.table_widget.setItem(r, 0, chk)
 
-            for c, val in enumerate(vals):
-                header = display_headers[c + val_offset] if show_table_col else display_headers[c]
-                display_value = val
-                if header == "Statut":
-                    display_value = _status_label(str(val or ""))
-                elif header == "Type":
-                    display_value = _type_label(str(val or ""))
-                cell = _item(display_value, row_color)
-                table_col = col_offset + c
-                if (db_table == "commercial_products"
-                        and not show_table_col
-                        and table_col in self._editable_col_to_field):
-                    cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
-                    cell.setToolTip("Double-clic pour modifier")
-                self.table_widget.setItem(r, table_col, cell)
+                col_offset = 1
+                if show_table_col:
+                    tbl_item = _item(TABLES_META[db_table]["label"], row_color)
+                    tbl_item.setFont(QFont("", -1, QFont.Weight.Bold))
+                    self.table_widget.setItem(r, 1, tbl_item)
+                    col_offset = 2
 
-        self.table_widget.setSortingEnabled(True)
-        self.table_widget.blockSignals(False)
+                for c, val in enumerate(vals):
+                    header = display_headers[c + val_offset] if show_table_col else display_headers[c]
+                    display_value = val
+                    if header == "Statut":
+                        display_value = _status_label(str(val or ""))
+                    elif header == "Type":
+                        display_value = _type_label(str(val or ""))
+                    cell = _item(display_value, row_color)
+                    table_col = col_offset + c
+                    if (db_table == "commercial_products"
+                            and not show_table_col
+                            and table_col in self._editable_col_to_field):
+                        cell.setFlags(cell.flags() | Qt.ItemFlag.ItemIsEditable)
+                        cell.setToolTip("Double-clic pour modifier")
+                    self.table_widget.setItem(r, table_col, cell)
+        finally:
+            self.table_widget.setSortingEnabled(was_sorting)
+            self.table_widget.blockSignals(False)
 
     # ------------------------------------------------------------------
     # Sélection
@@ -940,16 +947,24 @@ class ValidateWidget(QWidget):
 
     def _check_all(self) -> None:
         self.table_widget.blockSignals(True)
-        for r in range(self.table_widget.rowCount()):
-            self.table_widget.item(r, 0).setCheckState(Qt.CheckState.Checked)
-        self.table_widget.blockSignals(False)
+        try:
+            for r in range(self.table_widget.rowCount()):
+                item = self.table_widget.item(r, 0)
+                if item:
+                    item.setCheckState(Qt.CheckState.Checked)
+        finally:
+            self.table_widget.blockSignals(False)
         self._update_sel_count()
 
     def _uncheck_all(self) -> None:
         self.table_widget.blockSignals(True)
-        for r in range(self.table_widget.rowCount()):
-            self.table_widget.item(r, 0).setCheckState(Qt.CheckState.Unchecked)
-        self.table_widget.blockSignals(False)
+        try:
+            for r in range(self.table_widget.rowCount()):
+                item = self.table_widget.item(r, 0)
+                if item:
+                    item.setCheckState(Qt.CheckState.Unchecked)
+        finally:
+            self.table_widget.blockSignals(False)
         self._update_sel_count()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
@@ -989,52 +1004,54 @@ class ValidateWidget(QWidget):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
         try:
-            conn = sqlite3.connect(self.sqlite_path)
-            for (db_table, row_id), changes in self._pending_edits.items():
-                if db_table != "commercial_products":
-                    continue
-                clean = {k: v for k, v in changes.items() if k in _CP_ALLOWED_FIELDS}
-                if not clean:
-                    continue
-                params: dict = {}
-                for field, val in clean.items():
-                    if field in _CP_NUMERIC_FIELDS:
-                        try:
-                            params[field] = float(val.replace(",", ".")) if val.strip() else None
-                        except ValueError:
-                            params[field] = None
-                    else:
-                        params[field] = val or None
-                set_clauses = ", ".join(f"{k} = ?" for k in params)
-                values = list(params.values()) + [now, row_id]
-                conn.execute(
-                    f"UPDATE commercial_products SET {set_clauses}, updated_at = ? WHERE id = ?",
-                    values,
-                )
-            conn.commit()
-            conn.close()
+            with sqlite3.connect(self.sqlite_path) as conn:
+                for (db_table, row_id), changes in self._pending_edits.items():
+                    if db_table != "commercial_products":
+                        continue
+                    clean = {k: v for k, v in changes.items() if k in _CP_ALLOWED_FIELDS}
+                    if not clean:
+                        continue
+                    params: dict = {}
+                    for field, val in clean.items():
+                        if field in _CP_NUMERIC_FIELDS:
+                            try:
+                                params[field] = float(val.replace(",", ".")) if val.strip() else None
+                            except ValueError:
+                                params[field] = None
+                        else:
+                            params[field] = val or None
+                    if not params:
+                        continue
+                    set_clauses = ", ".join(f"{k} = ?" for k in params)
+                    values = list(params.values()) + [now, row_id]
+                    conn.execute(
+                        f"UPDATE commercial_products SET {set_clauses}, updated_at = ? WHERE id = ?",
+                        values,
+                    )
         except Exception as e:
             _admin_message(self, "Erreur", f"Impossible de sauvegarder : {e}")
             return
         n = len(self._pending_edits)
         # Réinitialiser les fonds jaunes sans recharger toute la table (évite le freeze)
         self.table_widget.blockSignals(True)
-        for r in range(self.table_widget.rowCount()):
-            chk = self.table_widget.item(r, 0)
-            if not chk:
-                continue
-            data = chk.data(Qt.ItemDataRole.UserRole)
-            if not isinstance(data, tuple) or len(data) < 2:
-                continue
-            key = (data[0], data[1])
-            if key not in self._pending_edits:
-                continue
-            orig_bg = chk.background()
-            for col in self._editable_col_to_field:
-                cell = self.table_widget.item(r, col)
-                if cell:
-                    cell.setBackground(orig_bg)
-        self.table_widget.blockSignals(False)
+        try:
+            for r in range(self.table_widget.rowCount()):
+                chk = self.table_widget.item(r, 0)
+                if not chk:
+                    continue
+                data = chk.data(Qt.ItemDataRole.UserRole)
+                if not isinstance(data, tuple) or len(data) < 2:
+                    continue
+                key = (data[0], data[1])
+                if key not in self._pending_edits:
+                    continue
+                orig_bg = chk.background()
+                for col in self._editable_col_to_field:
+                    cell = self.table_widget.item(r, col)
+                    if cell:
+                        cell.setBackground(orig_bg)
+        finally:
+            self.table_widget.blockSignals(False)
         self._pending_edits.clear()
         self._update_pending_label()
         _admin_message(self, "Sauvegardé", f"{n} produit(s) mis à jour.")
@@ -1226,18 +1243,24 @@ class ValidateWidget(QWidget):
 
     def _refresh_after_validate(self, validated_entries: list[tuple[str, str]]) -> None:
         """Met à jour la table après validation sans recharger tous les widgets (évite le freeze)."""
-        validated_set = set(validated_entries)
+        self._refresh_after_status_change(validated_entries, "validated")
+
+    def _refresh_after_reject(self, rejected_entries: list[tuple[str, str]]) -> None:
+        """Met à jour la table après rejet sans rechargement complet."""
+        self._refresh_after_status_change(rejected_entries, "deprecated")
+
+    def _refresh_after_status_change(self, entries: list[tuple[str, str]], new_status: str) -> None:
+        changed_set = set(entries)
         status_filter = self.status_combo.currentData()
-        keep_in_view = status_filter in ("all", "validated")
+        keep_in_view = status_filter in ("all", new_status)
         status_col = self._column_index("Statut")
         search_text = self.search_edit.text()
+        color = _COLOR_DEPRECATED if new_status == "deprecated" else _COLOR_VALIDATED
+        label = _status_label(new_status)
 
         # Déconnecter itemChanged et couper le tri : modifier "Statut" peut déplacer
         # les lignes si le tableau est trié, ce qui laisse des coches/edits fantômes.
-        try:
-            self.table_widget.itemChanged.disconnect(self._on_item_changed)
-        except (RuntimeError, TypeError):
-            pass
+        self._disconnect_item_changed()
 
         was_sorting = self.table_widget.isSortingEnabled()
         self.table_widget.blockSignals(True)
@@ -1253,18 +1276,18 @@ class ValidateWidget(QWidget):
                 if not isinstance(data, tuple) or len(data) < 2:
                     continue
                 entry_key = (data[0], data[1])
-                if entry_key not in validated_set:
+                if entry_key not in changed_set:
                     continue
                 if keep_in_view:
                     for col in range(self.table_widget.columnCount()):
                         cell = self.table_widget.item(r, col)
                         if cell:
-                            cell.setBackground(_COLOR_VALIDATED)
+                            cell.setBackground(color)
                             cell.setForeground(_BLACK)
                     if status_col >= 0:
                         s_item = self.table_widget.item(r, status_col)
                         if s_item:
-                            s_item.setText(_STATUS_LABEL.get("validated", "Validé"))
+                            s_item.setText(label)
                     chk.setCheckState(Qt.CheckState.Unchecked)
                     chk.setSelected(False)
                 else:
@@ -1273,15 +1296,13 @@ class ValidateWidget(QWidget):
             for r in reversed(rows_to_remove):
                 self.table_widget.removeRow(r)
 
-            # Nettoyer les pending_edits des entrées qui viennent d'être validées
-            for entry in validated_set:
+            for entry in changed_set:
                 self._pending_edits.pop(entry, None)
         finally:
             self.table_widget.setSortingEnabled(was_sorting)
             self.table_widget.blockSignals(False)
 
-        # Reconnecter itemChanged (garantit que le handler est actif après la mise à jour)
-        self.table_widget.itemChanged.connect(self._on_item_changed)
+        self._connect_item_changed_once()
 
         self.detail_view.clear()
         self._filter_rows(search_text)
@@ -1312,7 +1333,7 @@ class ValidateWidget(QWidget):
         QApplication.restoreOverrideCursor()
         progress.close()
         _admin_message(self, "Succès", f"{len(entries)} entrée(s) rejetée(s).")
-        self._load_table()
+        self._refresh_after_reject(entries)
 
     def _on_edit(self) -> None:
         entries = self._selected_entries()

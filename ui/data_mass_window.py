@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog, QToolTip,
-    QScrollArea, QSizePolicy
+    QScrollArea, QSizePolicy, QListView
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QDoubleValidator, QIntValidator
@@ -555,6 +555,9 @@ class DataMassWindow(QMainWindow):
 
         # Instead of form_layout.addRow("Code NACRES:", self.nacres_input)
         self.nacres_combo = QComboBox()
+        self.nacres_combo.setView(QListView())
+        self.nacres_combo.setMaxVisibleItems(15)
+        self.nacres_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         nacres_layout = QVBoxLayout()
         nacres_layout.setContentsMargins(0, 0, 0, 0)
         nacres_layout.addWidget(self.nacres_combo)

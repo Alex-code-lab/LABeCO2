@@ -4,6 +4,7 @@
 import sqlite3
 import unittest
 
+from tools.admin import quality_rules
 from ui.quality_check import (
     QualityIssue,
     check_commercial_product,
@@ -21,6 +22,14 @@ def _errors(issues):
 
 def _warnings(issues):
     return [i for i in issues if i.severity == "WARNING"]
+
+
+class TestQualityFacade(unittest.TestCase):
+
+    def test_ui_quality_check_uses_common_engine(self):
+        self.assertIs(QualityIssue, quality_rules.QualityIssue)
+        self.assertIs(check_database, quality_rules.check_database)
+        self.assertIs(check_commercial_product, quality_rules.check_commercial_product)
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +255,31 @@ class TestCheckDatabase(unittest.TestCase):
         errs = [i for i in issues if i.rule == "negative_price"]
         self.assertEqual(len(errs), 1)
 
+    def test_missing_packaging_is_warning(self):
+        conn = _make_db()
+        conn.execute("""
+            INSERT INTO commercial_products
+            (id, name, reference, code_nacres, product_type, status)
+            VALUES ('p-pack', 'Produit sans conditionnement', 'REF', 'NB11', 'solid', 'validated')
+        """)
+        conn.commit()
+        issues = check_database(conn)
+        warns = [i for i in issues if i.rule == "missing_packaging"]
+        self.assertEqual(len(warns), 1)
+        self.assertEqual(warns[0].severity, "WARNING")
+
+    def test_units_per_pack_suffices_for_packaging_context(self):
+        conn = _make_db()
+        conn.execute("""
+            INSERT INTO commercial_products
+            (id, name, reference, code_nacres, product_type, units_per_sold_packaging, status)
+            VALUES ('p-pack-ok', 'Produit unitaire', 'REF', 'NB11', 'solid', 1, 'validated')
+        """)
+        conn.commit()
+        issues = check_database(conn)
+        warns = [i for i in issues if i.rule == "missing_packaging"]
+        self.assertEqual(warns, [])
+
     def test_factor_without_source_is_error(self):
         conn = _make_db()
         conn.execute("""
@@ -313,13 +347,35 @@ class TestCheckDatabase(unittest.TestCase):
         conn = _make_db()
         for i in (1, 2):
             conn.execute(f"""
-                INSERT INTO commercial_products (id, name, code_nacres, product_type, status)
-                VALUES ('p{i}', 'Tube 15mL', 'NB11', 'solid', 'validated')
+                INSERT INTO commercial_products
+                (id, name, brand, reference, code_nacres, product_type, sold_packaging_label, status)
+                VALUES ('p{i}', 'Tube 15mL', 'Marque', 'REF', 'NB11', 'solid', '100 u', 'validated')
             """)
         conn.commit()
         issues = check_database(conn)
         warns = [i for i in issues if i.rule == "duplicate_product"]
         self.assertGreaterEqual(len(warns), 1)
+        self.assertEqual(set(warns[0].related_ids), {"p1", "p2"})
+        self.assertEqual(warns[0].row_id, "")
+
+    def test_same_name_with_different_packaging_is_not_duplicate(self):
+        conn = _make_db()
+        for product_id, reference, packaging in (
+            ("p1", "REF-1G", "1 g"),
+            ("p2", "REF-5G", "5 g"),
+        ):
+            conn.execute(
+                """
+                INSERT INTO commercial_products
+                (id, name, brand, reference, code_nacres, product_type, sold_packaging_label, status)
+                VALUES (?, 'Talc', 'Marque', ?, 'NB11', 'solid', ?, 'validated')
+                """,
+                (product_id, reference, packaging),
+            )
+        conn.commit()
+        issues = check_database(conn)
+        warns = [i for i in issues if i.rule == "duplicate_product"]
+        self.assertEqual(warns, [])
 
     def test_density_out_of_range_warning(self):
         conn = _make_db()

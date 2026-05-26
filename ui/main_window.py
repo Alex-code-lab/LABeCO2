@@ -78,6 +78,37 @@ _NACRES_NEW_NO_FE_TOOLTIP = (
     "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
     "de facteur d'émission pour cette catégorie."
 )
+_DETAIL_COMBO_WIDTH = 330
+_MAIN_SEARCH_WIDTH = 220
+_MAIN_COMBO_VISIBLE_ITEMS = 15
+
+
+class CompactPopupComboBox(QComboBox):
+    """QComboBox dont le popup reste à la taille de la case.
+
+    Sur macOS, les libellés NACRES longs peuvent faire ouvrir un popup très
+    large. On redimensionne explicitement la fenêtre du popup après ouverture
+    pour éviter le grand rectangle gris autour de la liste.
+    """
+
+    def showPopup(self) -> None:
+        super().showPopup()
+        width = self.width()
+        view = self.view()
+        popup = view.window()
+        view.setMinimumWidth(width)
+        view.setMaximumWidth(width)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        popup.setMinimumWidth(width)
+        popup.setMaximumWidth(width)
+        popup.resize(width, popup.height())
+
+
+def _configure_detail_combo(combo: QComboBox) -> None:
+    combo.setFixedWidth(_DETAIL_COMBO_WIDTH)
+    combo.setMaxVisibleItems(_MAIN_COMBO_VISIBLE_ITEMS)
+    combo.view().setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
 
 
 class MainWindow(QMainWindow):
@@ -478,14 +509,15 @@ class MainWindow(QMainWindow):
         # Sous-catégorie
         self.subcategory_label = QLabel('Sous-catégorie:')
         self.subcategory_combo = QComboBox()
+        self.subcategory_combo.setMaxVisibleItems(_MAIN_COMBO_VISIBLE_ITEMS)
 
         # Nom (subsub_name) + barre de recherche
         self.subsub_name_label = QLabel('Nom:')
-        self.subsub_name_combo = QComboBox()
-        self.subsub_name_combo.setFixedWidth(200)
+        self.subsub_name_combo = CompactPopupComboBox()
+        _configure_detail_combo(self.subsub_name_combo)
         self.search_label = QLabel('Recherche:')
         self.search_field = QLineEdit()
-        self.search_field.setFixedWidth(200)
+        self.search_field.setFixedWidth(_MAIN_SEARCH_WIDTH)
         self.reset_search_button = QToolButton()
         self.reset_search_button.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
         self.reset_search_button.setToolTip("Réinitialiser les recherches")
@@ -508,11 +540,11 @@ class MainWindow(QMainWindow):
         self.conso_filtered_label.setToolTip(
             "Matières premières, produits chimiques/biologiques et organismes vivants"
         )
-        self.conso_filtered_combo = QComboBox()
-        self.conso_filtered_combo.setFixedWidth(200)
+        self.conso_filtered_combo = CompactPopupComboBox()
+        _configure_detail_combo(self.conso_filtered_combo)
         self.conso_search_label = QLabel("Recherche:")
         self.conso_search_field = QLineEdit()
-        self.conso_search_field.setFixedWidth(200)
+        self.conso_search_field.setFixedWidth(_MAIN_SEARCH_WIDTH)
 
         self.indicator_conso = QLabel("✗")
         self.indicator_conso.setFixedWidth(20)

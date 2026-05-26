@@ -3,7 +3,8 @@
 
 import sqlite3
 
-from tools.admin.workflow import check_entry_quality, promote_pending_products
+from tools.admin import quality_rules
+from tools.admin.workflow import AdminIssue, check_entry_quality, promote_pending_products
 from ui.sqlite_schema import ensure_app_schema
 
 
@@ -73,6 +74,11 @@ def _make_db() -> sqlite3.Connection:
         "INSERT INTO nacres_codes(id, code, label, parent_code, statut_maj_2026) VALUES('n3','ZZ99','Ancien','ZZ','a_ne_plus_utiliser')"
     )
     return conn
+
+
+def test_workflow_uses_common_quality_issue_type():
+    assert AdminIssue is quality_rules.QualityIssue
+    assert check_entry_quality is quality_rules.check_entry_quality
 
 
 def test_product_quality_warns_deprecated_nacres_without_blocking():

@@ -74,6 +74,7 @@ QComboBox {
 
 QComboBox QAbstractItemView {
     background-color: #FFFFFF !important; /* Forcer la liste déroulante en blanc */
+    color: #000000;                       /* Texte lisible aussi en thème sombre */
     selection-background-color: #B0D0FF;   /* Couleur au survol/sélection */
     selection-color: #000000;             /* Texte au survol/sélection */
 }
