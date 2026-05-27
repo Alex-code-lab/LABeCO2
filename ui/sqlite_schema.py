@@ -146,9 +146,12 @@ def ensure_app_schema(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_SUPPLIER_PRICE_CACHE)
     conn.execute(_CREATE_SUPPLIER_SCRAPE_RUNS)
     conn.execute(_CREATE_SUPPLIER_FETCH_LOG)
+    # Une même page fournisseur peut exposer plusieurs variantes/références.
+    # L'unicité métier reste donc supplier + supplier_product_ref, pas l'URL.
+    conn.execute("DROP INDEX IF EXISTS idx_supplier_references_url")
     conn.execute(
         """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_references_url
+        CREATE INDEX IF NOT EXISTS idx_supplier_references_url
         ON supplier_references(supplier, product_url)
         WHERE product_url IS NOT NULL AND product_url != ''
         """
@@ -181,3 +184,13 @@ def ensure_app_schema(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN import_batch_id TEXT")
     if supplier_catalogue_columns and "row_hash" not in supplier_catalogue_columns:
         conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN row_hash TEXT")
+    if supplier_catalogue_columns and "product_url" not in supplier_catalogue_columns:
+        conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN product_url TEXT")
+    if supplier_catalogue_columns and "source_html_hash" not in supplier_catalogue_columns:
+        conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN source_html_hash TEXT")
+    if supplier_catalogue_columns and "scraping_notes" not in supplier_catalogue_columns:
+        conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN scraping_notes TEXT")
+    if supplier_catalogue_columns and "variant_attributes_json" not in supplier_catalogue_columns:
+        conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN variant_attributes_json TEXT")
+    if supplier_catalogue_columns and "currency" not in supplier_catalogue_columns:
+        conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN currency TEXT")

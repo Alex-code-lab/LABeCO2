@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from ui.validation_details import format_entry_detail
 from ui.validation_ops import now_iso as _now, reject_entries, validate_entries
 from ui.sqlite_schema import ensure_app_schema
+from tools.admin.nacres_suggest import suggest_nacres
 from tools.admin.workflow import (
     blocking_issues,
     check_entries_quality,
@@ -38,6 +39,7 @@ _BLACK = QColor(0, 0, 0)
 
 _COLOR_WARN      = QColor(255, 243, 180)   # jaune  : entrée à valider sans source
 _COLOR_OK        = QColor(210, 240, 210)   # vert   : entrée à valider avec source
+_COLOR_PENDING   = QColor(255, 243, 180)   # jaune  : entrée catalogue en attente
 _COLOR_VALIDATED = QColor(200, 225, 255)   # bleu   : validé
 _COLOR_DEPRECATED = QColor(220, 220, 220)  # gris   : déprécié
 _STATUS_LABEL = {
@@ -475,6 +477,9 @@ class ValidateWidget(QWidget):
         filter_row_main.addWidget(QLabel("Statut :"))
         self.status_combo = QComboBox()
         self.status_combo.addItem("À valider", "draft")
+        self.status_combo.addItem("En attente", "pending")
+        self.status_combo.addItem("Validé", "validated")
+        self.status_combo.addItem("Déprécié", "deprecated")
         self.status_combo.addItem("Tous les statuts", "all")
         self.status_combo.currentIndexChanged.connect(self._load_table)
         self.status_combo.setMinimumWidth(160)
@@ -504,6 +509,9 @@ class ValidateWidget(QWidget):
         filter_row_main.addStretch()
         self.count_label = QLabel("")
         filter_row_main.addWidget(self.count_label)
+        btn_reload = QPushButton("Recharger")
+        btn_reload.clicked.connect(self._load_table)
+        filter_row_main.addWidget(btn_reload)
         filters.addLayout(filter_row_main)
 
         filter_row_search = QHBoxLayout()
@@ -512,6 +520,7 @@ class ValidateWidget(QWidget):
         self.nacres_filter_edit.setPlaceholderText("NA25")
         self.nacres_filter_edit.setMinimumWidth(120)
         self.nacres_filter_edit.setMaximumWidth(180)
+        self.nacres_filter_edit.setClearButtonEnabled(True)
         self.nacres_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
         filter_row_search.addWidget(self.nacres_filter_edit)
 
@@ -520,6 +529,7 @@ class ValidateWidget(QWidget):
         self.supplier_filter_edit.setPlaceholderText("DUCHEFA")
         self.supplier_filter_edit.setMinimumWidth(180)
         self.supplier_filter_edit.setMaximumWidth(260)
+        self.supplier_filter_edit.setClearButtonEnabled(True)
         self.supplier_filter_edit.textChanged.connect(lambda: self._filter_rows(self.search_edit.text()))
         filter_row_search.addWidget(self.supplier_filter_edit)
 
@@ -530,6 +540,9 @@ class ValidateWidget(QWidget):
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(self._filter_rows)
         filter_row_search.addWidget(self.search_edit, 1)
+        btn_clear_filters = QPushButton("Effacer filtres")
+        btn_clear_filters.clicked.connect(self._clear_secondary_filters)
+        filter_row_search.addWidget(btn_clear_filters)
         filters.addLayout(filter_row_search)
 
         root.addLayout(filters)
@@ -595,6 +608,13 @@ class ValidateWidget(QWidget):
         self.btn_save_edits.setEnabled(False)
         self.btn_save_edits.clicked.connect(self._save_pending_edits)
         save_bar.addWidget(self.btn_save_edits)
+        self.btn_suggest_nacres = QPushButton("Suggérer NACRES")
+        self.btn_suggest_nacres.setToolTip(
+            "Propose des codes NACRES par correspondance de mots-clés sur les lignes visibles.\n"
+            "Les suggestions restent à vérifier puis à sauvegarder."
+        )
+        self.btn_suggest_nacres.clicked.connect(self._suggest_nacres_for_visible_rows)
+        save_bar.addWidget(self.btn_suggest_nacres)
         self.pending_edits_label = QLabel("")
         self.pending_edits_label.setStyleSheet("color: #b45309; font-style: italic;")
         save_bar.addWidget(self.pending_edits_label)
@@ -647,14 +667,19 @@ class ValidateWidget(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        show_all = self.status_combo.currentData() == "all" if hasattr(self, "status_combo") else False
+        status_filter = self.status_combo.currentData() if hasattr(self, "status_combo") else "draft"
         legend_items = [
             ("À valider sans source", _COLOR_WARN),
             ("À valider avec source", _COLOR_OK),
         ]
-        if show_all:
+        if status_filter in ("all", "pending"):
+            legend_items.insert(0, ("En attente", _COLOR_PENDING))
+        if status_filter in ("all", "validated"):
             legend_items += [
                 ("Validé", _COLOR_VALIDATED),
+            ]
+        if status_filter in ("all", "deprecated"):
+            legend_items += [
                 ("Déprécié", _COLOR_DEPRECATED),
             ]
         for label, color in legend_items:
@@ -684,8 +709,9 @@ class ValidateWidget(QWidget):
 
     def _where_clause(self, alias: str) -> str:
         """Retourne la clause WHERE selon le filtre statut sélectionné."""
-        if self.status_combo.currentData() == "draft":
-            return f"WHERE {alias}.status = 'draft'"
+        status = self.status_combo.currentData()
+        if status and status != "all":
+            return f"WHERE {alias}.status = '{status}'"
         return ""
 
     def _disconnect_item_changed(self) -> None:
@@ -733,6 +759,20 @@ class ValidateWidget(QWidget):
         self._connect_item_changed_once()
         self._filter_rows(self.search_edit.text())
         self._update_sel_count()
+
+    def _clear_secondary_filters(self) -> None:
+        """Efface les filtres qui masquent souvent les entrées sans que ce soit visible."""
+        for combo in (self.category_combo, self.product_type_combo):
+            idx = combo.findData("all")
+            if idx >= 0:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(idx)
+                combo.blockSignals(False)
+        for edit in (self.nacres_filter_edit, self.supplier_filter_edit, self.search_edit):
+            edit.blockSignals(True)
+            edit.clear()
+            edit.blockSignals(False)
+        self._filter_rows("")
 
     def _load_all(self, conn: sqlite3.Connection) -> None:
         """Vue unifiée : colonnes fixes Statut / Nom / Source / Contributeur / Créé le."""
@@ -824,7 +864,7 @@ class ValidateWidget(QWidget):
             or bool(supplier_filter)
         )
         if needle or has_structured_filter:
-            self.count_label.setText(f"{visible}/{total} entrée(s)")
+            self.count_label.setText(f"{visible}/{total} entrée(s) - filtres actifs")
         else:
             self.count_label.setText(f"{total} entrée(s)")
 
@@ -997,6 +1037,65 @@ class ValidateWidget(QWidget):
         else:
             self.pending_edits_label.setText("")
             self.btn_save_edits.setEnabled(False)
+
+    def _valid_nacres_codes(self) -> set[str]:
+        try:
+            with sqlite3.connect(self.sqlite_path) as conn:
+                rows = conn.execute("SELECT code FROM nacres_codes").fetchall()
+        except Exception:
+            return set()
+        return {str(row[0] or "").upper() for row in rows}
+
+    def _suggest_nacres_for_visible_rows(self) -> None:
+        if self.table_combo.currentData() != "commercial_products":
+            _admin_message(
+                self,
+                "Suggestions NACRES",
+                "Sélectionnez d'abord la table Produits commerciaux.",
+            )
+            return
+        name_col = self._column_index("Nom")
+        nacres_col = self._column_index("NACRES")
+        if name_col < 0 or nacres_col < 0:
+            return
+        valid_codes = self._valid_nacres_codes()
+        filled = 0
+        self.table_widget.blockSignals(True)
+        try:
+            for row in range(self.table_widget.rowCount()):
+                if self.table_widget.isRowHidden(row):
+                    continue
+                chk = self.table_widget.item(row, 0)
+                name_item = self.table_widget.item(row, name_col)
+                nacres_item = self.table_widget.item(row, nacres_col)
+                if not chk or not name_item or not nacres_item:
+                    continue
+                if nacres_item.text().strip():
+                    continue
+                user_data = chk.data(Qt.ItemDataRole.UserRole)
+                if not isinstance(user_data, tuple) or len(user_data) < 2:
+                    continue
+                db_table, row_id = user_data
+                if db_table != "commercial_products":
+                    continue
+                code, reason = suggest_nacres(name_item.text())
+                if not code or code.upper() not in valid_codes:
+                    continue
+                code = code.upper()
+                nacres_item.setText(code)
+                nacres_item.setToolTip(f"Suggestion automatique : {reason}")
+                nacres_item.setBackground(_COLOR_EDITED)
+                self._pending_edits.setdefault((db_table, row_id), {})["code_nacres"] = code
+                filled += 1
+        finally:
+            self.table_widget.blockSignals(False)
+        self._update_pending_label()
+        _admin_message(
+            self,
+            "Suggestions NACRES",
+            f"{filled} code(s) NACRES suggéré(s).\n"
+            "Vérifiez les lignes en jaune puis cliquez sur Sauvegarder les modifications.",
+        )
 
     def _save_pending_edits(self) -> None:
         if not self._pending_edits:

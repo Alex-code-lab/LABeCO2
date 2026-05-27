@@ -33,7 +33,8 @@ reste integre a la base LABeCO2 existante:
 - `supplier_fetch_log`: journal des URLs chargees, ignorees ou bloquees.
 
 La cle principale metier de reference est `supplier + supplier_product_ref`.
-Une contrainte supplementaire evite aussi de dupliquer une meme URL fournisseur.
+Une meme URL peut exposer plusieurs variantes fournisseur, donc l'URL est indexee
+pour la recherche mais n'est pas unique.
 
 ## Base privee de capture
 
@@ -68,6 +69,29 @@ python -m tools.supplier_scraper.main \
   --config tools/supplier_scraper/config.yaml \
   --export-csv exports/supplier_references.csv
 ```
+
+Importer la base privee de capture vers la base LABeCO2 en apercu:
+
+```bash
+python tools/supplier_scraper/import_to_labeco2.py \
+  --source-db private/supplier_scraping_lab.sqlite \
+  --target-db private/labeco2.sqlite
+```
+
+Appliquer l'import apres verification de l'apercu:
+
+```bash
+python tools/supplier_scraper/import_to_labeco2.py \
+  --source-db private/supplier_scraping_lab.sqlite \
+  --target-db private/labeco2.sqlite \
+  --apply
+```
+
+Cet import ne valide rien automatiquement. Il ajoute/met a jour les references
+fournisseur, historise les prix observes dans `supplier_price_cache`, cree les
+lignes de catalogue fournisseur, puis cree seulement des `commercial_products`
+en statut `pending` quand la reference n'existe pas deja. Les produits valides
+existants ne sont pas ecrases.
 
 Pour activer un fournisseur, modifier `enabled: true` dans `config.yaml`, verifier
 les domaines autorises, les URLs de depart et les regex d'extraction, puis lancer

@@ -1690,6 +1690,10 @@ class QualityTab(QWidget):
 # Règles ordonnées : la première qui matche l'emporte.
 # Tuple (keywords_lower, nacres_code, label_raison)
 _NACRES_RULES: list[tuple[list[str], str, str]] = [
+    # Équipements de protection individuelle
+    (["gant", "gants", "glove", "gloves", "nitrile", "latex powder", "latex glove"],
+     "HA01", "gants / EPI"),
+
     # Enzymes (avant "ase" générique)
     (["cellulase", "macerozyme", "pectolyase", "zymolyase", "protease",
       "lipase", "amylase", "nuclease", "lysozyme", "pectinase"],

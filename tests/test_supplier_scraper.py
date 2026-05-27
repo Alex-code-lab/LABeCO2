@@ -14,6 +14,7 @@ from tools.supplier_scraper.parser import (
     extract_product_option_attributes,
     parse_product_page,
 )
+from tools.supplier_scraper.import_to_labeco2 import import_observations
 from tools.supplier_scraper.storage import LocalCaptureStorage, SupplierStorage
 from ui.sqlite_schema import ensure_app_schema
 
@@ -299,6 +300,83 @@ def test_local_capture_storage_records_price_snapshot(tmp_path):
     assert prices["price_text"] == "24,50 €"
     assert prices["price_value"] == 24.5
     assert prices["currency"] == "EUR"
+
+
+def test_import_private_scrape_to_labeco2_is_idempotent(tmp_path):
+    source_db = tmp_path / "private_capture.sqlite"
+    source_storage = LocalCaptureStorage(source_db)
+    html = (FIXTURES / "sample_product.html").read_text(encoding="utf-8")
+    candidate = parse_product_page(
+        supplier="TEST",
+        product_url="https://example.org/store/product/TALC-1000",
+        html_text=html,
+        retrieval_date="2026-05-26T12:00:00+00:00",
+        rules={
+            "generic_category": "poudre",
+            "ref_patterns": [r"Référence:\s*(?P<ref>[A-Z0-9._-]+)"],
+            "packaging_patterns": [r"Conditionnement:\s*(?P<pack>[^\n]+)"],
+        },
+    )
+    assert candidate is not None
+
+    with source_storage.connect() as source_conn:
+        source_storage.capture_candidate(source_conn, candidate)
+        source_conn.commit()
+
+    target_conn = sqlite3.connect(":memory:")
+    target_conn.execute(
+        """
+        CREATE TABLE commercial_products (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            brand TEXT,
+            reference TEXT,
+            code_nacres TEXT,
+            product_type TEXT NOT NULL,
+            sold_packaging_label TEXT,
+            units_per_sold_packaging INTEGER,
+            price_sold_packaging REAL,
+            sold_unit_volume_ml REAL,
+            supplier_catalogue_id TEXT,
+            status TEXT NOT NULL DEFAULT 'draft',
+            created_at TEXT,
+            updated_at TEXT,
+            note TEXT
+        )
+        """
+    )
+    with source_storage.connect() as source_conn:
+        first = import_observations(source_conn, target_conn, supplier="TEST")
+        target_conn.commit()
+        second = import_observations(source_conn, target_conn, supplier="TEST")
+        target_conn.commit()
+
+    assert first.supplier_references_inserted == 1
+    assert first.supplier_catalogue_inserted == 1
+    assert first.price_snapshots_inserted == 1
+    assert first.commercial_products_created_pending == 1
+    assert second.supplier_references_updated == 1
+    assert second.supplier_catalogue_updated == 1
+    assert second.price_snapshots_inserted == 0
+    assert second.commercial_products_existing == 1
+    assert second.commercial_products_pending_updated == 0
+
+    product = target_conn.execute(
+        """
+        SELECT name, reference, product_type, sold_packaging_label,
+               units_per_sold_packaging, price_sold_packaging, status
+        FROM commercial_products
+        """
+    ).fetchone()
+    assert tuple(product) == (
+        "Talc pur pour laboratoire, 1 kg",
+        "TALC-1000",
+        "solid",
+        "1 kg",
+        1,
+        24.5,
+        "pending",
+    )
 
 
 def test_simple_yaml_parser_handles_supplier_config():

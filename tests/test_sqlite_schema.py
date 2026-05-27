@@ -50,6 +50,10 @@ def test_ensure_app_schema_adds_admin_audit_tables_and_catalogue_columns():
     supplier_columns = {row[1] for row in conn.execute("PRAGMA table_info(supplier_catalogue)")}
     assert "import_batch_id" in supplier_columns
     assert "row_hash" in supplier_columns
+    assert "product_url" in supplier_columns
+    assert "source_html_hash" in supplier_columns
+    assert "variant_attributes_json" in supplier_columns
+    assert "currency" in supplier_columns
 
 
 def test_load_nacres_options_flags_new_codes_without_purchase_factor():
