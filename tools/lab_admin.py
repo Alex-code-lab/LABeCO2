@@ -2908,6 +2908,278 @@ class CatalogueTab(QWidget):
 
 
 # ============================================================
+# Onglet 5 — Import Scraping
+# ============================================================
+
+_SCRAPE_STATUS_LABELS = {
+    "new":          "NOUVEAU",
+    "price_update": "MAJ PRIX",
+    "known":        "DÉJÀ CONNU",
+}
+_SCRAPE_STATUS_COLORS = {
+    "new":          QColor(210, 240, 210),   # vert clair
+    "price_update": QColor(255, 243, 180),   # jaune
+    "known":        QColor(230, 230, 230),   # gris
+}
+_SCOL_STATUS    = 0
+_SCOL_SUPPLIER  = 1
+_SCOL_REF       = 2
+_SCOL_NAME      = 3
+_SCOL_PACKAGING = 4
+_SCOL_PRICE     = 5
+_SCOL_DATE      = 6
+
+_SCRAPE_HEADERS = [
+    "Statut", "Fournisseur", "Référence", "Nom", "Conditionnement", "Prix (€)", "Date scraping",
+]
+
+
+class ScrapingImportTab(QWidget):
+    """Onglet d'import des observations de scraping privé vers labeco2.sqlite."""
+
+    def __init__(self, db_path: Path):
+        super().__init__()
+        self.db_path = db_path
+        self._scraping_path: Path | None = None
+        self._build_ui()
+
+    def reload(self, db_path: Path) -> None:
+        self.db_path = db_path
+        if self._scraping_path:
+            self._load_preview()
+
+    # ------------------------------------------------------------------
+    # UI
+    # ------------------------------------------------------------------
+
+    def _build_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setSpacing(8)
+
+        # Barre fichier source
+        src_bar = QHBoxLayout()
+        src_bar.addWidget(QLabel("Fichier scraping :"))
+        self.src_label = QLabel("(aucun fichier sélectionné)")
+        self.src_label.setStyleSheet("color: #888;")
+        src_bar.addWidget(self.src_label, 1)
+        btn_open = QPushButton("Ouvrir…")
+        btn_open.setMaximumWidth(90)
+        btn_open.clicked.connect(self._open_scraping_db)
+        src_bar.addWidget(btn_open)
+        btn_refresh = QPushButton("Actualiser")
+        btn_refresh.setMaximumWidth(90)
+        btn_refresh.clicked.connect(self._load_preview)
+        src_bar.addWidget(btn_refresh)
+        root.addLayout(src_bar)
+
+        # Légende
+        legend = QHBoxLayout()
+        for key, label in _SCRAPE_STATUS_LABELS.items():
+            dot = QLabel(f"  ■ {label}  ")
+            dot.setStyleSheet(
+                f"background: {_SCRAPE_STATUS_COLORS[key].name()}; "
+                "border-radius: 3px; padding: 2px 6px;"
+            )
+            legend.addWidget(dot)
+        legend.addStretch()
+        root.addLayout(legend)
+
+        # Table aperçu
+        self.table = QTableWidget()
+        self.table.setColumnCount(len(_SCRAPE_HEADERS))
+        self.table.setHorizontalHeaderLabels(_SCRAPE_HEADERS)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        root.addWidget(self.table)
+
+        # Barre bas : bouton + résumé + stats
+        self.btn_import = QPushButton("⬇  Importer dans labeco2.sqlite")
+        self.btn_import.setEnabled(False)
+        self.btn_import.setStyleSheet(
+            "background: #2e7d32; color: white; font-weight: bold; padding: 6px 18px;"
+        )
+        self.btn_import.clicked.connect(self._do_import)
+
+        self.import_summary = QLabel("")
+        self.import_summary.setStyleSheet("color: #444; padding-left: 12px;")
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.btn_import)
+        btn_row.addWidget(self.import_summary, 1)
+        root.addLayout(btn_row)
+
+        self.stats_text = QTextEdit()
+        self.stats_text.setReadOnly(True)
+        self.stats_text.setMaximumHeight(130)
+        self.stats_text.setFont(QFont("Courier New", 10))
+        self.stats_text.setPlaceholderText("Résultats de l'import apparaîtront ici…")
+        root.addWidget(self.stats_text)
+
+    # ------------------------------------------------------------------
+    # Logique
+    # ------------------------------------------------------------------
+
+    def _open_scraping_db(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Sélectionner la base de scraping",
+            str(ROOT / "private"),
+            "SQLite (*.sqlite *.db);;Tous (*)",
+        )
+        if not path:
+            return
+        self._scraping_path = Path(path)
+        self.src_label.setText(str(self._scraping_path))
+        self.src_label.setStyleSheet("color: black; font-weight: bold;")
+        self._load_preview()
+
+    def _load_preview(self) -> None:
+        if not self._scraping_path or not self._scraping_path.exists():
+            return
+        try:
+            from tools.supplier_scraper.import_to_labeco2 import (
+                latest_observations,
+                product_display_name,
+            )
+        except ImportError as exc:
+            QMessageBox.critical(self, "Erreur d'import module", str(exc))
+            return
+
+        try:
+            src_conn = sqlite3.connect(str(self._scraping_path))
+            observations = latest_observations(src_conn)
+            src_conn.close()
+        except Exception as exc:
+            QMessageBox.critical(self, "Erreur lecture scraping", str(exc))
+            return
+
+        # Récupérer les références déjà connues + leur dernier prix
+        try:
+            tgt_conn = sqlite3.connect(str(self.db_path))
+            known: dict[tuple[str, str], float | None] = {}
+            for supplier, ref, price in tgt_conn.execute("""
+                SELECT sr.supplier, sr.supplier_product_ref,
+                    (SELECT price_value FROM supplier_price_cache
+                     WHERE supplier = sr.supplier
+                       AND supplier_product_ref = sr.supplier_product_ref
+                     ORDER BY retrieved_at DESC LIMIT 1)
+                FROM supplier_references sr
+            """).fetchall():
+                key = (str(supplier or "").strip(), str(ref or "").strip())
+                known[key] = float(price) if price is not None else None
+            tgt_conn.close()
+        except Exception as exc:
+            QMessageBox.critical(self, "Erreur lecture base cible", str(exc))
+            return
+
+        # Remplir la table
+        self.table.setRowCount(0)
+        counts = {"new": 0, "price_update": 0, "known": 0}
+
+        for obs in observations:
+            key = (obs.supplier.strip(), obs.supplier_product_ref.strip())
+            if key not in known:
+                status = "new"
+            elif (
+                obs.price_value is not None
+                and known[key] is not None
+                and abs(obs.price_value - known[key]) > 0.005
+            ):
+                status = "price_update"
+            else:
+                status = "known"
+            counts[status] += 1
+
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            color = _SCRAPE_STATUS_COLORS[status]
+            cells = [
+                _SCRAPE_STATUS_LABELS[status],
+                obs.supplier,
+                obs.supplier_product_ref,
+                product_display_name(obs),
+                obs.packaging_text,
+                f"{obs.price_value:.2f}" if obs.price_value is not None else "—",
+                (obs.retrieval_date or "")[:10],
+            ]
+            for c, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                item.setBackground(color)
+                self.table.setItem(r, c, item)
+
+        n = len(observations)
+        self.import_summary.setText(
+            f"{n} observation(s)  ·  "
+            f"{counts['new']} nouveau(x)  ·  "
+            f"{counts['price_update']} mise(s) à jour prix  ·  "
+            f"{counts['known']} déjà connu(s)"
+        )
+        self.btn_import.setEnabled(n > 0)
+        self.stats_text.clear()
+
+    def _do_import(self) -> None:
+        if not self._scraping_path or not self._scraping_path.exists():
+            return
+        try:
+            from tools.supplier_scraper.import_to_labeco2 import (
+                backup_database,
+                format_stats,
+                import_observations,
+            )
+        except ImportError as exc:
+            QMessageBox.critical(self, "Erreur d'import module", str(exc))
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirmer l'import",
+            f"Importer les observations de\n  {self._scraping_path.name}\nvers\n  {self.db_path.name} ?\n\n"
+            "Une sauvegarde sera créée automatiquement.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            backup_path = backup_database(self.db_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Erreur sauvegarde", str(exc))
+            return
+
+        src_conn: sqlite3.Connection | None = None
+        tgt_conn: sqlite3.Connection | None = None
+        try:
+            src_conn = sqlite3.connect(str(self._scraping_path))
+            tgt_conn = sqlite3.connect(str(self.db_path))
+            stats = import_observations(src_conn, tgt_conn)
+            tgt_conn.commit()
+        except Exception as exc:
+            if tgt_conn:
+                tgt_conn.rollback()
+            QMessageBox.critical(self, "Erreur lors de l'import", str(exc))
+            return
+        finally:
+            if src_conn:
+                src_conn.close()
+            if tgt_conn:
+                tgt_conn.close()
+
+        result = format_stats(stats, applied=True)
+        result += f"\n\nSauvegarde créée : {backup_path.name}"
+        self.stats_text.setPlainText(result)
+
+        msg = (
+            f"{stats.commercial_products_created_pending} produit(s) créés en attente (pending).\n\n"
+            "➜ Onglet « Catalogue fournisseurs » pour compléter les codes NACRES.\n"
+            "➜ Onglet « Validation » pour valider les produits."
+        )
+        QMessageBox.information(self, "Import terminé", msg)
+        self._load_preview()
+
+
+# ============================================================
 # Fenêtre principale
 # ============================================================
 
@@ -2948,10 +3220,12 @@ class AdminWindow(QMainWindow):
         self.tab_merge     = MergeTab(self.db_path)
         self.tab_quality   = QualityTab(self.db_path)
         self.tab_catalogue = CatalogueTab(self.db_path)
+        self.tab_scraping  = ScrapingImportTab(self.db_path)
         self.tabs.addTab(self.tab_validate,  "Validation")
         self.tabs.addTab(self.tab_merge,     "Fusion / Conflits")
-        self.tabs.addTab(self.tab_quality,   "Qualite")
+        self.tabs.addTab(self.tab_quality,   "Qualité")
         self.tabs.addTab(self.tab_catalogue, "Catalogue fournisseurs")
+        self.tabs.addTab(self.tab_scraping,  "⬇ Import Scraping")
         root.addWidget(self.tabs)
 
         self.tab_quality.navigate_to.connect(self._navigate_to_product)
@@ -2982,6 +3256,7 @@ class AdminWindow(QMainWindow):
         self.tab_merge.reload(self.db_path)
         self.tab_quality.reload(self.db_path)
         self.tab_catalogue.reload(self.db_path)
+        self.tab_scraping.reload(self.db_path)
 
 
 # ============================================================

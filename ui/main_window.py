@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
     QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
-    QToolButton, QStyle,
+    QToolButton, QStyle, QListView,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QIntValidator, QDoubleValidator
@@ -91,17 +91,27 @@ class CompactPopupComboBox(QComboBox):
     pour éviter le grand rectangle gris autour de la liste.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        view = QListView(self)
+        view.setUniformItemSizes(True)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setStyleSheet("QListView { background: white; color: black; }")
+        self.setView(view)
+
     def showPopup(self) -> None:
-        super().showPopup()
-        width = self.width()
+        width = max(self.width(), min(620, self.width() + 260))
         view = self.view()
+        view.setMinimumWidth(width)
+        view.setMaximumWidth(width)
+        super().showPopup()
         popup = view.window()
         view.setMinimumWidth(width)
         view.setMaximumWidth(width)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         popup.setMinimumWidth(width)
         popup.setMaximumWidth(width)
-        popup.resize(width, popup.height())
+        popup.resize(width, min(popup.height(), 420))
 
 
 def _configure_detail_combo(combo: QComboBox) -> None:

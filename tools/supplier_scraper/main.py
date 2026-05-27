@@ -69,6 +69,7 @@ def main() -> int:
         print(
             f"{supplier['name']}: pages={stats.fetched_pages}, "
             f"produits={stats.product_pages}, références={stats.stored_references}, "
+            f"nouvelles={stats.new_references}, déjà_connues={stats.known_references}, "
             f"sans_ref={stats.skipped_without_ref}, arrêt={stats.stopped_reason or '-'}"
         )
         if stats.stopped_reason:

@@ -29,7 +29,7 @@ request:
   stop_status_codes: [403, 429]
 
 limits:
-  max_pages_per_run: 50
+  max_pages_per_run: 500
   max_products_per_run: 200
 
 suppliers:
@@ -64,11 +64,12 @@ suppliers:
     base_url: "https://www.fishersci.fr/"
     allowed_domains: ["www.fishersci.fr"]
     start_urls:
-      - "https://www.fishersci.fr/fr/fr/browse/90136135/gants-dexamen"
-      - "https://www.fishersci.fr/shop/products/indigo-nitrile-disposable-gloves-5/17909980#?keyword=gants%20nitrile"
+      - "https://www.fishersci.fr/fr/fr/browse/90111011/bo%C3%AEtes-de-culture-cellulaire"
+      - "https://www.fishersci.fr/fr/fr/browse/90168054/Tubes"
     crawl_url_patterns:
       - "/shop/products"
       - "/fr/fr/search"
+      - "/fr/fr/browse"
     product_url_patterns:
       - "/shop/products/"
     deny_url_patterns:

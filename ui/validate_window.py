@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListView,
     QProgressDialog,
     QPushButton,
     QTableWidget,
@@ -25,9 +26,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtCore import QSortFilterProxyModel
+
+from ui.nacres_metadata import load_nacres_options
+from ui.sqlite_schema import ensure_app_schema
 from ui.validation_details import format_entry_detail
 from ui.validation_ops import now_iso as _now, reject_entries, validate_entries
-from ui.sqlite_schema import ensure_app_schema
 from tools.admin.nacres_suggest import suggest_nacres
 from tools.admin.workflow import (
     blocking_issues,
@@ -437,6 +442,34 @@ _CP_ALLOWED_FIELDS = frozenset(_CP_EDITABLE_FIELDS.values())
 _COLOR_EDITED = QColor(255, 240, 180)  # jaune clair : modification non sauvegardée
 
 
+class _NacresPrefixFilterProxy(QSortFilterProxyModel):
+    """Filtre NACRES par préfixe de code pendant la saisie."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._prefix = ""
+
+    def set_prefix(self, prefix: str) -> None:
+        self._prefix = (prefix or "").strip().upper()
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:
+        if not self._prefix:
+            return True
+        index = self.sourceModel().index(source_row, 0, source_parent)
+        code = str(index.data(Qt.ItemDataRole.UserRole) or "").upper()
+        return code.startswith(self._prefix)
+
+
+def _nacres_code_from_text(text: str) -> str:
+    raw = (text or "").strip().upper()
+    if " — " in raw:
+        return raw.split(" — ", 1)[0].strip()
+    if " - " in raw:
+        return raw.split(" - ", 1)[0].strip()
+    return raw[:4] if len(raw) > 4 and raw[:4].isalnum() else raw
+
+
 class ValidateWidget(QWidget):
     """Widget de validation embarquable (onglet ou fenêtre standalone)."""
 
@@ -449,6 +482,9 @@ class ValidateWidget(QWidget):
         self._show_close = show_close
         self._pending_edits: dict[tuple, dict[str, str]] = {}  # (db_table, row_id) → {field: val}
         self._editable_col_to_field: dict[int, str] = {}       # col_index → db_field
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        self._nacres_model = QStandardItemModel(self)
         self._build_ui()
         self._load_table()
 
@@ -563,6 +599,7 @@ class ValidateWidget(QWidget):
         self.table_widget.horizontalHeader().setStretchLastSection(True)
         self.table_widget.setSortingEnabled(True)
         self.table_widget.itemSelectionChanged.connect(self._show_selected_detail)
+        self.table_widget.cellDoubleClicked.connect(self._activate_cell_editor)
         root.addWidget(self.table_widget)
 
         self.detail_view = QTextEdit()
@@ -748,6 +785,7 @@ class ValidateWidget(QWidget):
         conn = sqlite3.connect(self.sqlite_path)
         conn.row_factory = sqlite3.Row
         ensure_app_schema(conn)
+        self._load_nacres_model(conn)
 
         if selected_key == "all":
             self._load_all(conn)
@@ -759,6 +797,102 @@ class ValidateWidget(QWidget):
         self._connect_item_changed_once()
         self._filter_rows(self.search_edit.text())
         self._update_sel_count()
+
+    def _nacres_display(self, code: str) -> str:
+        option = self._nacres_by_code.get((code or "").strip().upper())
+        if not option:
+            return (code or "").strip().upper()
+        return f"{option.code} — {option.label}" if option.label else option.code
+
+    def _load_nacres_model(self, conn: sqlite3.Connection) -> None:
+        self._nacres_options = load_nacres_options(conn)
+        self._nacres_by_code = {option.code: option for option in self._nacres_options}
+        model = QStandardItemModel(self)
+        empty = QStandardItem("")
+        empty.setData("", Qt.ItemDataRole.UserRole)
+        empty.setData(_BLACK, Qt.ItemDataRole.ForegroundRole)
+        model.appendRow(empty)
+        for option in self._nacres_options:
+            item = QStandardItem(self._nacres_display(option.code))
+            item.setData(option.code, Qt.ItemDataRole.UserRole)
+            item.setData(_BLACK, Qt.ItemDataRole.ForegroundRole)
+            model.appendRow(item)
+        self._nacres_model = model
+
+    def _activate_cell_editor(self, row: int, column: int) -> None:
+        header_item = self.table_widget.horizontalHeaderItem(column)
+        if not header_item or header_item.text() != "NACRES":
+            return
+        chk = self.table_widget.item(row, 0)
+        if not chk:
+            return
+        user_data = chk.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(user_data, tuple) or len(user_data) < 2:
+            return
+        db_table, row_id = user_data
+        if db_table != "commercial_products":
+            return
+        if isinstance(self.table_widget.cellWidget(row, column), QComboBox):
+            return
+
+        item = self.table_widget.item(row, column)
+        current_code = _nacres_code_from_text(item.text() if item else "")
+        combo = QComboBox(self.table_widget)
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        combo.setMinimumWidth(max(180, self.table_widget.columnWidth(column)))
+        combo.setMaxVisibleItems(15)
+        view = QListView(combo)
+        view.setUniformItemSizes(True)
+        view.setMinimumWidth(560)
+        view.setMaximumWidth(620)
+        combo.setView(view)
+        proxy = _NacresPrefixFilterProxy(combo)
+        proxy.setSourceModel(self._nacres_model)
+        combo._nacres_proxy = proxy
+        combo.setModel(proxy)
+        combo.setCompleter(None)
+        combo.lineEdit().setPlaceholderText("Code NACRES…")
+        combo.lineEdit().setCompleter(None)
+        combo.setStyleSheet("QComboBox, QComboBox QLineEdit { color: black; background: white; }")
+        if current_code:
+            idx = combo.findData(current_code)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            combo.setEditText(current_code)
+            combo.lineEdit().setCursorPosition(0)
+        else:
+            combo.setCurrentIndex(0)
+
+        def filter_text(text: str, c=combo) -> None:
+            proxy_obj = getattr(c, "_nacres_proxy", None)
+            if isinstance(proxy_obj, _NacresPrefixFilterProxy):
+                proxy_obj.set_prefix(_nacres_code_from_text(text))
+            c.lineEdit().setText(text)
+            c.lineEdit().setCursorPosition(len(text))
+
+        def commit_text(c=combo, r=row, col=column, rid=row_id, table=db_table) -> None:
+            code = _nacres_code_from_text(c.currentText())
+            if code and code not in self._nacres_by_code:
+                return
+            item_obj = self.table_widget.item(r, col)
+            if item_obj:
+                item_obj.setText(code)
+                item_obj.setToolTip(self._nacres_display(code) if code else "")
+                item_obj.setBackground(_COLOR_EDITED)
+            self._pending_edits.setdefault((table, rid), {})["code_nacres"] = code
+            c.blockSignals(True)
+            c.setEditText(code)
+            c.lineEdit().setCursorPosition(0)
+            c.blockSignals(False)
+            self._update_pending_label()
+
+        combo.lineEdit().textEdited.connect(filter_text)
+        combo.activated.connect(lambda _idx, c=combo: commit_text(c))
+        combo.lineEdit().editingFinished.connect(lambda c=combo: commit_text(c))
+        self.table_widget.setCellWidget(row, column, combo)
+        combo.setFocus()
+        combo.showPopup()
 
     def _clear_secondary_filters(self) -> None:
         """Efface les filtres qui masquent souvent les entrées sans que ce soit visible."""

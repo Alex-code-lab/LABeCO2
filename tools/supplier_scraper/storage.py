@@ -266,6 +266,7 @@ class SupplierStorage:
 _CREATE_LOCAL_OBSERVATIONS = """
 CREATE TABLE IF NOT EXISTS supplier_scrape_observations (
     id                       TEXT PRIMARY KEY,
+    run_id                   TEXT,
     supplier                 TEXT NOT NULL,
     supplier_product_ref     TEXT NOT NULL,
     product_url              TEXT,
@@ -290,6 +291,7 @@ CREATE TABLE IF NOT EXISTS supplier_scrape_observations (
 _CREATE_LOCAL_PRICE_SNAPSHOTS = """
 CREATE TABLE IF NOT EXISTS supplier_local_price_snapshots (
     id                    TEXT PRIMARY KEY,
+    run_id                TEXT,
     observation_id        TEXT,
     supplier              TEXT NOT NULL,
     supplier_product_ref  TEXT NOT NULL,
@@ -305,6 +307,43 @@ CREATE TABLE IF NOT EXISTS supplier_local_price_snapshots (
 )
 """
 
+_CREATE_LOCAL_RUNS = """
+CREATE TABLE IF NOT EXISTS supplier_local_scrape_runs (
+    id                       TEXT PRIMARY KEY,
+    supplier                 TEXT NOT NULL,
+    started_at               TEXT NOT NULL,
+    finished_at              TEXT,
+    status                   TEXT NOT NULL,
+    dry_run                  INTEGER NOT NULL DEFAULT 1,
+    config_path              TEXT,
+    start_url_count          INTEGER NOT NULL DEFAULT 0,
+    request_count            INTEGER NOT NULL DEFAULT 0,
+    product_page_count       INTEGER NOT NULL DEFAULT 0,
+    stored_reference_count   INTEGER NOT NULL DEFAULT 0,
+    new_reference_count      INTEGER NOT NULL DEFAULT 0,
+    known_reference_count    INTEGER NOT NULL DEFAULT 0,
+    skipped_without_ref      INTEGER NOT NULL DEFAULT 0,
+    stopped_reason           TEXT,
+    created_at               TEXT NOT NULL
+)
+"""
+
+_CREATE_LOCAL_FETCH_LOG = """
+CREATE TABLE IF NOT EXISTS supplier_local_fetch_log (
+    id            TEXT PRIMARY KEY,
+    run_id        TEXT,
+    supplier      TEXT NOT NULL,
+    url           TEXT NOT NULL,
+    fetched_at    TEXT NOT NULL,
+    status_code   INTEGER,
+    from_cache    INTEGER NOT NULL DEFAULT 0,
+    html_hash     TEXT,
+    error         TEXT,
+    notes         TEXT,
+    FOREIGN KEY(run_id) REFERENCES supplier_local_scrape_runs(id)
+)
+"""
+
 
 class LocalCaptureStorage:
     """SQLite privé pour observations larges non destinées à la base distribuée."""
@@ -316,13 +355,22 @@ class LocalCaptureStorage:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute(_CREATE_LOCAL_RUNS)
+        conn.execute(_CREATE_LOCAL_FETCH_LOG)
         conn.execute(_CREATE_LOCAL_OBSERVATIONS)
         conn.execute(_CREATE_LOCAL_PRICE_SNAPSHOTS)
         observation_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(supplier_scrape_observations)")
         }
+        if "run_id" not in observation_columns:
+            conn.execute("ALTER TABLE supplier_scrape_observations ADD COLUMN run_id TEXT")
         if "variant_attributes_json" not in observation_columns:
             conn.execute("ALTER TABLE supplier_scrape_observations ADD COLUMN variant_attributes_json TEXT")
+        price_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(supplier_local_price_snapshots)")
+        }
+        if "run_id" not in price_columns:
+            conn.execute("ALTER TABLE supplier_local_price_snapshots ADD COLUMN run_id TEXT")
         conn.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_supplier_scrape_observations_ref
@@ -335,7 +383,121 @@ class LocalCaptureStorage:
             ON supplier_local_price_snapshots(supplier, supplier_product_ref)
             """
         )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_supplier_scrape_observations_run
+            ON supplier_scrape_observations(run_id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_supplier_local_fetch_log_run
+            ON supplier_local_fetch_log(run_id)
+            """
+        )
         return conn
+
+    def known_refs(self, conn: sqlite3.Connection, supplier: str) -> set[str]:
+        return {
+            row[0]
+            for row in conn.execute(
+                "SELECT DISTINCT supplier_product_ref FROM supplier_scrape_observations WHERE supplier = ?",
+                (supplier,),
+            )
+        }
+
+    def start_run(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        supplier: str,
+        dry_run: bool,
+        config_path: str,
+        start_url_count: int,
+    ) -> str:
+        run_id = str(uuid.uuid4())
+        now = now_iso()
+        conn.execute(
+            """
+            INSERT INTO supplier_local_scrape_runs(
+                id, supplier, started_at, status, dry_run, config_path,
+                start_url_count, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (run_id, supplier, now, "running", int(dry_run), config_path, start_url_count, now),
+        )
+        return run_id
+
+    def finish_run(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        *,
+        status: str,
+        request_count: int,
+        product_page_count: int,
+        stored_reference_count: int,
+        new_reference_count: int,
+        known_reference_count: int,
+        skipped_without_ref: int,
+        stopped_reason: str = "",
+    ) -> None:
+        conn.execute(
+            """
+            UPDATE supplier_local_scrape_runs
+            SET finished_at = ?, status = ?, request_count = ?,
+                product_page_count = ?, stored_reference_count = ?,
+                new_reference_count = ?, known_reference_count = ?,
+                skipped_without_ref = ?, stopped_reason = ?
+            WHERE id = ?
+            """,
+            (
+                now_iso(),
+                status,
+                request_count,
+                product_page_count,
+                stored_reference_count,
+                new_reference_count,
+                known_reference_count,
+                skipped_without_ref,
+                stopped_reason,
+                run_id,
+            ),
+        )
+
+    def log_fetch(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        run_id: str,
+        supplier: str,
+        url: str,
+        status_code: int | None,
+        from_cache: bool,
+        html_hash: str = "",
+        error: str = "",
+        notes: str = "",
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO supplier_local_fetch_log(
+                id, run_id, supplier, url, fetched_at, status_code,
+                from_cache, html_hash, error, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                stable_id("supplier_local_fetch_log", run_id, url, now_iso()),
+                run_id,
+                supplier,
+                url,
+                now_iso(),
+                status_code,
+                int(from_cache),
+                html_hash,
+                error,
+                notes,
+            ),
+        )
 
     def capture_candidate(
         self,
@@ -343,6 +505,7 @@ class LocalCaptureStorage:
         candidate: ProductCandidate,
         *,
         source_html_cache_path: str = "",
+        run_id: str = "",
     ) -> str:
         now = now_iso()
         observation_id = stable_id(
@@ -354,13 +517,14 @@ class LocalCaptureStorage:
         conn.execute(
             """
             INSERT INTO supplier_scrape_observations(
-                id, supplier, supplier_product_ref, product_url, product_name_short,
+                id, run_id, supplier, supplier_product_ref, product_url, product_name_short,
                 generic_category, packaging_text, price_publicly_visible, price_text,
                 price_value, currency_detected, retrieval_date, source_html_hash,
                 source_html_cache_path, variant_refs_json, variant_attributes_json,
                 scraping_notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(supplier, supplier_product_ref, retrieval_date) DO UPDATE SET
+                run_id = excluded.run_id,
                 product_url = excluded.product_url,
                 product_name_short = excluded.product_name_short,
                 generic_category = excluded.generic_category,
@@ -377,6 +541,7 @@ class LocalCaptureStorage:
             """,
             (
                 observation_id,
+                run_id,
                 candidate.supplier,
                 candidate.supplier_product_ref,
                 candidate.product_url,
@@ -400,10 +565,10 @@ class LocalCaptureStorage:
             conn.execute(
                 """
                 INSERT INTO supplier_local_price_snapshots(
-                    id, observation_id, supplier, supplier_product_ref, product_url,
+                    id, run_id, observation_id, supplier, supplier_product_ref, product_url,
                     price_text, price_value, currency, retrieved_at, source_html_hash,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(supplier, supplier_product_ref, retrieved_at, price_text)
                 DO NOTHING
                 """,
@@ -415,6 +580,7 @@ class LocalCaptureStorage:
                         candidate.retrieval_date,
                         candidate.price_text,
                     ),
+                    run_id,
                     observation_id,
                     candidate.supplier,
                     candidate.supplier_product_ref,

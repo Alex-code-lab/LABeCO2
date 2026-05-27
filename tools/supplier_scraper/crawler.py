@@ -48,6 +48,8 @@ class CrawlStats:
     fetched_pages: int = 0
     product_pages: int = 0
     stored_references: int = 0
+    new_references: int = 0
+    known_references: int = 0
     skipped_without_ref: int = 0
     stopped_reason: str = ""
 
@@ -116,6 +118,15 @@ class PoliteHttpClient:
             logger.info("Pause polie %.1fs avant prochaine requête", remaining)
             time.sleep(remaining)
 
+    @staticmethod
+    def _encode_url(url: str) -> str:
+        parsed = urllib.parse.urlparse(url)
+        encoded = parsed._replace(
+            path=urllib.parse.quote(parsed.path, safe="/:@!$&'()*+,;="),
+            query=urllib.parse.quote(parsed.query, safe="=&+%"),
+        )
+        return urllib.parse.urlunparse(encoded)
+
     def fetch(self, url: str) -> FetchResult:
         cache_path = self._cache_path(url)
         if self.use_cache and cache_path.exists():
@@ -128,7 +139,9 @@ class PoliteHttpClient:
             raise StopScraping(f"robots.txt interdit l'accès à {url}")
 
         self._wait()
-        request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
+        request = urllib.request.Request(
+            self._encode_url(url), headers={"User-Agent": self.user_agent}
+        )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 status_code = int(response.status)
@@ -231,6 +244,19 @@ class SupplierCrawler:
                 config_path=config_path,
                 start_url_count=len(start_urls),
             )
+            local_conn = None
+            local_run_id = ""
+            known_local_refs: set[str] = set()
+            if self.local_capture and (not dry_run or self.capture_during_dry_run):
+                local_conn = self.local_capture.connect()
+                known_local_refs = self.local_capture.known_refs(local_conn, self.supplier["name"])
+                local_run_id = self.local_capture.start_run(
+                    local_conn,
+                    supplier=self.supplier["name"],
+                    dry_run=dry_run,
+                    config_path=config_path,
+                    start_url_count=len(start_urls),
+                )
             queue = list(start_urls)
             seen_urls: set[str] = set()
             seen_product_urls: set[str] = set()
@@ -242,7 +268,32 @@ class SupplierCrawler:
                         continue
                     seen_urls.add(url)
                     logger.info("Fetch %s", url)
-                    result = self.client.fetch(url)
+                    try:
+                        result = self.client.fetch(url)
+                    except StopScraping as exc:
+                        if local_conn and local_run_id:
+                            self.local_capture.log_fetch(
+                                local_conn,
+                                run_id=local_run_id,
+                                supplier=self.supplier["name"],
+                                url=url,
+                                status_code=None,
+                                from_cache=False,
+                                error=str(exc),
+                            )
+                        raise
+                    except Exception as exc:
+                        if local_conn and local_run_id:
+                            self.local_capture.log_fetch(
+                                local_conn,
+                                run_id=local_run_id,
+                                supplier=self.supplier["name"],
+                                url=url,
+                                status_code=None,
+                                from_cache=False,
+                                error=str(exc),
+                            )
+                        raise
                     stats.fetched_pages += 1
                     self.storage.log_fetch(
                         conn,
@@ -253,6 +304,16 @@ class SupplierCrawler:
                         from_cache=result.from_cache,
                         html_hash=result.html_hash,
                     )
+                    if local_conn and local_run_id:
+                        self.local_capture.log_fetch(
+                            local_conn,
+                            run_id=local_run_id,
+                            supplier=self.supplier["name"],
+                            url=url,
+                            status_code=result.status_code,
+                            from_cache=result.from_cache,
+                            html_hash=result.html_hash,
+                        )
 
                     if self._is_product_url(url):
                         seen_product_urls.add(url)
@@ -270,7 +331,17 @@ class SupplierCrawler:
                         if candidate.supplier_product_ref in seen_supplier_refs:
                             continue
                         seen_supplier_refs.add(candidate.supplier_product_ref)
-                        self._store_candidate(conn, candidate, dry_run, stats)
+                        is_new_local = candidate.supplier_product_ref not in known_local_refs
+                        self._store_candidate(
+                            conn,
+                            candidate,
+                            dry_run,
+                            stats,
+                            local_conn=local_conn,
+                            local_run_id=local_run_id,
+                            is_new_local=is_new_local,
+                        )
+                        known_local_refs.add(candidate.supplier_product_ref)
                         self._queue_variant_urls(url, candidate, queue, seen_urls, seen_product_urls)
                         continue
 
@@ -301,6 +372,21 @@ class SupplierCrawler:
                 stored_reference_count=stats.stored_references,
                 notes=stats.stopped_reason,
             )
+            if local_conn and local_run_id:
+                self.local_capture.finish_run(
+                    local_conn,
+                    local_run_id,
+                    status=final_status,
+                    request_count=stats.fetched_pages,
+                    product_page_count=stats.product_pages,
+                    stored_reference_count=stats.stored_references,
+                    new_reference_count=stats.new_references,
+                    known_reference_count=stats.known_references,
+                    skipped_without_ref=stats.skipped_without_ref,
+                    stopped_reason=stats.stopped_reason,
+                )
+                local_conn.commit()
+                local_conn.close()
             if dry_run:
                 conn.rollback()
             else:
@@ -313,6 +399,10 @@ class SupplierCrawler:
         candidate: ProductCandidate,
         dry_run: bool,
         stats: CrawlStats,
+        *,
+        local_conn=None,
+        local_run_id: str = "",
+        is_new_local: bool = False,
     ) -> None:
         logger.info(
             "%s référence %s %s",
@@ -322,12 +412,15 @@ class SupplierCrawler:
         )
         if not dry_run:
             self.storage.upsert_reference(conn, candidate)
-        if self.local_capture and (not dry_run or self.capture_during_dry_run):
-            with self.local_capture.connect() as local_conn:
-                self.local_capture.capture_candidate(
-                    local_conn,
-                    candidate,
-                    source_html_cache_path=str(self.client.cache_path_for(candidate.product_url)),
-                )
-                local_conn.commit()
+        if self.local_capture and local_conn is not None:
+            self.local_capture.capture_candidate(
+                local_conn,
+                candidate,
+                source_html_cache_path=str(self.client.cache_path_for(candidate.product_url)),
+                run_id=local_run_id,
+            )
         stats.stored_references += 1
+        if is_new_local:
+            stats.new_references += 1
+        else:
+            stats.known_references += 1

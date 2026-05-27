@@ -302,6 +302,80 @@ def test_local_capture_storage_records_price_snapshot(tmp_path):
     assert prices["currency"] == "EUR"
 
 
+def test_local_capture_storage_records_run_history(tmp_path):
+    db_path = tmp_path / "private_capture.sqlite"
+    storage = LocalCaptureStorage(db_path)
+    html = (FIXTURES / "sample_product.html").read_text(encoding="utf-8")
+    candidate = parse_product_page(
+        supplier="TEST",
+        product_url="https://example.org/store/product/TALC-1000",
+        html_text=html,
+        retrieval_date="2026-05-26T12:00:00+00:00",
+        rules={
+            "generic_category": "poudre",
+            "ref_patterns": [r"Référence:\s*(?P<ref>[A-Z0-9._-]+)"],
+            "packaging_patterns": [r"Conditionnement:\s*(?P<pack>[^\n]+)"],
+        },
+    )
+    assert candidate is not None
+
+    with storage.connect() as conn:
+        run_id = storage.start_run(
+            conn,
+            supplier="TEST",
+            dry_run=True,
+            config_path="config.yaml",
+            start_url_count=1,
+        )
+        storage.log_fetch(
+            conn,
+            run_id=run_id,
+            supplier="TEST",
+            url="https://example.org/store/product/TALC-1000",
+            status_code=200,
+            from_cache=True,
+            html_hash=candidate.source_html_hash,
+        )
+        storage.capture_candidate(conn, candidate, run_id=run_id)
+        storage.finish_run(
+            conn,
+            run_id,
+            status="completed",
+            request_count=1,
+            product_page_count=1,
+            stored_reference_count=1,
+            new_reference_count=1,
+            known_reference_count=0,
+            skipped_without_ref=0,
+        )
+        conn.commit()
+
+        run = conn.execute(
+            """
+            SELECT supplier, status, request_count, product_page_count,
+                   stored_reference_count, new_reference_count, known_reference_count
+            FROM supplier_local_scrape_runs
+            WHERE id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        fetch_count = conn.execute(
+            "SELECT COUNT(*) FROM supplier_local_fetch_log WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()[0]
+        observation_run = conn.execute(
+            "SELECT run_id FROM supplier_scrape_observations"
+        ).fetchone()["run_id"]
+        price_run = conn.execute(
+            "SELECT run_id FROM supplier_local_price_snapshots"
+        ).fetchone()["run_id"]
+
+    assert tuple(run) == ("TEST", "completed", 1, 1, 1, 1, 0)
+    assert fetch_count == 1
+    assert observation_run == run_id
+    assert price_run == run_id
+
+
 def test_import_private_scrape_to_labeco2_is_idempotent(tmp_path):
     source_db = tmp_path / "private_capture.sqlite"
     source_storage = LocalCaptureStorage(source_db)

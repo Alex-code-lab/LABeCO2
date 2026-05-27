@@ -41,9 +41,13 @@ pour la recherche mais n'est pas unique.
 `local_capture` dans `config.yaml` active une base SQLite a part:
 
 - `supplier_scrape_observations`: capture large des champs observes, URL, hash,
-  chemin du cache HTML, variantes detectees, attributs de variante, prix texte
-  et prix numerique.
-- `supplier_local_price_snapshots`: historique local des prix observes.
+  chemin du cache HTML, variantes detectees, attributs de variante, prix texte,
+  prix numerique et `run_id`.
+- `supplier_local_price_snapshots`: historique local des prix observes, avec
+  `run_id`.
+- `supplier_local_scrape_runs`: resume prive de chaque lancement, y compris pages
+  vues, produits vus, references nouvelles/deja connues et raison d'arret.
+- `supplier_local_fetch_log`: journal prive des URLs fetchées pour chaque run.
 
 Par defaut, `dry_run: true` empeche l'ecriture dans la base LABeCO2. Avec
 `local_capture.capture_during_dry_run: true`, le scraper peut quand meme ecrire
@@ -61,6 +65,8 @@ python -m tools.supplier_scraper.main \
 
 Avec la configuration actuelle, cette commande n'ecrit pas dans la base LABeCO2,
 mais alimente la base privee de capture `private/supplier_scraping_lab.sqlite`.
+Le resume imprime distingue maintenant les references nouvelles et celles deja
+presentes dans cette base privee.
 
 Exporter les references deja presentes:
 
