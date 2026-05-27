@@ -10,6 +10,7 @@ build/
 Desktop/
 packaging/
 private/
+.cache/
 .DS_Store
 ~$*
 *.xlsx
