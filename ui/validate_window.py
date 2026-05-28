@@ -7,8 +7,8 @@ import sqlite3
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -682,23 +682,36 @@ class ValidateWidget(QWidget):
         )
         self.btn_edit = QPushButton("Ouvrir / modifier")
         self.btn_quality = QPushButton("Contrôle qualité sélection")
+        self.btn_open_url = QPushButton("Ouvrir fiche fournisseur")
+        self.btn_open_url.setToolTip(
+            "Ouvre la page produit chez le fournisseur dans le navigateur "
+            "(utile pour récupérer NACRES, prix, conditionnement)."
+        )
         self.btn_edit.setStyleSheet(
             "QPushButton{background:#e65100;color:white;font-weight:bold;padding:6px 16px;}"
             "QPushButton:hover{background:#f4511e;}"
+            "QPushButton:disabled{background:#aaa;}"
+        )
+        self.btn_open_url.setStyleSheet(
+            "QPushButton{background:#1565c0;color:white;font-weight:bold;padding:6px 16px;}"
+            "QPushButton:hover{background:#1976d2;}"
             "QPushButton:disabled{background:#aaa;}"
         )
         self.btn_validate.setEnabled(False)
         self.btn_reject.setEnabled(False)
         self.btn_edit.setEnabled(False)
         self.btn_quality.setEnabled(False)
+        self.btn_open_url.setEnabled(False)
         self.btn_validate.clicked.connect(self._on_validate)
         self.btn_reject.clicked.connect(self._on_reject)
         self.btn_edit.clicked.connect(self._on_edit)
         self.btn_quality.clicked.connect(self._on_quality_check)
+        self.btn_open_url.clicked.connect(self._on_open_supplier_url)
         action_bar.addWidget(self.btn_validate)
         action_bar.addWidget(self.btn_reject)
         action_bar.addWidget(self.btn_quality)
         action_bar.addWidget(self.btn_edit)
+        action_bar.addWidget(self.btn_open_url)
         action_bar.addStretch()
         if self._show_close:
             btn_close = QPushButton("Fermer")
@@ -1462,6 +1475,58 @@ class ValidateWidget(QWidget):
             checked[0].data(Qt.ItemDataRole.UserRole)[0] in self._EDITABLE_TABLES
         )
         self.btn_edit.setEnabled(can_edit)
+        can_open_url = (
+            n == 1
+            and checked[0].data(Qt.ItemDataRole.UserRole) is not None
+            and checked[0].data(Qt.ItemDataRole.UserRole)[0] == "commercial_products"
+            and bool(self._supplier_url_for_product(checked[0].data(Qt.ItemDataRole.UserRole)[1]))
+        )
+        self.btn_open_url.setEnabled(can_open_url)
+
+    def _supplier_url_for_product(self, product_id: str) -> str:
+        """Récupère l'URL produit chez le fournisseur, si elle existe."""
+        if not product_id:
+            return ""
+        try:
+            with sqlite3.connect(self.sqlite_path) as conn:
+                row = conn.execute(
+                    """
+                    SELECT COALESCE(sc.product_url, sr.product_url, '') AS url
+                    FROM commercial_products cp
+                    LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
+                    LEFT JOIN supplier_references sr
+                           ON sr.supplier = sc.supplier
+                          AND sr.supplier_product_ref = sc.code_fournisseur
+                    WHERE cp.id = ?
+                    LIMIT 1
+                    """,
+                    (product_id,),
+                ).fetchone()
+        except sqlite3.Error:
+            return ""
+        return (row[0] if row else "") or ""
+
+    def _on_open_supplier_url(self) -> None:
+        checked = [
+            self.table_widget.item(r, 0)
+            for r in range(self.table_widget.rowCount())
+            if self.table_widget.item(r, 0)
+            and self.table_widget.item(r, 0).checkState() == Qt.CheckState.Checked
+        ]
+        if len(checked) != 1:
+            return
+        user_data = checked[0].data(Qt.ItemDataRole.UserRole)
+        if not isinstance(user_data, tuple) or user_data[0] != "commercial_products":
+            return
+        url = self._supplier_url_for_product(user_data[1])
+        if not url:
+            _admin_message(
+                self,
+                "Pas d'URL fournisseur",
+                "Aucune fiche fournisseur n'est enregistrée pour ce produit.",
+            )
+            return
+        QDesktopServices.openUrl(QUrl(url))
 
     def _selected_entries(self) -> list[tuple[str, str]]:
         result = []

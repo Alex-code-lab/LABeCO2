@@ -26,8 +26,8 @@ from PySide6.QtWidgets import (
     QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
     QToolButton, QStyle, QListView,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QIntValidator, QDoubleValidator
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QCursor, QDesktopServices, QIntValidator, QDoubleValidator
 from shiboken6 import isValid
 
 from ui.data_manager import DataManager
@@ -560,9 +560,22 @@ class MainWindow(QMainWindow):
         self.indicator_conso.setFixedWidth(20)
         self.indicator_conso.setStyleSheet("color: #dc2626; font-size: 15px; font-weight: bold;")
 
+        self.btn_open_supplier_url = QPushButton("🌐")
+        self.btn_open_supplier_url.setFixedWidth(40)
+        self.btn_open_supplier_url.setToolTip(
+            "Ouvrir la fiche du produit chez le fournisseur dans le navigateur."
+        )
+        self.btn_open_supplier_url.setStyleSheet(
+            "QPushButton{background:#1565c0;color:white;font-weight:bold;padding:4px 10px;}"
+            "QPushButton:hover{background:#1976d2;}"
+            "QPushButton:disabled{background:#cccccc;color:#666666;}"
+        )
+        self.btn_open_supplier_url.clicked.connect(self._open_selected_consumable_url)
+
         conso_layout = QHBoxLayout()
         conso_layout.addWidget(self.indicator_conso)
         conso_layout.addWidget(self.conso_filtered_combo)
+        conso_layout.addWidget(self.btn_open_supplier_url)
         conso_layout.addWidget(self.conso_search_label)
         conso_layout.addWidget(self.conso_search_field)
 
@@ -620,8 +633,8 @@ class MainWindow(QMainWindow):
         self.contenant_warning_label.setWordWrap(True)
         self.contenant_warning_label.setVisible(False)
 
-        self.manage_consumables_button = QPushButton("Enrichir le consommable choisi")
-        self.manage_consumables_button.setToolTip("Enrichir le consommable choisi")
+        self.manage_consumables_button = QPushButton("Enrichir le consommable")
+        self.manage_consumables_button.setToolTip("Enrichir le consommable")
         self.manage_consumables_button.setEnabled(False)
         self.manage_consumables_button.setMaximumWidth(230)
         self.add_consumable_button = QPushButton("Ajouter un consommable")
@@ -1132,6 +1145,7 @@ class MainWindow(QMainWindow):
 
         self.subsub_name_combo.currentIndexChanged.connect(self._update_field_indicators)
         self.conso_filtered_combo.currentIndexChanged.connect(self._update_field_indicators)
+        self.conso_filtered_combo.currentIndexChanged.connect(self._update_supplier_url_button)
         self.input_field.textChanged.connect(self._update_field_indicators)
         self.quantity_input.textChanged.connect(self._update_field_indicators)
 
@@ -1420,6 +1434,68 @@ class MainWindow(QMainWindow):
             if re.match(r"^[A-Za-z]{2}[0-9]{2}\b", clean_text(code)):
                 return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid", "conditionnement": ""}
         return {"code_nacres": "", "consommable": text, "source": "solid", "conditionnement": ""}
+
+    def _supplier_url_for_consumable(self) -> str:
+        """Récupère l'URL fournisseur du consommable sélectionné, si elle existe."""
+        selected = self._selected_consumable_data()
+        if not selected:
+            return ""
+        name = clean_text(selected.get("consommable"))
+        code = clean_text(selected.get("code_nacres")).upper()
+        if not name:
+            return ""
+        sqlite_path = getattr(self.data_manager, "sqlite_path", "")
+        if not sqlite_path:
+            return ""
+        try:
+            with sqlite3.connect(sqlite_path) as conn:
+                # Match exact d'abord. Si le nom est tronqué dans l'UI, fallback
+                # sur un préfixe LIKE pour rester robuste.
+                row = conn.execute(
+                    """
+                    SELECT COALESCE(sc.product_url, sr.product_url, '') AS url
+                    FROM commercial_products cp
+                    LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
+                    LEFT JOIN supplier_references sr
+                           ON sr.supplier = sc.supplier
+                          AND sr.supplier_product_ref = sc.code_fournisseur
+                    WHERE (
+                              lower(trim(cp.name)) = lower(trim(?))
+                           OR lower(trim(cp.name)) LIKE lower(trim(?)) || '%'
+                          )
+                      AND (? = '' OR upper(trim(cp.code_nacres)) = ?)
+                      AND COALESCE(cp.status, '') != 'deprecated'
+                      AND (
+                          COALESCE(sc.product_url, '') != ''
+                       OR COALESCE(sr.product_url, '') != ''
+                      )
+                    ORDER BY CASE cp.status
+                        WHEN 'validated' THEN 0
+                        WHEN 'draft'     THEN 1
+                        ELSE 2 END
+                    LIMIT 1
+                    """,
+                    (name, name, code, code),
+                ).fetchone()
+        except sqlite3.Error:
+            return ""
+        return (row[0] if row else "") or ""
+
+    def _open_selected_consumable_url(self) -> None:
+        url = self._supplier_url_for_consumable()
+        if not url:
+            QMessageBox.information(
+                self,
+                "Pas de fiche fournisseur",
+                "Aucune URL fournisseur n'est enregistrée pour ce consommable.",
+            )
+            return
+        QDesktopServices.openUrl(QUrl(url))
+
+    def _update_supplier_url_button(self) -> None:
+        button = getattr(self, "btn_open_supplier_url", None)
+        if button is not None:
+            button.setEnabled(bool(self._supplier_url_for_consumable()))
 
     def _select_consumable_item(self, code_nacres, consommable, packaging=""):
         code_prefix = normalize_nacres_prefix(code_nacres)
@@ -3207,6 +3283,7 @@ class MainWindow(QMainWindow):
             prefill_name=prefill_name,
             prefill_source=prefill_source,
             sqlite_path=getattr(self.data_manager, "sqlite_path", None),
+            prefill_source_url=self._supplier_url_for_consumable(),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()

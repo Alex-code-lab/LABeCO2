@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog, QToolTip,
     QScrollArea, QSizePolicy, QListView
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QDoubleValidator, QIntValidator
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QCursor, QDesktopServices, QDoubleValidator, QIntValidator
 from ui.display_utils import looks_like_liquid_commercial_product
 from ui.nacres_metadata import load_nacres_options
 from ui.sqlite_legacy_adapter import SQLITE_ID_COL, load_legacy_dataframes
@@ -94,7 +94,7 @@ class DataMassWindow(QMainWindow):
     def __init__(self, parent=None, data_materials=None, base_path=None,
                  user_path=None, prefill_code=None, prefill_name=None,
                  prefill_source="solid", initial_mode=None, mode_filter="consumable",
-                 sqlite_path=None):
+                 sqlite_path=None, prefill_source_url=""):
         super().__init__(parent)
 
         self.mode_filter = mode_filter or "consumable"
@@ -203,6 +203,13 @@ class DataMassWindow(QMainWindow):
 
         if prefill_code or prefill_name:
             self.prefill_consumable(prefill_code or "", prefill_name or "", source=prefill_source)
+
+        # Pré-remplit la source avec l'URL fournisseur si rien n'est déjà
+        # renseigné côté source : pratique pour récupérer NACRES / prix sur la
+        # page du fournisseur sans avoir à recopier l'URL à la main.
+        prefill_url = (prefill_source_url or "").strip()
+        if prefill_url and not self.source_input.text().strip():
+            self.source_input.setText(prefill_url)
 
     def charger_ou_initialiser_donnees(self):
         if self._uses_sqlite():
@@ -326,6 +333,33 @@ class DataMassWindow(QMainWindow):
         return bool(
             re.search(r"https?://|www\.|doi\s*:|doi\.org|10\.\d{4,9}/", text, flags=re.IGNORECASE)
         )
+
+    @staticmethod
+    def _looks_like_url(value):
+        """Détecte si la valeur contient une URL ou un DOI ouvrable dans un navigateur."""
+        text = (value or "").strip()
+        if not text:
+            return False
+        return bool(
+            re.search(r"https?://|www\.|doi\.org/|10\.\d{4,9}/", text, flags=re.IGNORECASE)
+        )
+
+    def _open_text_url(self, value):
+        """Ouvre l'URL contenue dans `value` dans le navigateur par défaut."""
+        text = (value or "").strip()
+        if not text:
+            return
+        # Extrait la première URL explicite si le champ contient plus de texte.
+        match = re.search(r"https?://\S+|www\.\S+|10\.\d{4,9}/\S+", text)
+        if match:
+            url = match.group(0)
+        else:
+            url = text
+        if url.lower().startswith("www."):
+            url = "https://" + url
+        elif url.lower().startswith("10."):
+            url = "https://doi.org/" + url
+        QDesktopServices.openUrl(QUrl(url))
 
     def migrate_source_signature_columns(self, df, mode):
         """Convertit l'ancien champ mixte sans le réécrire dans les bases."""
@@ -713,8 +747,40 @@ class DataMassWindow(QMainWindow):
         self.register_required_field(self.factor_input, "Facteur CO₂")
 
         self.add_section_header("Source et notes")
-        self.form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
-        self.form_layout.addRow("Source (article/lien):", self.source_input)
+        # Lien / Note / Remarque : QLineEdit + bouton qui ouvre le lien si valide.
+        lien_row = QHBoxLayout()
+        lien_row.setContentsMargins(0, 0, 0, 0)
+        lien_row.addWidget(self.lien_input)
+        self.btn_open_lien = QPushButton("Ouvrir ↗")
+        self.btn_open_lien.setToolTip("Ouvre le lien dans le navigateur si le champ contient une URL.")
+        self.btn_open_lien.setMaximumWidth(110)
+        self.btn_open_lien.setEnabled(False)
+        self.btn_open_lien.clicked.connect(lambda: self._open_text_url(self.lien_input.text()))
+        self.lien_input.textChanged.connect(
+            lambda t: self.btn_open_lien.setEnabled(self._looks_like_url(t))
+        )
+        lien_row.addWidget(self.btn_open_lien)
+        lien_widget = QWidget()
+        lien_widget.setLayout(lien_row)
+        self.form_layout.addRow("Lien / Note / Remarque:", lien_widget)
+
+        # Source (article/lien) : même traitement.
+        source_row = QHBoxLayout()
+        source_row.setContentsMargins(0, 0, 0, 0)
+        source_row.addWidget(self.source_input)
+        self.btn_open_source = QPushButton("Ouvrir ↗")
+        self.btn_open_source.setToolTip("Ouvre la source dans le navigateur si le champ contient une URL.")
+        self.btn_open_source.setMaximumWidth(110)
+        self.btn_open_source.setEnabled(False)
+        self.btn_open_source.clicked.connect(lambda: self._open_text_url(self.source_input.text()))
+        self.source_input.textChanged.connect(
+            lambda t: self.btn_open_source.setEnabled(self._looks_like_url(t))
+        )
+        source_row.addWidget(self.btn_open_source)
+        source_widget = QWidget()
+        source_widget.setLayout(source_row)
+        self.form_layout.addRow("Source (article/lien):", source_widget)
+
         self.form_layout.addRow("Signature (nom/équipe/labo):", self.signature_input)
         self.register_required_field(self.source_input, "Source")
         self.register_required_field(self.signature_input, "Signature")
