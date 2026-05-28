@@ -2,10 +2,52 @@
 """
 LABeCO2 — Outil d'administration des bases de données.
 
-Lance une application Qt indépendante avec trois onglets :
-  1. Validation   — valider ou rejeter les entrées à valider
-  2. Fusion       — fusionner deux bases SQLite, résoudre les conflits
-  3. Qualité      — audit complet de la base
+==============================================================================
+ ⚠️ OUTIL DESTINÉ AUX CONTRIBUTEURS ET ADMINISTRATEURS, PAS AUX UTILISATEURS
+    FINAUX DU CALCULATEUR.
+==============================================================================
+
+À quoi sert ce script
+---------------------
+lab_admin est l'outil utilisé pour préparer, vérifier et fusionner les données
+qui alimentent la base de référence de LABeCO2. Il ne calcule pas d'empreinte
+carbone : il sert à enrichir le référentiel partagé entre tous les utilisateurs
+(facteurs d'émission, consommables, codes NACRES, matériaux, sources, etc.).
+
+Comment les utilisateurs finaux contribuent
+-------------------------------------------
+La plupart des utilisateurs n'ont **pas besoin** de lancer lab_admin. Depuis
+le calculateur principal (`main.py`), il est déjà possible de :
+  - ajouter un consommable manquant via « Enrichir le consommable » ;
+  - ajouter un facteur d'émission via « Ajouter un facteur d'émission » ;
+  - ajouter un consommable totalement nouveau via « Ajouter un consommable ».
+
+Toutes ces contributions sont écrites en statut « pending » ou « draft » dans
+la base SQLite locale de l'utilisateur (le fichier `labeco2.sqlite` de son
+dossier personnel). Elles n'impactent **que sa propre base**.
+
+Pour que ces ajouts intègrent la base de référence officielle, l'utilisateur
+peut envoyer son fichier `labeco2.sqlite` à un administrateur du projet, qui
+utilisera lab_admin pour :
+  1. ouvrir la base reçue ;
+  2. fusionner les nouvelles entrées dans la base de référence ;
+  3. valider les entrées après contrôle qualité (NACRES, source, FE…) ;
+  4. publier une base de référence enrichie dans la release suivante.
+
+Onglets disponibles
+-------------------
+  1. Validation             — vérifier et valider les entrées en attente
+  2. Fusion / Conflits      — fusionner les contributions de plusieurs bases
+  3. Qualité                — audit complet de la base (anomalies, doublons…)
+  4. Catalogue fournisseurs — édition des produits et URLs fournisseurs
+  5. ⬇ Import Scraping       — import contrôlé des observations du scraper
+
+Garde-fous
+----------
+Toutes les modifications sont locales tant qu'elles ne sont pas distribuées
+dans une release officielle. Avant chaque import en masse, lab_admin crée
+automatiquement une sauvegarde de la base cible. Aucune écriture ne se fait
+sur un serveur distant.
 
 Usage :
     python tools/lab_admin.py [--db PATH]

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# windows/main_window.py, LABeCO2 ©
-# Copyright (c), 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+# ui/main_window.py, LABeCO2 ©
+# Copyright (c), 2024-2026, LABeCO2, Alexandre Souchaud. Tous droits réservés.
 # Auteur : Alexandre Souchaud — labeco2.contact@gmail.com
 #
 # Ce programme est distribué sous licence :
@@ -8,8 +8,8 @@
 #
 # Vous pouvez consulter la GPL ici : https://www.gnu.org/licenses/gpl-3.0.fr.html
 #
-# Date de création : 01/10/2024 — Version V2.1 du 10/04/2025
-# DOI: 10.5281/zenodo.15243498
+# Date de création : 01/10/2024 — Version V3.0 du 28/05/2026
+# DOI: 10.5281/zenodo.15240634
 
 
 import sys
