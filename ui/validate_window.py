@@ -7,12 +7,14 @@ import sqlite3
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -652,6 +654,12 @@ class ValidateWidget(QWidget):
         )
         self.btn_suggest_nacres.clicked.connect(self._suggest_nacres_for_visible_rows)
         save_bar.addWidget(self.btn_suggest_nacres)
+        self.btn_apply_nacres = QPushButton("Appliquer NACRES à la sélection")
+        self.btn_apply_nacres.setToolTip(
+            "Applique le même code NACRES à toutes les lignes cochées (produits commerciaux uniquement)."
+        )
+        self.btn_apply_nacres.clicked.connect(self._apply_nacres_to_selection)
+        save_bar.addWidget(self.btn_apply_nacres)
         self.pending_edits_label = QLabel("")
         self.pending_edits_label.setStyleSheet("color: #b45309; font-style: italic;")
         save_bar.addWidget(self.pending_edits_label)
@@ -871,24 +879,47 @@ class ValidateWidget(QWidget):
             c.lineEdit().setText(text)
             c.lineEdit().setCursorPosition(len(text))
 
-        def commit_text(c=combo, r=row, col=column, rid=row_id, table=db_table) -> None:
+        def commit_text(c=combo, r=row, col=column, rid=row_id, table=db_table,
+                        initial=current_code) -> None:
+            if getattr(c, "_committed", False):
+                return
+            # Tant que l'utilisateur n'a pas interagi (popup juste ouvert),
+            # on ne commit pas : sinon le simple changement de focus vers le
+            # popup fermerait immédiatement l'éditeur.
+            if not getattr(c, "_interacted", False):
+                return
             code = _nacres_code_from_text(c.currentText())
             if code and code not in self._nacres_by_code:
                 return
+            # Pas de modification réelle : on referme sans rien écrire.
+            if code == initial:
+                c._committed = True
+                QTimer.singleShot(0, lambda: self.table_widget.removeCellWidget(r, col))
+                return
+            c._committed = True
             item_obj = self.table_widget.item(r, col)
             if item_obj:
                 item_obj.setText(code)
                 item_obj.setToolTip(self._nacres_display(code) if code else "")
                 item_obj.setBackground(_COLOR_EDITED)
             self._pending_edits.setdefault((table, rid), {})["code_nacres"] = code
-            c.blockSignals(True)
-            c.setEditText(code)
-            c.lineEdit().setCursorPosition(0)
-            c.blockSignals(False)
             self._update_pending_label()
+            # Restaure la cellule en texte simple : on retire la combo après le
+            # cycle d'événements en cours pour éviter de la détruire pendant
+            # qu'elle est encore en train d'émettre des signaux.
+            QTimer.singleShot(0, lambda: self.table_widget.removeCellWidget(r, col))
+
+        def mark_interacted(*_args, c=combo) -> None:
+            c._interacted = True
+
+        def on_activated(_idx, c=combo) -> None:
+            c._interacted = True
+            commit_text(c)
 
         combo.lineEdit().textEdited.connect(filter_text)
-        combo.activated.connect(lambda _idx, c=combo: commit_text(c))
+        combo.lineEdit().textEdited.connect(mark_interacted)
+        combo.activated.connect(on_activated)
+        combo.lineEdit().returnPressed.connect(mark_interacted)
         combo.lineEdit().editingFinished.connect(lambda c=combo: commit_text(c))
         self.table_widget.setCellWidget(row, column, combo)
         combo.setFocus()
@@ -1231,6 +1262,128 @@ class ValidateWidget(QWidget):
             "Vérifiez les lignes en jaune puis cliquez sur Sauvegarder les modifications.",
         )
 
+    def _apply_nacres_to_selection(self) -> None:
+        """Applique le même code NACRES à toutes les lignes cochées."""
+        nacres_col = self._column_index("NACRES")
+        if nacres_col < 0:
+            _admin_message(
+                self,
+                "Appliquer NACRES",
+                "La colonne NACRES n'est pas disponible dans cette vue.",
+            )
+            return
+
+        # Collecte des lignes cochées qui pointent vers commercial_products.
+        targets: list[tuple[int, str]] = []  # (row_index, row_id)
+        for r in range(self.table_widget.rowCount()):
+            chk = self.table_widget.item(r, 0)
+            if not chk or chk.checkState() != Qt.CheckState.Checked:
+                continue
+            user_data = chk.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(user_data, tuple) or len(user_data) < 2:
+                continue
+            db_table, row_id = user_data
+            if db_table != "commercial_products":
+                continue
+            targets.append((r, row_id))
+
+        if not targets:
+            _admin_message(
+                self,
+                "Appliquer NACRES",
+                "Aucune ligne cochée n'est un produit commercial.",
+                informative="Cochez les lignes à modifier puis réessayez.",
+            )
+            return
+
+        # Dialogue de saisie avec combo NACRES filtrée.
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Appliquer un code NACRES")
+        dlg.setMinimumWidth(420)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(
+            f"Code NACRES à appliquer aux {len(targets)} ligne(s) cochée(s) :"
+        ))
+
+        combo = QComboBox(dlg)
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        combo.setMaxVisibleItems(15)
+        view = QListView(combo)
+        view.setUniformItemSizes(True)
+        view.setMinimumWidth(560)
+        view.setMaximumWidth(620)
+        combo.setView(view)
+        proxy = _NacresPrefixFilterProxy(combo)
+        proxy.setSourceModel(self._nacres_model)
+        combo.setModel(proxy)
+        combo.setCompleter(None)
+        combo.lineEdit().setPlaceholderText("Tapez un code (ex: NB13)…")
+        combo.lineEdit().setCompleter(None)
+        combo.setCurrentIndex(0)
+
+        def on_text(text: str) -> None:
+            proxy.set_prefix(_nacres_code_from_text(text))
+
+        combo.lineEdit().textEdited.connect(on_text)
+        layout.addWidget(combo)
+
+        info = QLabel("La modification reste en attente : pensez à cliquer sur « Sauvegarder les modifications ».")
+        info.setStyleSheet("color: #888; font-style: italic;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=dlg,
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        code = _nacres_code_from_text(combo.currentText())
+        if not code or code not in self._nacres_by_code:
+            _admin_message(
+                self,
+                "Code NACRES invalide",
+                f"Le code « {code or '(vide)'} » n'existe pas dans le référentiel.",
+            )
+            return
+
+        # Application aux lignes : item texte + pending edit + couleur édition.
+        tooltip = self._nacres_display(code)
+        applied = 0
+        self.table_widget.blockSignals(True)
+        try:
+            for row_index, row_id in targets:
+                # Si une combobox d'édition est encore ouverte sur la cellule, on la ferme.
+                if isinstance(self.table_widget.cellWidget(row_index, nacres_col), QComboBox):
+                    self.table_widget.removeCellWidget(row_index, nacres_col)
+                item = self.table_widget.item(row_index, nacres_col)
+                if item is None:
+                    item = QTableWidgetItem("")
+                    self.table_widget.setItem(row_index, nacres_col, item)
+                item.setText(code)
+                item.setToolTip(tooltip)
+                item.setBackground(_COLOR_EDITED)
+                self._pending_edits.setdefault(
+                    ("commercial_products", row_id), {}
+                )["code_nacres"] = code
+                applied += 1
+        finally:
+            self.table_widget.blockSignals(False)
+
+        self._update_pending_label()
+        _admin_message(
+            self,
+            "Code NACRES appliqué",
+            f"{applied} ligne(s) mise(s) à jour avec le code {code}.",
+            informative="Cliquez sur « Sauvegarder les modifications » pour persister.",
+        )
+
     def _save_pending_edits(self) -> None:
         if not self._pending_edits:
             return
@@ -1420,6 +1573,19 @@ class ValidateWidget(QWidget):
         entries = self._selected_entries()
         if not entries:
             return
+        # Les modifs en attente (NACRES, etc.) ne sont pas encore en base : le
+        # contrôle qualité lirait l'ancien état et signalerait à tort des
+        # erreurs. On propose de sauvegarder d'abord.
+        if self._pending_edits:
+            n_pending = len(self._pending_edits)
+            if not _admin_confirm(
+                self,
+                "Modifications non sauvegardées",
+                f"{n_pending} modification(s) en attente.",
+                "Sauvegarder d'abord puis valider la sélection ?",
+            ):
+                return
+            self._save_pending_edits()
         progress = self._busy_dialog(f"Contrôle qualité de {len(entries)} entrée(s)…")
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:

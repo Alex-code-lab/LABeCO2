@@ -84,11 +84,11 @@ _MAIN_COMBO_VISIBLE_ITEMS = 15
 
 
 class CompactPopupComboBox(QComboBox):
-    """QComboBox dont le popup reste à la taille de la case.
+    """QComboBox dont le popup reste exactement à la largeur de la case.
 
-    Sur macOS, les libellés NACRES longs peuvent faire ouvrir un popup très
-    large. On redimensionne explicitement la fenêtre du popup après ouverture
-    pour éviter le grand rectangle gris autour de la liste.
+    Sur macOS le popup natif peut paraître flottant. On force ici la fenêtre du
+    popup à la même largeur que la combo et on la repositionne juste sous le
+    widget pour qu'elle se déroule pile à son emplacement.
     """
 
     def __init__(self, *args, **kwargs):
@@ -96,22 +96,22 @@ class CompactPopupComboBox(QComboBox):
         view = QListView(self)
         view.setUniformItemSizes(True)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setTextElideMode(Qt.TextElideMode.ElideRight)
         view.setStyleSheet("QListView { background: white; color: black; }")
         self.setView(view)
 
     def showPopup(self) -> None:
-        width = max(self.width(), min(620, self.width() + 260))
+        width = self.width()
         view = self.view()
         view.setMinimumWidth(width)
         view.setMaximumWidth(width)
         super().showPopup()
         popup = view.window()
-        view.setMinimumWidth(width)
-        view.setMaximumWidth(width)
-        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         popup.setMinimumWidth(width)
         popup.setMaximumWidth(width)
-        popup.resize(width, min(popup.height(), 420))
+        height = min(popup.height(), 420)
+        anchor = self.mapToGlobal(self.rect().bottomLeft())
+        popup.setGeometry(anchor.x(), anchor.y(), width, height)
 
 
 def _configure_detail_combo(combo: QComboBox) -> None:
