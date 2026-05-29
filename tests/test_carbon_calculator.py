@@ -605,6 +605,85 @@ class TestEndOfLifeEmissions(unittest.TestCase):
         self.assertAlmostEqual(emission, 3.0, places=4)
         self.assertAlmostEqual(masse, 1.0)
 
+    def test_breakdown_disponible_apres_calcul(self):
+        """Le calcul masse-based remplit calc.last_breakdown avec le détail par composant."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(
+                masse_g=10.0, materiau='PP',
+                masse_emb=5.0, mat_emb='Carton',
+            ),
+            material_map={'PP': (3.0, 0.0), 'Carton': (1.0, 0.0)},
+            eol_material_map={'Carton': (0.120, 0.20, 'Emballages/Carton')},
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},
+        )
+        calc = CarbonCalculator(dm)
+        calc._calculate_mass_based_emissions_old('NB11', 'Tube', quantity=100)
+
+        bd = calc.last_breakdown
+        self.assertIsNotNone(bd)
+        self.assertEqual(bd['filiere_consommable'], 'DASRI')
+        # 2 composants traités : PP (product) + Carton (packaging)
+        comps_traites = [c for c in bd['components']]
+        self.assertEqual(len(comps_traites), 2)
+
+        # Composant PP : production + EoL DASRI
+        pp = comps_traites[0]
+        self.assertEqual(pp['type'], 'product')
+        self.assertEqual(pp['material'], 'PP')
+        self.assertAlmostEqual(pp['mass_kg_total'], 1.0)
+        self.assertAlmostEqual(pp['production']['co2'], 3.0)
+        self.assertEqual(pp['eol']['filiere'], 'DASRI')
+        self.assertAlmostEqual(pp['eol']['co2'], 0.943)
+        self.assertFalse(pp['eol']['missing'])
+
+        # Composant Carton : production + EoL par matériau
+        carton = comps_traites[1]
+        self.assertEqual(carton['type'], 'packaging')
+        self.assertIsNone(carton['eol']['filiere'])
+        self.assertAlmostEqual(carton['eol']['co2'], 0.5 * 0.120)
+
+        # Agrégats
+        totals = bd['totals']
+        self.assertAlmostEqual(totals['production'], 3.0 + 0.5)         # 3.5
+        self.assertAlmostEqual(totals['eol_consommable'], 0.943)
+        self.assertAlmostEqual(totals['eol_packaging'], 0.060)
+        self.assertAlmostEqual(totals['total'], 3.5 + 0.943 + 0.060)
+
+    def test_breakdown_signale_materiau_sans_eol(self):
+        """Un emballage en métal (sans EoL) apparaît dans missing_eol et eol.missing=True."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(
+                masse_g=10.0, materiau='PP',
+                masse_emb=5.0, mat_emb='Aluminium',
+            ),
+            material_map={'PP': (3.0, 0.0), 'Aluminium': (11.0, 0.0)},
+            eol_material_map={},  # ni PP ni Alu mappés EoL pour les packagings
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},
+        )
+        calc = CarbonCalculator(dm)
+        calc._calculate_mass_based_emissions_old('NB11', 'Tube', quantity=100)
+        bd = calc.last_breakdown
+
+        self.assertIn('Aluminium', bd['missing_eol'])
+        alu = bd['components'][1]
+        self.assertTrue(alu['eol']['missing'])
+        self.assertEqual(alu['eol']['co2'], 0.0)
+
+    def test_breakdown_reset_a_chaque_compute(self):
+        """compute_emission_data doit reset last_breakdown avant le calcul."""
+        dm = _make_dm()
+        calc = CarbonCalculator(dm)
+        # On simule un breakdown précédent
+        calc.last_breakdown = {"sentinelle": "ancien_calcul"}
+        # Appel sur un cas qui ne passe PAS par mass-based (catégorie inconnue)
+        calc.compute_emission_data({
+            'category': 'CatégorieInconnue',
+            'subcategory': '', 'subsubcategory': '', 'name': '',
+            'value': 0.0, 'days': 1,
+        })
+        self.assertIsNone(calc.last_breakdown,
+                          "last_breakdown doit être reset au début de compute_emission_data")
+
     def test_incertitude_eol_combinee_en_quadrature(self):
         """L'incertitude EoL doit s'ajouter à celle de la production en quadrature."""
         dm = _make_dm(
