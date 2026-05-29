@@ -18,6 +18,7 @@ pas en base : voir ui/end_of_life.py (Phase 2).
 Usage :
     python tools/migration/migrate_v3_end_of_life_factors.py
     python tools/migration/migrate_v3_end_of_life_factors.py --dry-run
+    python tools/migration/migrate_v3_end_of_life_factors.py --db-path private/labeco2.sqlite
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = ROOT / "data" / "labeco2_reference.sqlite"
+DEFAULT_DB_PATH = ROOT / "data" / "labeco2_reference.sqlite"
 MIGRATION_VERSION = 3
 MIGRATION_NAME = "add_end_of_life_factors"
 
@@ -208,12 +209,14 @@ MATERIAL_EOL_MAPPING: dict[str, str] = {
 
 # ── Migration ─────────────────────────────────────────────────────────────────
 
-def run(dry_run: bool = False) -> None:
-    if not DB_PATH.exists():
-        print(f"ERREUR : base introuvable à {DB_PATH}")
+def run(dry_run: bool = False, db_path: Path | None = None) -> None:
+    target_db = Path(db_path) if db_path is not None else DEFAULT_DB_PATH
+    if not target_db.exists():
+        print(f"ERREUR : base introuvable à {target_db}")
         return
 
-    conn = sqlite3.connect(DB_PATH)
+    print(f"Base ciblée : {target_db}")
+    conn = sqlite3.connect(target_db)
     conn.row_factory = sqlite3.Row
 
     if _already_applied(conn):
@@ -222,9 +225,9 @@ def run(dry_run: bool = False) -> None:
         return
 
     # Backup
-    backup = DB_PATH.with_suffix(f".pre_v{MIGRATION_VERSION}.backup")
+    backup = target_db.with_suffix(f".pre_v{MIGRATION_VERSION}.backup")
     if not dry_run:
-        shutil.copy2(DB_PATH, backup)
+        shutil.copy2(target_db, backup)
         print(f"Backup → {backup.name}")
 
     now = datetime.now(timezone.utc).isoformat()
@@ -358,5 +361,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true",
                         help="Simuler sans modifier la base")
+    parser.add_argument("--db-path", default=None,
+                        help="Chemin SQLite cible (par défaut : data/labeco2_reference.sqlite)")
     args = parser.parse_args()
-    run(dry_run=args.dry_run)
+    run(dry_run=args.dry_run, db_path=args.db_path)

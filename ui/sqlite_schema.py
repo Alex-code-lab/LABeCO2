@@ -179,6 +179,16 @@ def ensure_app_schema(conn: sqlite3.Connection) -> None:
     if commercial_product_columns and "supplier_catalogue_id" not in commercial_product_columns:
         conn.execute("ALTER TABLE commercial_products ADD COLUMN supplier_catalogue_id TEXT")
 
+    # Migration v3 — fin de vie : colonne défensive pour que les bases utilisateur
+    # antérieures à v3 chargent sans erreur (les données EoL seront NULL tant que
+    # la migration v3 n'a pas été appliquée sur cette base).
+    materials_columns = _columns(conn, "materials")
+    if materials_columns and "eol_emission_factor_id" not in materials_columns:
+        conn.execute(
+            "ALTER TABLE materials ADD COLUMN eol_emission_factor_id TEXT "
+            "REFERENCES emission_factors(id)"
+        )
+
     supplier_catalogue_columns = _columns(conn, "supplier_catalogue")
     if supplier_catalogue_columns and "import_batch_id" not in supplier_catalogue_columns:
         conn.execute("ALTER TABLE supplier_catalogue ADD COLUMN import_batch_id TEXT")

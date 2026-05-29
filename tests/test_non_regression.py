@@ -54,7 +54,13 @@ class TestNonRegressionValues(unittest.TestCase):
             )
 
     def test_solide_discret_pp_tube_15ml(self):
-        """Tube centrifugeuse 15 mL (PP) — CO₂ masse calculé depuis le matériau."""
+        """Tube centrifugeuse 15 mL (PP) — CO₂ masse incluant la fin de vie DASRI.
+
+        Mise à jour 2026-05-29 (migration v3 : ajout fin de vie) :
+          em      : 0.218755 → 0.281936  (+0.063181 = 0.067 kg × 0.943 EoL DASRI)
+          em_err  : 0.020794 → 0.037820  (quadrature avec ±50 % sur EoL DASRI)
+        ep / ep_err / tm inchangés (le calcul prix n'est pas affecté).
+        """
         ep, ep_err, em, em_err, tm, msg = self.calc.compute_emission_data({
             'category': 'Achats', 'subcategory': _SUB_CONSO,
             'subsubcategory': 'NB11',
@@ -65,8 +71,8 @@ class TestNonRegressionValues(unittest.TestCase):
         self.assertIsNone(msg)
         self._assert_close('ep',     ep,     4.200000)
         self._assert_close('ep_err', ep_err, 1.411200)
-        self._assert_close('em',     em,     0.218755)
-        self._assert_close('em_err', em_err, 0.020794)
+        self._assert_close('em',     em,     0.281936)
+        self._assert_close('em_err', em_err, 0.037820)
         self._assert_close('tm',     tm,     0.067000)
 
     def test_liquide_commercial_acetone_1l(self):
