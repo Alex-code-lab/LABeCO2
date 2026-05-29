@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
     QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
-    QToolButton, QStyle, QListView,
+    QToolButton, QStyle, QListView, QGroupBox,
 )
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QCursor, QDesktopServices, QIntValidator, QDoubleValidator
@@ -851,6 +851,10 @@ class MainWindow(QMainWindow):
             " background-color: #f3f4f6; padding: 3px; }"
         )
         main_layout.addWidget(self.history_list)
+
+        # ── Panneau "Détail du calcul" (production / fin de vie) ─────────
+        self._init_breakdown_panel(main_layout)
+        self.history_list.itemSelectionChanged.connect(self._update_breakdown_panel)
 
         self.delete_button = QPushButton('Supprimer le(s) calcul(s) sélectionné(s)')
         self.delete_button.setEnabled(False)
@@ -1679,6 +1683,7 @@ class MainWindow(QMainWindow):
             # Ici, par exemple, on "simule" ce que fait add_machine :
             # => on suppose que carbon_calculator gère 'value' = kWh
             ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+            item_data["breakdown"] = self.carbon_calculator.last_breakdown
             if msg:
                 item_data["calc_error_msg"] = msg
                 return item_data
@@ -1703,9 +1708,10 @@ class MainWindow(QMainWindow):
         # Si la fonction 'calculate_emission' fait plus de choses, on peut les reproduire ici.
 
         # 4) Appeler compute_emission_data
-        #    => on s'appuie sur la structure existante, 
+        #    => on s'appuie sur la structure existante,
         #    => item_data doit déjà contenir tout (category, subcategory, subsub, value, days, quantity, etc.)
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+        item_data["breakdown"] = self.carbon_calculator.last_breakdown
 
         # 5) Si erreur renvoyée
         if msg:
@@ -3537,6 +3543,7 @@ class MainWindow(QMainWindow):
                 )
 
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
+        breakdown = self.carbon_calculator.last_breakdown
         if msg:
             if msg.startswith("WARN:"):
                 QMessageBox.warning(self, "Matériaux non trouvés", msg[5:])
@@ -3563,6 +3570,7 @@ class MainWindow(QMainWindow):
             'unit': self.current_unit,
             'quantity': quantity,
             'origine': data_dict['origine'],
+            'breakdown': breakdown,
         }
 
         self.create_or_update_history_item(new_data)
@@ -3603,6 +3611,7 @@ class MainWindow(QMainWindow):
             # On suppose que modified_data['value'] = val/jour
             # et modified_data['days'] = days.
             ep, ep_err, em, em_err, tm, msg_price = self.carbon_calculator.compute_emission_data(modified_data)
+            modified_data['breakdown'] = self.carbon_calculator.last_breakdown
             if msg_price:
                 self._result_show_error(msg_price)
                 return
@@ -3920,7 +3929,205 @@ class MainWindow(QMainWindow):
         self.history_list.setItem(row, 3, price_item)
         self.history_list.setItem(row, 4, mass_item)
 
+        # Attacher le breakdown détaillé à la ligne pour le panneau "Détail".
+        # Utilise UserRole + 1 (UserRole est déjà pris par `data`).
+        breakdown = data.get('breakdown')
+        if breakdown:
+            cell0.setData(Qt.UserRole + 1, breakdown)
+
         return row
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Panneau "Détail du calcul" (production / fin de vie)
+    # ─────────────────────────────────────────────────────────────────────
+
+    _BREAKDOWN_PLACEHOLDER = (
+        "Sélectionner une ligne ci-dessus pour voir le détail du calcul "
+        "(production et fin de vie par composant)."
+    )
+
+    def _init_breakdown_panel(self, parent_layout):
+        """Crée le panneau de détail sous l'historique. Vide tant qu'aucune
+        ligne n'est sélectionnée (ou si la ligne sélectionnée n'a pas de
+        décomposition disponible : machine, véhicule, liquide…).
+        """
+        self.breakdown_panel = QGroupBox("Détail du calcul")
+        self.breakdown_panel.setStyleSheet(
+            "QGroupBox { color: black; font-weight: bold; "
+            "border: 1px solid #d1d5db; border-radius: 4px; "
+            "margin-top: 8px; padding-top: 12px; }"
+            "QGroupBox::title { subcontrol-origin: margin; "
+            "subcontrol-position: top left; padding: 0 4px; }"
+        )
+        layout = QVBoxLayout(self.breakdown_panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        # Ligne de placeholder (visible quand rien à afficher)
+        self.breakdown_placeholder = QLabel(self._BREAKDOWN_PLACEHOLDER)
+        self.breakdown_placeholder.setStyleSheet("color: #6b7280; font-style: italic;")
+        self.breakdown_placeholder.setWordWrap(True)
+        layout.addWidget(self.breakdown_placeholder)
+
+        # Résumé agrégé (production / EoL consommable / EoL emballage / total)
+        self.breakdown_summary = QLabel("")
+        self.breakdown_summary.setStyleSheet("color: black; font-weight: normal;")
+        self.breakdown_summary.setTextFormat(Qt.RichText)
+        self.breakdown_summary.setWordWrap(True)
+        self.breakdown_summary.setVisible(False)
+        layout.addWidget(self.breakdown_summary)
+
+        # Tableau des composants
+        self.breakdown_table = QTableWidget()
+        self.breakdown_table.setColumnCount(6)
+        self.breakdown_table.setHorizontalHeaderLabels([
+            "Composant", "Matériau", "Masse (kg)",
+            "Production (kgCO₂e)", "Fin de vie (kgCO₂e)", "Filière / facteur EoL",
+        ])
+        self.breakdown_table.verticalHeader().setVisible(False)
+        self.breakdown_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.breakdown_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.breakdown_table.setFocusPolicy(Qt.NoFocus)
+        header = self.breakdown_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        self.breakdown_table.setStyleSheet(
+            "QTableWidget { color: black; }"
+            "QHeaderView::section { color: black; font-weight: 600; "
+            "background-color: #f3f4f6; padding: 2px; }"
+        )
+        self.breakdown_table.setMaximumHeight(150)
+        self.breakdown_table.setVisible(False)
+        layout.addWidget(self.breakdown_table)
+
+        # Avertissement qualité (DASRI : 1/5, ±50 %)
+        self.breakdown_quality_warning = QLabel("")
+        self.breakdown_quality_warning.setStyleSheet(
+            "color: #92400e; background-color: #fef3c7; "
+            "border: 1px solid #fcd34d; border-radius: 3px; "
+            "padding: 4px 6px;"
+        )
+        self.breakdown_quality_warning.setWordWrap(True)
+        self.breakdown_quality_warning.setVisible(False)
+        layout.addWidget(self.breakdown_quality_warning)
+
+        parent_layout.addWidget(self.breakdown_panel)
+
+    def _update_breakdown_panel(self):
+        """Met à jour le panneau "Détail du calcul" en fonction de la ligne
+        sélectionnée. Lit le breakdown attaché via setData(Qt.UserRole + 1).
+        """
+        selected_items = self.history_list.selectedItems()
+        if not selected_items:
+            self._show_breakdown_placeholder()
+            return
+
+        # Plusieurs lignes sélectionnées → on n'affiche pas de détail (ambigu)
+        selected_rows = {item.row() for item in selected_items}
+        if len(selected_rows) != 1:
+            self._show_breakdown_placeholder(
+                "Plusieurs lignes sélectionnées — sélectionner une seule ligne pour voir son détail."
+            )
+            return
+
+        row = next(iter(selected_rows))
+        cell0 = self.history_list.item(row, 0)
+        breakdown = cell0.data(Qt.UserRole + 1) if cell0 is not None else None
+
+        if not breakdown or not breakdown.get("components"):
+            self._show_breakdown_placeholder(
+                "Pas de décomposition disponible pour cette ligne "
+                "(machine, véhicule ou consommable sans facteur masse)."
+            )
+            return
+
+        self._render_breakdown(breakdown, row)
+
+    def _show_breakdown_placeholder(self, text: str | None = None):
+        self.breakdown_placeholder.setText(text or self._BREAKDOWN_PLACEHOLDER)
+        self.breakdown_placeholder.setVisible(True)
+        self.breakdown_summary.setVisible(False)
+        self.breakdown_table.setVisible(False)
+        self.breakdown_quality_warning.setVisible(False)
+
+    def _render_breakdown(self, breakdown: dict, row: int):
+        """Rend la décomposition dans le panneau."""
+        self.breakdown_placeholder.setVisible(False)
+
+        totals = breakdown.get("totals", {})
+        prod = totals.get("production", 0.0)
+        eol_c = totals.get("eol_consommable", 0.0)
+        eol_p = totals.get("eol_packaging", 0.0)
+        total = totals.get("total", 0.0)
+        mass = totals.get("mass_kg", 0.0)
+        filiere = breakdown.get("filiere_consommable")
+
+        # Nom de la ligne courante (colonne "Élément")
+        elem_item = self.history_list.item(row, 1)
+        elem_label = elem_item.text() if elem_item else ""
+
+        filiere_txt = f" — filière <b>{filiere}</b>" if filiere else ""
+        self.breakdown_summary.setText(
+            f"<b>{elem_label}</b> — masse totale {mass*1000:.2f} g{filiere_txt}<br>"
+            f"Production&nbsp;: <b>{prod:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"Fin de vie consommable&nbsp;: <b>{eol_c:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"Fin de vie emballage&nbsp;: <b>{eol_p:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"<u>Total&nbsp;: {total:.4f} kgCO₂e</u>"
+        )
+        self.breakdown_summary.setVisible(True)
+
+        # Tableau des composants
+        components = breakdown.get("components", [])
+        self.breakdown_table.setRowCount(len(components))
+        for i, c in enumerate(components):
+            slot = c.get("slot", c.get("type", ""))
+            mat = c.get("material", "")
+            mass_kg = c.get("mass_kg_total", 0.0)
+            prod_co2 = c.get("production", {}).get("co2", 0.0)
+            eol = c.get("eol", {})
+            eol_co2 = eol.get("co2", 0.0)
+            filiere_or_factor = (
+                eol.get("filiere")
+                or (eol.get("factor_name") or "")
+                or ("— (matériau sans EoL)" if eol.get("missing") else "")
+            )
+
+            items_text = [
+                slot,
+                mat,
+                f"{mass_kg:.6f}",
+                f"{prod_co2:.4f}",
+                f"{eol_co2:.4f}",
+                filiere_or_factor,
+            ]
+            for col, text in enumerate(items_text):
+                item = QTableWidgetItem(text)
+                if col >= 2:
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                if eol.get("missing") and col >= 4:
+                    item.setForeground(QColor("#9ca3af"))
+                self.breakdown_table.setItem(i, col, item)
+        self.breakdown_table.setVisible(True)
+
+        # Avertissement qualité (DASRI = 1/5, ±50 %)
+        if filiere == "DASRI":
+            self.breakdown_quality_warning.setText(
+                "⚠ <b>Données DASRI ADEME peu précises</b> : qualité 1/5, incertitude ±50 %, "
+                "fiche v23.10 expirée. Cross-check Rizan et al. 2021 (1.074 kgCO₂e/kg) "
+                "pour le même ordre de grandeur."
+            )
+            self.breakdown_quality_warning.setVisible(True)
+        elif filiere == "DIS":
+            self.breakdown_quality_warning.setText(
+                "ℹ Données DIS ADEME : qualité 3/5, incertitude ±20 %."
+            )
+            self.breakdown_quality_warning.setVisible(True)
+        else:
+            self.breakdown_quality_warning.setVisible(False)
 
     def delete_selected_calculation(self):
         """
@@ -4127,6 +4334,7 @@ class MainWindow(QMainWindow):
             }
 
             ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
+            machine_breakdown = self.carbon_calculator.last_breakdown
             if msg:
                 QMessageBox.warning(self, 'Erreur', msg)
                 return
@@ -4147,6 +4355,7 @@ class MainWindow(QMainWindow):
                 'code_nacres': 'NA',
                 'consommable': 'NA',
                 'quantity': 0,
+                'breakdown': machine_breakdown,
             }
 
             self.create_or_update_history_item(new_data)
