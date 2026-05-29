@@ -19,7 +19,7 @@ Fonctions utilitaires liées à la gestion des couleurs dans les graphiques :
 Outils de chargement de ressources et données :
 - `resource_path(relative_path)` : Renvoie le chemin absolu des fichiers (compatible avec PyInstaller et exécution locale)
 - `load_logo()` : Charge le logo de l’application (utilisé dans l’interface graphique PySide6)
-- `load_data()` : Charge la base de données principale des facteurs d’émission (`data_base_GES1point5.hdf5`) au format Pandas DataFrame
+- `resolve_sqlite_path(base_path, user_path)` : Résout ou initialise la base SQLite de travail depuis `data/labeco2_reference.sqlite`
 
 Ce module centralise la gestion des fichiers de données ou de ressources (images…), garantissant leur accessibilité aussi bien en développement qu’en version distribuée.
 

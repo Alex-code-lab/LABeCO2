@@ -90,16 +90,17 @@ python -m pip install -r installation/requirements.txt
 
 ## 5. Installation des dépendances système (macOS/Linux uniquement)
 
-Certaines bibliothèques Python comme PyTables ou PySide6 nécessitent des bibliothèques système préalables.
+PySide6 peut nécessiter Qt sur certaines installations locales. L'application
+utilise SQLite pour ses données de référence.
 
 ### Sous macOS :
 ```bash
-brew install hdf5 qt c-blosc c-blosc2
+brew install qt
 ```
 
 ### Sous Linux (Ubuntu) :
 ```bash
-sudo apt install libhdf5-dev qtbase5-dev libblosc-dev
+sudo apt install qtbase5-dev
 ```
 
 *Pas nécessaire sous Windows, les wheels pip contiennent les dépendances.*

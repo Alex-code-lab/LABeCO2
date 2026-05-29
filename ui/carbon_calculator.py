@@ -7,7 +7,6 @@
 
 import math
 import pandas as pd
-from PySide6.QtWidgets import QMessageBox
 from ui.data_manager import DataManager
 from ui.display_utils import clean_text, normalize_nacres_prefix
 
@@ -18,6 +17,12 @@ class CarbonCalculator:
 
     def __init__(self, data_manager: DataManager):
         self.dm = data_manager
+        # Décomposition détaillée du dernier calcul (production / fin de vie par
+        # composant). Mis à jour à chaque appel de compute_emission_data ou
+        # _calculate_mass_based_emissions_old. Utilisé par l'UI pour afficher
+        # le détail au déroulement d'une ligne. None si non-applicable
+        # (machine, véhicule, ligne vide).
+        self.last_breakdown: dict | None = None
 
     @staticmethod
     def _safe_float(value, default=0.0):
@@ -53,7 +58,14 @@ class CarbonCalculator:
         """
         Calcule les émissions carbone (prix + incertitude) et (masse NACRES + incertitude),
         en évitant KeyError sur l'index de la Série quand on récupère l'incertitude.
+
+        Effet de bord : met à jour `self.last_breakdown` avec la décomposition
+        détaillée production / fin de vie quand le calcul passe par la voie masse.
+        Pour les autres voies (machine, véhicule, liquide), reste None.
         """
+        # Reset du breakdown — sera repeuplé seulement si le chemin masse-based est emprunté
+        self.last_breakdown = None
+
         category   = data_dict.get('category', '')
         subcat     = data_dict.get('subcategory', '')
         subsub     = data_dict.get('subsubcategory', '')
@@ -65,6 +77,7 @@ class CarbonCalculator:
 
         code_nacres    = data_dict.get('code_nacres', 'NA')
         consommable    = data_dict.get('consommable', 'NA')
+        conditionnement = clean_text(data_dict.get('conditionnement', ''))
         quantity       = self._safe_float(data_dict.get('quantity', 0), default=0.0)
         
         # Valeurs de sortie par défaut
@@ -166,10 +179,17 @@ class CarbonCalculator:
             product_row, linked_liq_row = (None, None)
             linked_lookup = getattr(self.dm, "get_consumable_liquid_factor_data", None)
             if callable(linked_lookup):
-                lookup_result = linked_lookup(code_nacres, consommable)
+                try:
+                    lookup_result = linked_lookup(code_nacres, consommable, conditionnement)
+                except TypeError:
+                    lookup_result = linked_lookup(code_nacres, consommable)
                 if isinstance(lookup_result, tuple) and len(lookup_result) == 2:
                     product_row, linked_liq_row = lookup_result
-            liq_row = linked_liq_row if linked_liq_row is not None else self.dm.get_liquid_data(code_nacres, consommable)
+            try:
+                fallback_liq_row = self.dm.get_liquid_data(code_nacres, consommable, conditionnement)
+            except TypeError:
+                fallback_liq_row = self.dm.get_liquid_data(code_nacres, consommable)
+            liq_row = linked_liq_row if linked_liq_row is not None else fallback_liq_row
             if liq_row is not None:
                 e_liq, m_liq, err_liq = self._calculate_liquid_emissions_from_row(liq_row, quantity)
                 # Facteur personnalisé (kg eCO₂/L) si aucun facteur en base
@@ -238,7 +258,7 @@ class CarbonCalculator:
             else:
                 # 2) Calcul classique pour consommables solides
                 e_mass, t_mass, e_mass_err, missing_mats = self._calculate_mass_based_emissions_old(
-                    code_nacres, consommable, quantity
+                    code_nacres, consommable, quantity, conditionnement
                 )
                 # Facteur personnalisé (kg eCO₂/kg) pour produits vrac sans matériau défini
                 if e_mass == 0.0 and custom_fe > 0.0:
@@ -255,20 +275,27 @@ class CarbonCalculator:
                 tm     = t_mass
                 if missing_mats:
                     noms = ", ".join(missing_mats)
-                    QMessageBox.warning(
-                        None,
-                        "Matériaux non trouvés",
-                        f"Les matériaux suivants sont absents de la base de données "
-                        f"et n'ont pas été comptabilisés dans le calcul :\n\n{noms}\n\n"
+                    error_message = (
+                        f"WARN:Les matériaux suivants sont absents de la base et "
+                        f"n'ont pas été comptabilisés :\n{noms}\n\n"
                         f"Vérifiez la base « empreinte_carbone_materiaux »."
                     )
 
         return (ep, ep_err, em, em_err, tm, error_message)
 
-    def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity):
+    def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity, packaging=""):
         """
-        Calcule l'empreinte carbone totale (produit + emballage + conditionnement)
-        à partir des masses unitaires et des matériaux.
+        Calcule l'empreinte carbone totale (production + fin de vie) d'un consommable
+        solide à partir des masses unitaires et des matériaux de ses composants.
+
+        Modèle de fin de vie :
+          - Consommable (produit slots 1/2/3) → filière contaminée DASRI ou DIS,
+            déterminée par le préfixe du code NACRES (cf. ui/end_of_life.py).
+          - Emballage et conditionnement → incinération triée par matériau
+            (cf. materials.eol_emission_factor_id).
+
+        Si la base ne contient pas de facteur EoL pour un matériau (métaux par ex.),
+        sa contribution EoL est ignorée silencieusement (pas considéré comme erreur).
         """
         # 1) Cas où aucun code NACRES valide n'est fourni
         if not code_nacres or code_nacres == 'NA':
@@ -288,40 +315,59 @@ class CarbonCalculator:
             code_mask &
             (self.data_masse[self.dm.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
         ]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.dm, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in df_row.columns:
+            exact_pack = df_row[df_row[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                df_row = exact_pack
         if df_row.empty:
             return (0.0, 0.0, 0.0, [])
         row = df_row.iloc[0]
 
-        # 3) Définir les composants à traiter, y compris le second matériau du produit
+        # 3) Définir les composants à traiter, avec leur type (product / packaging)
+        # et leur libellé d'emplacement (utile pour l'UI au déroulement).
         composants = [
-            # Produit principal : matériau 1 puis matériau 2
-            (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL),
-            (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None)),
-            (getattr(self.dm, "MASSE_G3_COL", None), getattr(self.dm, "MATERIAU3_COL", None)),
-            # Emballage
-            (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL),
-            # Conditionnement
-            (self.dm.MASSE_CONDITIONNEMENT_COL, self.dm.MATERIAU_CONDITIONNEMENT_COL),
+            (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL, "product",   "Matériau principal"),
+            (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None), "product", "Matériau secondaire"),
+            (getattr(self.dm, "MASSE_G3_COL", None), getattr(self.dm, "MATERIAU3_COL", None), "product", "Matériau tertiaire"),
+            (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL, "packaging", "Emballage secondaire"),
+            (self.dm.MASSE_CONDITIONNEMENT_COL, self.dm.MATERIAU_CONDITIONNEMENT_COL, "packaging", "Conditionnement primaire"),
         ]
+
+        # Facteur filière (DASRI/DIS) — uniforme pour tous les composants "product".
+        # Résolu une seule fois, hors boucle.
+        filiere_co2, filiere_unc, filiere = self.dm.get_filiere_factor(code_nacres)
 
         total_mass_kg = 0.0
         total_emission = 0.0
         total_unc_sq = 0.0
         missing_materials = []
+        breakdown_components: list[dict] = []
+        missing_eol_materials: list[str] = []
 
-        # 4) Pour chaque composant, calculer sa contribution
-        for col_masse, col_mat in composants:
+        # 4) Pour chaque composant, calculer production + fin de vie
+        for col_masse, col_mat, comp_type, slot_label in composants:
             if col_masse is None or col_mat is None:
                 continue
             # Lecture brute de la masse (g) — NaN doit être traité comme 0
             _raw = row.get(col_masse, 0.0)
             raw_masse = self._safe_float(_raw)
-            # Si on est dans le conditionnement, on divise par le nombre par conditionnement
+            # Si on est dans le conditionnement primaire, on divise par le nombre par conditionnement
             if col_masse == self.dm.MASSE_CONDITIONNEMENT_COL:
                 nombre = self._safe_float(row.get(self.dm.NOMBRE_PAR_COND_COL, 1), default=1.0)
                 if nombre <= 0:
                     continue
                 raw_masse = raw_masse / nombre
+            # Si on est dans l'emballage secondaire, on divise par le nombre partageant l'emballage
+            elif col_masse == self.dm.MASSE_EMBALLAGE_COL:
+                nb_emb = self._safe_float(
+                    row.get(getattr(self.dm, "NOMBRE_PAR_EMBALLAGE_COL", "Nbr par emballage secondaire"), 1),
+                    default=1.0,
+                )
+                if nb_emb <= 0:
+                    nb_emb = 1.0
+                raw_masse = raw_masse / nb_emb
             # On obtient la masse finale du composant
             masse_g = raw_masse
             materiau = row.get(col_mat, "") or ""
@@ -330,7 +376,7 @@ class CarbonCalculator:
             if masse_g <= 0 or not materiau:
                 continue
 
-            # Récupérer le facteur CO₂ (kgCO₂/kg) et son incertitude
+            # Récupérer le facteur CO₂ production (kgCO₂/kg) et son incertitude
             # AVANT d’accumuler la masse, pour ne pas compter une masse sans émission
             co2_per_kg, uncert_mat = self.dm.get_material_data(materiau)
             if co2_per_kg is None:
@@ -341,22 +387,101 @@ class CarbonCalculator:
             masse_kg = quantity * masse_g / 1000.0
             total_mass_kg += masse_kg
 
-            # Calcul de l’émission pour ce composant
-            emission = masse_kg * co2_per_kg
-            total_emission += emission
+            # 4a) Production
+            emission_prod = masse_kg * co2_per_kg
+            total_emission += emission_prod
+            total_unc_sq += (emission_prod * uncert_mat) ** 2
 
-            # Accumuler l’incertitude (émission * taux d’incertitude)²
-            total_unc_sq += (emission * uncert_mat) ** 2
+            # 4b) Fin de vie
+            emission_eol = 0.0
+            eol_co2_per_kg: float | None = None
+            eol_unc: float | None = None
+            eol_filiere: str | None = None
+            eol_factor_name: str | None = None
+            if comp_type == "product":
+                # Filière contaminée : facteur uniforme par NACRES.
+                if filiere_co2 is not None:
+                    eol_co2_per_kg = filiere_co2
+                    eol_unc = filiere_unc
+                    eol_filiere = filiere
+                    eol_factor_name = f"Filière {filiere}"
+                    emission_eol = masse_kg * filiere_co2
+                    total_emission += emission_eol
+                    if filiere_unc is not None:
+                        total_unc_sq += (emission_eol * filiere_unc) ** 2
+            else:  # packaging / conditionnement
+                co2_eol, unc_eol, eol_name = self.dm.get_material_eol_data(materiau)
+                if co2_eol is not None:
+                    eol_co2_per_kg = co2_eol
+                    eol_unc = unc_eol
+                    eol_factor_name = eol_name or ""
+                    emission_eol = masse_kg * co2_eol
+                    total_emission += emission_eol
+                    if unc_eol is not None:
+                        total_unc_sq += (emission_eol * unc_eol) ** 2
+                else:
+                    # Matériau sans EoL (métaux récupérés en mâchefers).
+                    # On le signale dans le breakdown pour la traçabilité UI,
+                    # mais ce n'est pas une erreur.
+                    if materiau not in missing_eol_materials:
+                        missing_eol_materials.append(materiau)
+
+            # Tracer le composant dans le breakdown détaillé (utilisé par l'UI
+            # pour le déroulement de ligne).
+            breakdown_components.append({
+                "type": comp_type,            # 'product' | 'packaging'
+                "slot": slot_label,           # libellé humain (UI)
+                "material": materiau,
+                "mass_g_per_unit": float(masse_g),
+                "mass_kg_total": float(masse_kg),
+                "production": {
+                    "co2_per_kg": float(co2_per_kg),
+                    "co2": float(emission_prod),
+                    "uncertainty_rel": float(uncert_mat),
+                },
+                "eol": {
+                    "filiere": eol_filiere,            # DASRI / DIS / None
+                    "factor_name": eol_factor_name,    # nom du facteur EoL appliqué
+                    "co2_per_kg": eol_co2_per_kg,      # None si pas de facteur
+                    "co2": float(emission_eol),
+                    "uncertainty_rel": eol_unc,        # None si pas d'incertitude
+                    "missing": eol_co2_per_kg is None, # True si pas de mapping (métal)
+                },
+            })
 
         total_unc = total_unc_sq ** 0.5
-        return (total_emission, total_mass_kg, total_unc, missing_materials)
-    
 
-    def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None):
+        # Construire et stocker le breakdown agrégé pour l'UI.
+        prod_total = sum(c["production"]["co2"] for c in breakdown_components)
+        eol_conso_total = sum(c["eol"]["co2"] for c in breakdown_components if c["type"] == "product")
+        eol_packaging_total = sum(c["eol"]["co2"] for c in breakdown_components if c["type"] == "packaging")
+        self.last_breakdown = {
+            "components": breakdown_components,
+            "totals": {
+                "production": prod_total,
+                "eol_consommable": eol_conso_total,
+                "eol_packaging": eol_packaging_total,
+                "total": total_emission,
+                "mass_kg": total_mass_kg,
+                "uncertainty": total_unc,
+            },
+            "filiere_consommable": filiere if filiere_co2 is not None else None,
+            "missing_production": list(missing_materials),
+            "missing_eol": missing_eol_materials,
+        }
+
+        return (total_emission, total_mass_kg, total_unc, missing_materials)
+
+
+
+    def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None, packaging=""):
         """
         Calcule l'empreinte carbone d'un consommable liquide via volume (mL).
         """
-        row = self.dm.get_liquid_data(code_nacres, consommable)
+        try:
+            row = self.dm.get_liquid_data(code_nacres, consommable, packaging)
+        except TypeError:
+            row = self.dm.get_liquid_data(code_nacres, consommable)
         if row is None:
             return (0.0, 0.0, 0.0)
         return self._calculate_liquid_emissions_from_row(row, volume_ml)

@@ -10,7 +10,17 @@ build/
 Desktop/
 packaging/
 private/
+.cache/
 .DS_Store
+~$*
 *.xlsx
+!data/nacres_codes/*.xlsx
 *.hdf5.backup
+*.backup_before_*
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 docs/test_carbon_calculator_annote.py

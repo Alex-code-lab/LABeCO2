@@ -4,8 +4,7 @@
 # Ce fichier fait partie du projet LABeCO2.
 # Distribué sous licence : GNU GPL v3 (non commercial)
 # edit_calculation_dialog.py
-import sys
-import os
+import logging
 import pandas as pd
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel, QComboBox, QLineEdit, 
@@ -18,6 +17,9 @@ from ui.display_utils import (
     is_consumables_subcategory,
     normalize_nacres_prefix,
 )
+
+logger = logging.getLogger(__name__)
+
 
 class EditCalculationDialog(QDialog):
     """
@@ -189,15 +191,25 @@ class EditCalculationDialog(QDialog):
         """
         code_nacres = data.get('code_nacres', '')
         consommable = data.get('consommable', '')
+        conditionnement = data.get('conditionnement', '')
         if not code_nacres or code_nacres == 'NA':
             return False
         # Produit commercial liquide lié à un facteur Liquides & Solvants.
         if self.data_manager is not None and hasattr(self.data_manager, "get_consumable_liquid_factor_data"):
-            _, liq = self.data_manager.get_consumable_liquid_factor_data(code_nacres, consommable)
+            _, liq = self.data_manager.get_consumable_liquid_factor_data(
+                code_nacres,
+                consommable,
+                conditionnement,
+            )
             if liq is not None:
                 return True
         # Solide
-        selected = {'code_nacres': code_nacres, 'consommable': consommable, 'source': 'solid'}
+        selected = {
+            'code_nacres': code_nacres,
+            'consommable': consommable,
+            'source': 'solid',
+            'conditionnement': conditionnement,
+        }
         return self._consumable_has_mass_data(selected)
 
     def _consumable_has_mass_data(self, selected):
@@ -216,6 +228,12 @@ class EditCalculationDialog(QDialog):
             (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
         )
         row = df[mask]
+        pack = clean_text(selected.get("conditionnement", ""))
+        condt_col = getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in row.columns:
+            exact_pack = row[row[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                row = exact_pack
         if row.empty:
             return False
         masse = row[self.data_manager.MASSE_G_COL].iloc[0]
@@ -259,17 +277,28 @@ class EditCalculationDialog(QDialog):
         if index >= 0:
             self.subcategory_combo.setCurrentIndex(index)
 
-    def _add_consumable_item(self, code_nacres, consommable, source="solid"):
+    def _add_consumable_item(self, code_nacres, consommable, source="solid", packaging=""):
         code = clean_text(code_nacres)
         name = clean_text(consommable)
+        pack = clean_text(packaging)
         if not code and not name:
             return
+        display = name or code
+        if pack and pack.casefold() not in display.casefold():
+            display = f"{display} - {pack}"
         self.nacres_filtered_combo.addItem(
-            name or code,
-            userData={"code_nacres": code, "consommable": name, "source": source}
+            display,
+            userData={
+                "code_nacres": code,
+                "consommable": name,
+                "source": source,
+                "conditionnement": pack,
+            }
         )
         index = self.nacres_filtered_combo.count() - 1
         tooltip = [f"Code NACRES : {code}"] if code else []
+        if pack:
+            tooltip.append(f"Conditionnement : {pack}")
         if source == "liquid":
             tooltip.append("Consommable liquide")
         if tooltip:
@@ -302,25 +331,32 @@ class EditCalculationDialog(QDialog):
                     "code_nacres": code,
                     "consommable": name,
                     "source": clean_text(data.get("source")) or "solid",
+                    "conditionnement": clean_text(data.get("conditionnement")),
                 }
         text = clean_text(self.nacres_filtered_combo.currentText())
         if not text or text == "Aucune correspondance":
             return None
         if " - " in text:
             code, name = text.split(" - ", 1)
-            return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid"}
-        return {"code_nacres": "", "consommable": text, "source": "solid"}
+            return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid", "conditionnement": ""}
+        return {"code_nacres": "", "consommable": text, "source": "solid", "conditionnement": ""}
 
-    def _select_consumable_item(self, code_nacres, consommable):
+    def _select_consumable_item(self, code_nacres, consommable, packaging=""):
         code_prefix = normalize_nacres_prefix(code_nacres)
         name = clean_text(consommable)
+        pack = clean_text(packaging)
         for index in range(self.nacres_filtered_combo.count()):
             data = self.nacres_filtered_combo.itemData(index)
             if not isinstance(data, dict):
                 continue
             item_code = clean_text(data.get("code_nacres"))
             item_name = clean_text(data.get("consommable"))
-            if item_name == name and normalize_nacres_prefix(item_code) == code_prefix:
+            item_pack = clean_text(data.get("conditionnement"))
+            if (
+                item_name == name and
+                normalize_nacres_prefix(item_code) == code_prefix and
+                (not pack or item_pack == pack)
+            ):
                 self.nacres_filtered_combo.setCurrentIndex(index)
                 return True
         return False
@@ -436,8 +472,9 @@ class EditCalculationDialog(QDialog):
                 self.update_nacres_filtered_combo()
                 code_nacres = data.get('code_nacres', '')
                 consommable = data.get('consommable', '')
+                conditionnement = data.get('conditionnement', '')
                 if code_nacres and consommable and consommable != 'NA':
-                    self._select_consumable_item(code_nacres, consommable)
+                    self._select_consumable_item(code_nacres, consommable, conditionnement)
                 self.nacres_filtered_combo.blockSignals(False)
 
                 selected_consumable = self._selected_consumable_data()
@@ -570,6 +607,7 @@ class EditCalculationDialog(QDialog):
                 'days': days,
                 'code_nacres': 'NA',    # valeurs par défaut qui peuvent être modifiées plus loin
                 'consommable': 'NA',
+                'conditionnement': '',
             }
 
             # Gestion du champ "Nombre de jours" pour Véhicules déjà prise en compte ci-dessus.
@@ -578,6 +616,7 @@ class EditCalculationDialog(QDialog):
             if category == 'Achats' and is_consumables_subcategory(subcategory):
                 code_nacres = 'NA'
                 consommable = 'NA'
+                conditionnement = ''
                 # Si on a un soussubcategory, en prendre les 4 premiers caractères pour NACRES de base
                 if subsubcategory:
                     code_nacres = subsubcategory[:4]
@@ -586,15 +625,18 @@ class EditCalculationDialog(QDialog):
                     if selected:
                         code_nacres = selected["code_nacres"] or code_nacres
                         consommable = selected["consommable"] or "NA"
+                        conditionnement = selected.get("conditionnement", "")
                     else:
                         if subsubcategory:
                             code_nacres = subsubcategory[:4]
                         else:
                             code_nacres = 'NA'
                         consommable = 'NA'
+                        conditionnement = ''
                 self.modified_data.update({
                     'code_nacres': code_nacres,
                     'consommable': consommable,
+                    'conditionnement': conditionnement,
                 })
 
                 # Lecture sécurisée de la quantité
@@ -625,7 +667,7 @@ class EditCalculationDialog(QDialog):
             self.accept()
 
         except ValueError as ve:
-            print("Erreur de conversion détectée :", ve)
+            logger.warning("Erreur de conversion détectée : %s", ve)
             QMessageBox.warning(self, 'Erreur', f"Erreur de conversion numérique : {ve}")
             return
 
@@ -757,8 +799,9 @@ class EditCalculationDialog(QDialog):
                     for _, row in filtered_entries.iterrows():
                         nom_objet_val = clean_text(row.get("Consommable", ""))
                         code_val = clean_text(row.get("Code NACRES", ""))
+                        pack_val = clean_text(row.get(getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm"), ""))
                         if nom_objet_val:
-                            entries.append((nom_objet_val.casefold(), code_val, nom_objet_val, "solid"))
+                            entries.append((nom_objet_val.casefold(), code_val, nom_objet_val, "solid", pack_val))
 
                 if not entries:
                     self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)
@@ -773,8 +816,8 @@ class EditCalculationDialog(QDialog):
                     return
 
                 self._add_direct_nacres_item(code_nacres_prefix)
-                for _, code, name, source in sorted(entries):
-                    self._add_consumable_item(code, name, source)
+                for _, code, name, source, packaging in sorted(entries):
+                    self._add_consumable_item(code, name, source, packaging)
 
             if self.nacres_filtered_combo.count() == 0:
                 self.nacres_filtered_combo.addItem("Aucune correspondance", userData=None)

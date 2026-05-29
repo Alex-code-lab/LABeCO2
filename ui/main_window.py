@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# windows/main_window.py, LABeCO2 ©
-# Copyright (c), 2024, LABeCO2, Alexandre Souchaud. Tous droits réservés.
+# ui/main_window.py, LABeCO2 ©
+# Copyright (c), 2024-2026, LABeCO2, Alexandre Souchaud. Tous droits réservés.
 # Auteur : Alexandre Souchaud — labeco2.contact@gmail.com
 #
 # Ce programme est distribué sous licence :
@@ -8,40 +8,49 @@
 #
 # Vous pouvez consulter la GPL ici : https://www.gnu.org/licenses/gpl-3.0.fr.html
 #
-# Date de création : 01/10/2024 — Version V2.1 du 10/04/2025
-# DOI: 10.5281/zenodo.15243498
+# Date de création : 01/10/2024 — Version V3.0 du 28/05/2026
+# DOI: 10.5281/zenodo.15240634
 
 
 import sys
 import os
 import math
 import re
+import json
+import sqlite3
 import pandas as pd
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QComboBox, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QFrame,
     QFormLayout, QDialog, QScrollArea, QSizePolicy, QAbstractItemView, QToolTip,
-    QToolButton, QStyle,
+    QToolButton, QStyle, QListView, QGroupBox,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor, QIntValidator, QDoubleValidator
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QCursor, QDesktopServices, QIntValidator, QDoubleValidator
 from shiboken6 import isValid
 
 from ui.data_manager import DataManager
 from ui.carbon_calculator import CarbonCalculator
+from ui.nacres_metadata import load_nacres_options
 from ui.display_utils import (
     clean_text,
     display_unit,
     format_quantity,
     format_subcategory_label,
     is_consumables_subcategory,
+    looks_like_liquid_commercial_product,
     normalize_nacres_prefix,
     normalize_search,
     safe_float,
 )
 
-from utils.data_loader import load_logo, get_user_data_path, init_user_data
+from utils.data_loader import (
+    get_user_data_path,
+    init_user_data,
+    load_logo,
+    resolve_sqlite_path,
+)
 from utils.color_utils import CATEGORY_COLORS
 from scenarios.manip_type_db import ManipsTypeDB
 from ui.charts.pie_chart import PieChartWindow
@@ -64,6 +73,53 @@ from ui.user_manip_dialog import UserManipDialog
 from ui.charts.history_utils import iter_history_data
 
 
+_NACRES_NEW_NO_FE_COLOR = QColor(255, 210, 150)
+_NACRES_NEW_NO_FE_TOOLTIP = (
+    "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
+    "de facteur d'émission pour cette catégorie."
+)
+_DETAIL_COMBO_WIDTH = 330
+_MAIN_SEARCH_WIDTH = 220
+_MAIN_COMBO_VISIBLE_ITEMS = 15
+
+
+class CompactPopupComboBox(QComboBox):
+    """QComboBox dont le popup reste exactement à la largeur de la case.
+
+    Sur macOS le popup natif peut paraître flottant. On force ici la fenêtre du
+    popup à la même largeur que la combo et on la repositionne juste sous le
+    widget pour qu'elle se déroule pile à son emplacement.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        view = QListView(self)
+        view.setUniformItemSizes(True)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setTextElideMode(Qt.TextElideMode.ElideRight)
+        view.setStyleSheet("QListView { background: white; color: black; }")
+        self.setView(view)
+
+    def showPopup(self) -> None:
+        width = self.width()
+        view = self.view()
+        view.setMinimumWidth(width)
+        view.setMaximumWidth(width)
+        super().showPopup()
+        popup = view.window()
+        popup.setMinimumWidth(width)
+        popup.setMaximumWidth(width)
+        height = min(popup.height(), 420)
+        anchor = self.mapToGlobal(self.rect().bottomLeft())
+        popup.setGeometry(anchor.x(), anchor.y(), width, height)
+
+
+def _configure_detail_combo(combo: QComboBox) -> None:
+    combo.setFixedWidth(_DETAIL_COMBO_WIDTH)
+    combo.setMaxVisibleItems(_MAIN_COMBO_VISIBLE_ITEMS)
+    combo.view().setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+
 
 class MainWindow(QMainWindow):
     data_changed = Signal()
@@ -79,7 +135,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LABeCO₂ - Calculateur de Bilan Carbone")
 
         # 1) DataManager
-        init_user_data()  # copie les HDF5 modifiables au premier lancement compilé
+        init_user_data()  # initialise les données utilisateur au premier lancement compilé
         # base_path  : données en lecture seule (bundlées dans l'exécutable)
         # user_path  : données modifiables par l'utilisateur (persistantes entre sessions)
         if getattr(sys, 'frozen', False):
@@ -94,7 +150,12 @@ class MainWindow(QMainWindow):
         self.manips_db = ManipsTypeDB(db_path=db_path)
 
         try:
-            self.data_manager = DataManager(base_path, user_path=user_path)
+            sqlite_path = resolve_sqlite_path(base_path, user_path)
+            self.data_manager = DataManager(
+                base_path,
+                user_path=user_path,
+                sqlite_path=sqlite_path,
+            )
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de charger les données : {e}")
             sys.exit(1)
@@ -166,6 +227,14 @@ class MainWindow(QMainWindow):
         self.origine_combo = None
         self.origine_info_button = None
         self.origine_row_widget = None
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        self._consumable_search_entries = []
+        self._consumable_prefixes_all = set()
+        self._purchase_rows_by_prefix = {}
+        self._purchase_row_cache = {}
+        self._load_nacres_options()
+        self._rebuild_search_indexes()
 
         self.setStyleSheet("""
             QPushButton {
@@ -450,14 +519,15 @@ class MainWindow(QMainWindow):
         # Sous-catégorie
         self.subcategory_label = QLabel('Sous-catégorie:')
         self.subcategory_combo = QComboBox()
+        self.subcategory_combo.setMaxVisibleItems(_MAIN_COMBO_VISIBLE_ITEMS)
 
         # Nom (subsub_name) + barre de recherche
         self.subsub_name_label = QLabel('Nom:')
-        self.subsub_name_combo = QComboBox()
-        self.subsub_name_combo.setFixedWidth(200)
+        self.subsub_name_combo = CompactPopupComboBox()
+        _configure_detail_combo(self.subsub_name_combo)
         self.search_label = QLabel('Recherche:')
         self.search_field = QLineEdit()
-        self.search_field.setFixedWidth(200)
+        self.search_field.setFixedWidth(_MAIN_SEARCH_WIDTH)
         self.reset_search_button = QToolButton()
         self.reset_search_button.setIcon(self.style().standardIcon(QStyle.SP_DialogResetButton))
         self.reset_search_button.setToolTip("Réinitialiser les recherches")
@@ -480,19 +550,32 @@ class MainWindow(QMainWindow):
         self.conso_filtered_label.setToolTip(
             "Matières premières, produits chimiques/biologiques et organismes vivants"
         )
-        self.conso_filtered_combo = QComboBox()
-        self.conso_filtered_combo.setFixedWidth(200)
+        self.conso_filtered_combo = CompactPopupComboBox()
+        _configure_detail_combo(self.conso_filtered_combo)
         self.conso_search_label = QLabel("Recherche:")
         self.conso_search_field = QLineEdit()
-        self.conso_search_field.setFixedWidth(200)
+        self.conso_search_field.setFixedWidth(_MAIN_SEARCH_WIDTH)
 
         self.indicator_conso = QLabel("✗")
         self.indicator_conso.setFixedWidth(20)
         self.indicator_conso.setStyleSheet("color: #dc2626; font-size: 15px; font-weight: bold;")
 
+        self.btn_open_supplier_url = QPushButton("🌐")
+        self.btn_open_supplier_url.setFixedWidth(40)
+        self.btn_open_supplier_url.setToolTip(
+            "Ouvrir la fiche du produit chez le fournisseur dans le navigateur."
+        )
+        self.btn_open_supplier_url.setStyleSheet(
+            "QPushButton{background:#1565c0;color:white;font-weight:bold;padding:4px 10px;}"
+            "QPushButton:hover{background:#1976d2;}"
+            "QPushButton:disabled{background:#cccccc;color:#666666;}"
+        )
+        self.btn_open_supplier_url.clicked.connect(self._open_selected_consumable_url)
+
         conso_layout = QHBoxLayout()
         conso_layout.addWidget(self.indicator_conso)
         conso_layout.addWidget(self.conso_filtered_combo)
+        conso_layout.addWidget(self.btn_open_supplier_url)
         conso_layout.addWidget(self.conso_search_label)
         conso_layout.addWidget(self.conso_search_field)
 
@@ -550,8 +633,8 @@ class MainWindow(QMainWindow):
         self.contenant_warning_label.setWordWrap(True)
         self.contenant_warning_label.setVisible(False)
 
-        self.manage_consumables_button = QPushButton("Enrichir le consommable choisi")
-        self.manage_consumables_button.setToolTip("Enrichir le consommable choisi")
+        self.manage_consumables_button = QPushButton("Enrichir le consommable")
+        self.manage_consumables_button.setToolTip("Enrichir le consommable")
         self.manage_consumables_button.setEnabled(False)
         self.manage_consumables_button.setMaximumWidth(230)
         self.add_consumable_button = QPushButton("Ajouter un consommable")
@@ -768,6 +851,10 @@ class MainWindow(QMainWindow):
             " background-color: #f3f4f6; padding: 3px; }"
         )
         main_layout.addWidget(self.history_list)
+
+        # ── Panneau "Détail du calcul" (production / fin de vie) ─────────
+        self._init_breakdown_panel(main_layout)
+        self.history_list.itemSelectionChanged.connect(self._update_breakdown_panel)
 
         self.delete_button = QPushButton('Supprimer le(s) calcul(s) sélectionné(s)')
         self.delete_button.setEnabled(False)
@@ -1010,10 +1097,12 @@ class MainWindow(QMainWindow):
         self.category_combo.currentIndexChanged.connect(self.update_subcategories)
         self.subcategory_combo.currentIndexChanged.connect(self.update_subsubcategory_names)
         self.subcategory_combo.currentIndexChanged.connect(self.update_quantity_visibility)
+        self.subcategory_combo.currentIndexChanged.connect(self.update_nacres_visibility)
 
         self.conso_search_field.textChanged.connect(
             lambda text: self.update_conso_filtered_combo(filter_text=text)
         )
+        self.conso_search_field.textChanged.connect(self.update_subsubcategory_names)
         self.search_field.textChanged.connect(self.on_search_text_changed)
         self.reset_search_button.clicked.connect(self.reset_search_fields)
         self.subsub_name_combo.currentIndexChanged.connect(self.update_years)
@@ -1060,6 +1149,7 @@ class MainWindow(QMainWindow):
 
         self.subsub_name_combo.currentIndexChanged.connect(self._update_field_indicators)
         self.conso_filtered_combo.currentIndexChanged.connect(self._update_field_indicators)
+        self.conso_filtered_combo.currentIndexChanged.connect(self._update_supplier_url_button)
         self.input_field.textChanged.connect(self._update_field_indicators)
         self.quantity_input.textChanged.connect(self._update_field_indicators)
 
@@ -1078,6 +1168,67 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Helpers d'affichage et de sélection
     # ------------------------------------------------------------------
+    def _load_nacres_options(self):
+        self._nacres_options = []
+        self._nacres_by_code = {}
+        sqlite_path = getattr(self.data_manager, "sqlite_path", None)
+        if not sqlite_path:
+            return
+        try:
+            with sqlite3.connect(sqlite_path) as conn:
+                self._nacres_options = load_nacres_options(conn)
+            self._nacres_by_code = {option.code: option for option in self._nacres_options}
+        except Exception:
+            self._nacres_options = []
+            self._nacres_by_code = {}
+
+    def _rebuild_search_indexes(self):
+        """Prépare les index utilisés par la recherche consommables/NACRES."""
+        self._consumable_search_entries = []
+        self._consumable_prefixes_all = set()
+        self._purchase_rows_by_prefix = {}
+        self._purchase_row_cache = {}
+
+        df = getattr(self, "data_masse", None)
+        if (
+            df is not None and
+            not df.empty and
+            self.data_manager.CODE_NACRES_COL in df.columns and
+            self.data_manager.CONSOMMABLE_COL in df.columns
+        ):
+            unit_col = getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")
+            for row in df.to_dict("records"):
+                full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
+                consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
+                prefix = normalize_nacres_prefix(full_code)
+                if not consommable or not prefix:
+                    continue
+                packaging = self._consumable_packaging_label(row)
+                source = "liquid" if clean_text(row.get(unit_col)) else "solid"
+                search_text = normalize_search(f"{full_code} {consommable} {packaging}")
+                self._consumable_search_entries.append(
+                    (consommable.casefold(), full_code, consommable, source, search_text, prefix, packaging)
+                )
+                self._consumable_prefixes_all.add(prefix)
+
+        data = getattr(self, "data", None)
+        if data is None or data.empty:
+            return
+        achats = data[data["category"] == "Achats"].copy()
+        if achats.empty:
+            return
+        subsub = achats["subsubcategory"].fillna("").astype(str).str.strip().str.upper()
+        achats = achats.assign(_nacres_prefix=subsub.str[:4])
+        for row in achats.to_dict("records"):
+            prefix = normalize_nacres_prefix(row.get("_nacres_prefix", ""))
+            if not prefix:
+                continue
+            self._purchase_rows_by_prefix.setdefault(prefix, []).append(row)
+
+    def _ensure_search_indexes(self):
+        if not hasattr(self, "_consumable_search_entries") or not hasattr(self, "_purchase_rows_by_prefix"):
+            self._rebuild_search_indexes()
+
     def _populate_subcategory_combo(self, subcategories):
         self.subcategory_combo.clear()
         for subcategory in sorted(clean_text(s) for s in subcategories if clean_text(s)):
@@ -1104,22 +1255,59 @@ class MainWindow(QMainWindow):
             return True
         return False
 
-    def _add_consumable_combo_item(self, code_nacres, consommable, source="solid"):
+    def _consumable_packaging_label(self, row) -> str:
+        conditionnement = clean_text(row.get("condt_ijm", ""))
+        if conditionnement:
+            return conditionnement
+
+        volume = safe_float(
+            row.get(getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)")),
+            default=0.0,
+        )
+        unit = clean_text(row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")))
+        if volume > 0 and unit:
+            return f"{format_quantity(volume)} {unit}"
+
+        nb = safe_float(
+            row.get(getattr(self.data_manager, "NOMBRE_PAR_COND_COL", "Nbr par conditionnement")),
+            default=0.0,
+        )
+        if nb > 0:
+            return f"{format_quantity(nb)} unité(s)"
+
+        return ""
+
+    def _consumable_display_name(self, consommable: str, packaging: str) -> str:
+        name = clean_text(consommable)
+        pack = clean_text(packaging)
+        if not name:
+            return pack
+        if not pack:
+            return name
+        if normalize_search(pack) in normalize_search(name):
+            return name
+        return f"{name} - {pack}"
+
+    def _add_consumable_combo_item(self, code_nacres, consommable, source="solid", packaging=""):
         code = clean_text(code_nacres)
         name = clean_text(consommable)
         if not code and not name:
             return
-        display = name or code
+        pack = clean_text(packaging)
+        display = self._consumable_display_name(name or code, pack)
         metadata = {
             "code_nacres": code,
             "consommable": name,
             "source": source,
+            "conditionnement": pack,
         }
         self.conso_filtered_combo.addItem(display, userData=metadata)
         index = self.conso_filtered_combo.count() - 1
         tooltip = []
         if code:
             tooltip.append(f"Code NACRES : {code}")
+        if pack:
+            tooltip.append(f"Conditionnement : {pack}")
         if source == "liquid":
             tooltip.append("Consommable liquide")
         if tooltip:
@@ -1146,6 +1334,61 @@ class MainWindow(QMainWindow):
             return ""
         subsubcategory, _ = self.split_subsub_name(subsub_name)
         return normalize_nacres_prefix(subsubcategory or subsub_name)
+
+    def _consumable_code_prefixes(self, filter_text: str | None = None) -> set:
+        """Codes NACRES pour lesquels la base consommables contient au moins un produit.
+
+        Si filter_text est fourni, seuls les codes dont au moins un consommable
+        correspond au filtre sont inclus.
+        """
+        self._ensure_search_indexes()
+        norm_filter = normalize_search(filter_text) if filter_text else None
+        if not norm_filter:
+            return set(self._consumable_prefixes_all)
+        return {
+            prefix
+            for _, _, _, _, search_text, prefix, _ in self._consumable_search_entries
+            if norm_filter in search_text
+        }
+
+    def _nacres_prefix_has_consumables(self, code_nacres):
+        return normalize_nacres_prefix(code_nacres) in self._consumable_code_prefixes()
+
+    def _purchase_factor_rows_for_nacres(self, code_nacres):
+        """Retourne les lignes Achats du référentiel monétaire pour un préfixe NACRES."""
+        self._ensure_search_indexes()
+        prefix = normalize_nacres_prefix(code_nacres)
+        if not prefix:
+            return []
+        return self._purchase_rows_by_prefix.get(prefix, [])
+
+    def _purchase_factor_row_for_nacres(self, code_nacres, preferred_subcategory=None):
+        """Choisit la ligne d'achat à utiliser pour un code NACRES donné."""
+        prefix = normalize_nacres_prefix(code_nacres)
+        preferred = clean_text(preferred_subcategory)
+        cache_key = (prefix, preferred)
+        self._ensure_search_indexes()
+        if cache_key in self._purchase_row_cache:
+            return self._purchase_row_cache[cache_key]
+
+        rows = self._purchase_factor_rows_for_nacres(code_nacres)
+        if not rows:
+            self._purchase_row_cache[cache_key] = None
+            return None
+
+        if preferred:
+            for row in rows:
+                if clean_text(row.get("subcategory", "")) == preferred:
+                    self._purchase_row_cache[cache_key] = row
+                    return row
+
+        for row in rows:
+            if is_consumables_subcategory(clean_text(row.get("subcategory", ""))):
+                self._purchase_row_cache[cache_key] = row
+                return row
+
+        self._purchase_row_cache[cache_key] = rows[0]
+        return rows[0]
 
     def _current_subsub_data(self):
         if self.subsub_name_combo is None:
@@ -1184,6 +1427,7 @@ class MainWindow(QMainWindow):
                     "code_nacres": code,
                     "consommable": name,
                     "source": clean_text(data.get("source")) or "solid",
+                    "conditionnement": clean_text(data.get("conditionnement")),
                 }
 
         text = clean_text(self.conso_filtered_combo.currentText())
@@ -1191,19 +1435,88 @@ class MainWindow(QMainWindow):
             return None
         if " - " in text:
             code, name = text.split(" - ", 1)
-            return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid"}
-        return {"code_nacres": "", "consommable": text, "source": "solid"}
+            if re.match(r"^[A-Za-z]{2}[0-9]{2}\b", clean_text(code)):
+                return {"code_nacres": clean_text(code), "consommable": clean_text(name), "source": "solid", "conditionnement": ""}
+        return {"code_nacres": "", "consommable": text, "source": "solid", "conditionnement": ""}
 
-    def _select_consumable_item(self, code_nacres, consommable):
+    def _supplier_url_for_consumable(self) -> str:
+        """Récupère l'URL fournisseur du consommable sélectionné, si elle existe."""
+        selected = self._selected_consumable_data()
+        if not selected:
+            return ""
+        name = clean_text(selected.get("consommable"))
+        code = clean_text(selected.get("code_nacres")).upper()
+        if not name:
+            return ""
+        sqlite_path = getattr(self.data_manager, "sqlite_path", "")
+        if not sqlite_path:
+            return ""
+        try:
+            with sqlite3.connect(sqlite_path) as conn:
+                # Match exact d'abord. Si le nom est tronqué dans l'UI, fallback
+                # sur un préfixe LIKE pour rester robuste.
+                row = conn.execute(
+                    """
+                    SELECT COALESCE(sc.product_url, sr.product_url, '') AS url
+                    FROM commercial_products cp
+                    LEFT JOIN supplier_catalogue sc ON sc.id = cp.supplier_catalogue_id
+                    LEFT JOIN supplier_references sr
+                           ON sr.supplier = sc.supplier
+                          AND sr.supplier_product_ref = sc.code_fournisseur
+                    WHERE (
+                              lower(trim(cp.name)) = lower(trim(?))
+                           OR lower(trim(cp.name)) LIKE lower(trim(?)) || '%'
+                          )
+                      AND (? = '' OR upper(trim(cp.code_nacres)) = ?)
+                      AND COALESCE(cp.status, '') != 'deprecated'
+                      AND (
+                          COALESCE(sc.product_url, '') != ''
+                       OR COALESCE(sr.product_url, '') != ''
+                      )
+                    ORDER BY CASE cp.status
+                        WHEN 'validated' THEN 0
+                        WHEN 'draft'     THEN 1
+                        ELSE 2 END
+                    LIMIT 1
+                    """,
+                    (name, name, code, code),
+                ).fetchone()
+        except sqlite3.Error:
+            return ""
+        return (row[0] if row else "") or ""
+
+    def _open_selected_consumable_url(self) -> None:
+        url = self._supplier_url_for_consumable()
+        if not url:
+            QMessageBox.information(
+                self,
+                "Pas de fiche fournisseur",
+                "Aucune URL fournisseur n'est enregistrée pour ce consommable.",
+            )
+            return
+        QDesktopServices.openUrl(QUrl(url))
+
+    def _update_supplier_url_button(self) -> None:
+        button = getattr(self, "btn_open_supplier_url", None)
+        if button is not None:
+            button.setEnabled(bool(self._supplier_url_for_consumable()))
+
+    def _select_consumable_item(self, code_nacres, consommable, packaging=""):
         code_prefix = normalize_nacres_prefix(code_nacres)
         name = clean_text(consommable)
+        pack = clean_text(packaging)
         for index in range(self.conso_filtered_combo.count()):
             data = self.conso_filtered_combo.itemData(index)
             if not isinstance(data, dict):
                 continue
             item_name = clean_text(data.get("consommable"))
             item_code = clean_text(data.get("code_nacres"))
-            if item_name == name and normalize_nacres_prefix(item_code) == code_prefix:
+            item_pack = clean_text(data.get("conditionnement"))
+            if (
+                item_name == name and
+                normalize_nacres_prefix(item_code) == code_prefix and
+                (not pack or item_pack == pack)
+            ):
                 self.conso_filtered_combo.setCurrentIndex(index)
                 return True
         return False
@@ -1370,6 +1683,7 @@ class MainWindow(QMainWindow):
             # Ici, par exemple, on "simule" ce que fait add_machine :
             # => on suppose que carbon_calculator gère 'value' = kWh
             ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+            item_data["breakdown"] = self.carbon_calculator.last_breakdown
             if msg:
                 item_data["calc_error_msg"] = msg
                 return item_data
@@ -1394,9 +1708,10 @@ class MainWindow(QMainWindow):
         # Si la fonction 'calculate_emission' fait plus de choses, on peut les reproduire ici.
 
         # 4) Appeler compute_emission_data
-        #    => on s'appuie sur la structure existante, 
+        #    => on s'appuie sur la structure existante,
         #    => item_data doit déjà contenir tout (category, subcategory, subsub, value, days, quantity, etc.)
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(item_data)
+        item_data["breakdown"] = self.carbon_calculator.last_breakdown
 
         # 5) Si erreur renvoyée
         if msg:
@@ -1462,11 +1777,9 @@ class MainWindow(QMainWindow):
                 "electricity_type": item.get("electricity_type", ""),
                 "consommable": item.get("consommable", ""),
                 "code_nacres": item.get("code_nacres", ""),
+                "conditionnement": item.get("conditionnement", ""),
                 "origine": item.get("origine", self.data_manager.TRANSPORT_DEFAULT),
             }
-
-            # Optionnel : vérifier via un debug
-            # print("DEBUG new_data:", new_data)
 
             # 5) Recalculer les émissions pour cet item
             updated_data = self.calculate_emission_for_item(new_data)
@@ -1707,14 +2020,20 @@ class MainWindow(QMainWindow):
         """
         Met à jour la visibilité de la zone des consommables (NACRES).
 
-        Affiche ou masque les éléments liés aux consommables en fonction de la catégorie sélectionnée et de la sous-catégorie.
-        Si la catégorie est 'Achats' et que la sous-catégorie contient 'Consommables', affiche les éléments,
-        sinon les masque.
+        Affiche ou masque les éléments liés aux consommables en fonction de la catégorie sélectionnée.
+        La zone est visible pour la sous-catégorie "Consommables", ainsi que pour un code NACRES
+        d'une autre famille lorsqu'un consommable existe déjà pour ce code.
         """
         category = self.category_combo.currentText()
         subcat = self._current_subcategory()
+        selected_prefix_has_consumables = (
+            category == 'Achats' and
+            self._nacres_prefix_has_consumables(self._selected_nacres_prefix())
+        )
 
-        if category == 'Achats' and subcat and is_consumables_subcategory(subcat):
+        if category == 'Achats' and subcat and (
+            is_consumables_subcategory(subcat) or selected_prefix_has_consumables
+        ):
             # On affiche la zone NACRES
             self._set_consumable_controls_visible(True)
             self.quantity_label.setVisible(False)
@@ -1754,15 +2073,16 @@ class MainWindow(QMainWindow):
 
         entries = []
         seen = set()
-        for _, row in filtered_data.iterrows():
+
+        def add_subsub_entry(row):
             subsubcategory = clean_text(row.get('subsubcategory', ''))
             name = clean_text(row.get('name', ''))
             display = clean_text(f"{subsubcategory} - {name}").strip(" - ")
             if not display:
-                continue
+                return
             haystack = normalize_search(display)
             if search_text and search_text not in haystack:
-                continue
+                return
             item_data = {
                 "category": clean_text(row.get('category', '')),
                 "subcategory": clean_text(row.get('subcategory', '')),
@@ -1776,15 +2096,84 @@ class MainWindow(QMainWindow):
                 item_data["name"],
             )
             if key in seen:
-                continue
+                return
             seen.add(key)
             entries.append((display.casefold(), display, item_data))
+
+        for _, row in filtered_data.iterrows():
+            add_subsub_entry(row)
+
+        if category == 'Achats' and subcategory and is_consumables_subcategory(subcategory):
+            existing_prefixes = {
+                normalize_nacres_prefix(data["subsubcategory"])
+                for _, _, data in entries
+                if normalize_nacres_prefix(data["subsubcategory"])
+            }
+            conso_filter = (
+                self.conso_search_field.text()
+                if self.conso_search_field is not None else None
+            )
+            available_prefixes = self._consumable_code_prefixes(
+                filter_text=conso_filter or None
+            )
+            for prefix in sorted(available_prefixes - existing_prefixes):
+                row = self._purchase_factor_row_for_nacres(prefix)
+                if row is not None:
+                    add_subsub_entry(row)
+
+            existing_prefixes = {
+                normalize_nacres_prefix(data["subsubcategory"])
+                for _, _, data in entries
+                if normalize_nacres_prefix(data["subsubcategory"])
+            }
+            conso_filter_norm = normalize_search(conso_filter) if conso_filter else None
+            for option in self._nacres_options:
+                if option.code in existing_prefixes:
+                    continue
+                purchase_row = self._purchase_factor_row_for_nacres(option.code)
+                if purchase_row is not None:
+                    subsubcategory = clean_text(purchase_row.get("subsubcategory", "")) or option.code
+                    name = clean_text(purchase_row.get("name", "")) or option.label
+                    item_subcategory = clean_text(purchase_row.get("subcategory", "")) or subcategory
+                else:
+                    subsubcategory = option.code
+                    name = option.label
+                    item_subcategory = subcategory
+                display = f"{subsubcategory} - {name}".strip(" - ")
+                haystack = normalize_search(display)
+                if search_text and search_text not in haystack:
+                    continue
+                if conso_filter_norm and conso_filter_norm not in haystack:
+                    continue
+                item_data = {
+                    "category": "Achats",
+                    "subcategory": item_subcategory,
+                    "subsubcategory": subsubcategory,
+                    "name": name,
+                    "nacres_status": option.statut_maj_2026,
+                    "nacres_no_purchase_factor": not option.has_purchase_factor,
+                    "nacres_new_without_fe": option.is_new_without_labo1point5_fe,
+                }
+                key = (
+                    item_data["category"],
+                    item_data["subcategory"],
+                    item_data["subsubcategory"],
+                    item_data["name"],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append((display.casefold(), display, item_data))
 
         self.subsub_name_combo.blockSignals(True)
         self.subsub_name_combo.clear()
         self.subsub_name_combo.addItem("non renseignée")
         for _, display, item_data in sorted(entries):
             self.subsub_name_combo.addItem(display, userData=item_data)
+            idx = self.subsub_name_combo.count() - 1
+            if item_data.get("nacres_new_without_fe"):
+                self.subsub_name_combo.setItemData(idx, _NACRES_NEW_NO_FE_COLOR, Qt.BackgroundRole)
+                self.subsub_name_combo.setItemData(idx, _NACRES_NEW_NO_FE_TOOLTIP, Qt.ToolTipRole)
         self.subsub_name_combo.blockSignals(False)
 
         self.update_years()
@@ -1865,11 +2254,16 @@ class MainWindow(QMainWindow):
             self.input_field.setEnabled(True)
         else:
             self.current_unit = None
-            if self.days_label.isVisible():
+            if item_data.get("nacres_new_without_fe"):
+                self.input_label.setText(
+                    "Aucun facteur d'émission GES 1point5 n'est défini pour cette nouvelle catégorie NACRES."
+                )
+            elif self.days_label.isVisible():
                 self.input_label.setText('Entrez la valeur journalière:')
             else:
                 self.input_label.setText('Entrez la valeur:')
             self.input_field.setEnabled(False)
+        self.input_field.setToolTip(_NACRES_NEW_NO_FE_TOOLTIP if item_data.get("nacres_new_without_fe") else "")
         self._update_field_indicators()
 
     def update_conso_filtered_combo(self, filter_text=None):
@@ -1891,20 +2285,22 @@ class MainWindow(QMainWindow):
             filter_text = self.conso_search_field.text() if self.conso_search_field else ""
         filter_text = normalize_search(filter_text)
 
-        entries = []
-        for _, row in self.data_masse.iterrows():
-            full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            haystack = normalize_search(f"{full_code} {consommable}")
-            if consommable and (not filter_text or filter_text in haystack):
-                entries.append((consommable.casefold(), full_code, consommable, "solid"))
+        entries = [
+            (sort_key, full_code, consommable, source, packaging)
+            for sort_key, full_code, consommable, source, search_text, _, packaging in self._consumable_search_entries
+            if not filter_text or filter_text in search_text
+        ]
 
-        for _, code, name, source in sorted(entries):
-            self._add_consumable_combo_item(code, name, source)
+        for _, code, name, source, packaging in sorted(entries):
+            self._add_consumable_combo_item(code, name, source, packaging)
 
         self.conso_filtered_combo.blockSignals(False)
         if previous:
-            self._select_consumable_item(previous["code_nacres"], previous["consommable"])
+            self._select_consumable_item(
+                previous["code_nacres"],
+                previous["consommable"],
+                previous.get("conditionnement", ""),
+            )
         self.update_quantity_visibility()
         self.update_manage_consumable_button_state()
 
@@ -1939,22 +2335,28 @@ class MainWindow(QMainWindow):
             return
 
         self._sync_subcategory_from_subsub_selection()
-        if self.category_combo.currentText() != 'Achats' or not is_consumables_subcategory(self._current_subcategory()):
+
+        # Récupère les 4 premiers caractères comme code NACRES approximatif
+        code_nacres_4 = self._selected_nacres_prefix() or normalize_nacres_prefix(subsub_name)
+        can_show_consumables = (
+            self.category_combo.currentText() == 'Achats' and
+            (
+                is_consumables_subcategory(self._current_subcategory()) or
+                self._nacres_prefix_has_consumables(code_nacres_4)
+            )
+        )
+        if not can_show_consumables:
             self._set_consumable_controls_visible(False, clear_selection=True)
             self.update_unit()
             self.update_manage_consumable_button_state()
             self._update_field_indicators()
             return
 
-        # Récupère les 4 premiers caractères comme code NACRES approximatif
-        code_nacres_4 = normalize_nacres_prefix(subsub_name)
-
-        filtered_items = []
-        for _, row in self.data_masse.iterrows():
-            full_code = clean_text(row.get(self.data_manager.CODE_NACRES_COL, ""))
-            consommable = clean_text(row.get(self.data_manager.CONSOMMABLE_COL, ""))
-            if consommable and normalize_nacres_prefix(full_code) == code_nacres_4:
-                filtered_items.append((consommable.casefold(), full_code, consommable, "solid"))
+        filtered_items = [
+            (sort_key, full_code, consommable, source, packaging)
+            for sort_key, full_code, consommable, source, _, prefix, packaging in self._consumable_search_entries
+            if prefix == code_nacres_4
+        ]
 
         if not filtered_items:
             self.conso_filtered_combo.blockSignals(True)
@@ -2003,8 +2405,8 @@ class MainWindow(QMainWindow):
         self.conso_filtered_combo.blockSignals(True)
         self.conso_filtered_combo.clear()
         self._add_direct_nacres_combo_item(code_nacres_4)
-        for _, code, name, source in sorted(filtered_items):
-            self._add_consumable_combo_item(code, name, source)
+        for _, code, name, source, packaging in sorted(filtered_items):
+            self._add_consumable_combo_item(code, name, source, packaging)
         self.conso_filtered_combo.blockSignals(False)
 
         if len(filtered_items) == 1:
@@ -2024,10 +2426,17 @@ class MainWindow(QMainWindow):
         """
         Gère l'événement de changement de sélection dans la combobox des consommables filtrés.
 
-        Met à jour la catégorie à 'Achats' si nécessaire, sélectionne la sous-catégorie "Consommables",
-        et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
+        Met à jour la catégorie à 'Achats' si nécessaire, sélectionne la sous-catégorie réelle
+        du code NACRES, et ajuste la sélection des sous-sous-catégories en fonction du consommable sélectionné.
         Affiche la barre "Quantité" si un consommable valide est sélectionné.
         """
+        # Réinitialiser les champs de valeur à chaque changement de consommable
+        for field in (self.input_field, self.quantity_input):
+            if field is not None:
+                field.blockSignals(True)
+                field.clear()
+                field.blockSignals(False)
+
         selected = self._selected_consumable_data()
         if not selected:
             has_nacres_code = bool(self._selected_nacres_prefix())
@@ -2061,39 +2470,42 @@ class MainWindow(QMainWindow):
         # Récupérer codeNACRES_4
         code_nacres_4 = normalize_nacres_prefix(selected["code_nacres"])
 
-        # Forcer la catégorie Achats, sous-cat contenant "Consommables"
+        # Forcer la catégorie Achats.
+        was_achats = self.category_combo.currentText() == "Achats"
         idx_cat = self.category_combo.findText("Achats")
         if idx_cat >= 0:
             self.category_combo.blockSignals(True)
             self.category_combo.setCurrentIndex(idx_cat)
             self.category_combo.blockSignals(False)
+            if not was_achats:
+                subcats = self.data[self.data['category'] == "Achats"]['subcategory'].dropna().unique()
+                self._populate_subcategory_combo(subcats.astype(str))
 
-        # Chercher sous-cat "Consommables"
-        target_subcat = None
-        for i in range(self.subcategory_combo.count()):
-            txt = clean_text(self.subcategory_combo.itemData(i)) or self.subcategory_combo.itemText(i)
-            if is_consumables_subcategory(txt):
-                target_subcat = txt
-                break
+        purchase_row = self._purchase_factor_row_for_nacres(
+            code_nacres_4,
+            preferred_subcategory=self._current_subcategory(),
+        )
+        target_subcat = (
+            clean_text(purchase_row.get("subcategory", ""))
+            if purchase_row is not None else
+            None
+        )
+        if not target_subcat:
+            for i in range(self.subcategory_combo.count()):
+                txt = clean_text(self.subcategory_combo.itemData(i)) or self.subcategory_combo.itemText(i)
+                if is_consumables_subcategory(txt):
+                    target_subcat = txt
+                    break
         if target_subcat is not None:
-            idx_sub = self.subcategory_combo.findData(target_subcat)
-            if idx_sub < 0:
-                idx_sub = self.subcategory_combo.findText(target_subcat)
-            if idx_sub != -1:
-                self.subcategory_combo.blockSignals(True)
-                self.subcategory_combo.setCurrentIndex(idx_sub)
-                self.subcategory_combo.blockSignals(False)
+            self.subcategory_combo.blockSignals(True)
+            self._select_subcategory(target_subcat)
+            self.subcategory_combo.blockSignals(False)
 
-        # On appelle update_subsubcategory_names() pour lister toutes les subsub
+        # On appelle update_subsubcategory_names() après avoir ciblé la sous-catégorie réelle
+        # du code NACRES. AA01, par exemple, garde ainsi son facteur monétaire d'origine.
         self.update_subsubcategory_names()
 
-        # Ensuite, on cherche la subsub dont .str[:4] == code_nacres_4
-        filtered_data = self.data[
-            (self.data['category'] == "Achats") &
-            (self.data['subcategory'].str.contains("Consommables", na=False)) &
-            (self.data['subsubcategory'].fillna('').str[:4] == code_nacres_4)
-        ]
-        if filtered_data.empty:
+        if purchase_row is None:
             # subsub => "non renseignée"
             self.subsub_name_combo.blockSignals(True)
             idx_nr = self.subsub_name_combo.findText("non renseignée")
@@ -2103,10 +2515,15 @@ class MainWindow(QMainWindow):
                 self.subsub_name_combo.setCurrentIndex(0)
             self.subsub_name_combo.blockSignals(False)
         else:
-            row = filtered_data.iloc[0]
-            real_subsub = row['subsubcategory'] or ''
-            real_name = row['name'] or ''
+            real_subsub = clean_text(purchase_row.get('subsubcategory', ''))
+            real_name = clean_text(purchase_row.get('name', ''))
             new_subsub_text = f"{real_subsub} - {real_name}".strip(" - ")
+            item_data = {
+                "category": "Achats",
+                "subcategory": clean_text(purchase_row.get('subcategory', '')),
+                "subsubcategory": real_subsub,
+                "name": real_name,
+            }
 
             self.subsub_name_combo.blockSignals(True)
             idx_ss = self.subsub_name_combo.findText(new_subsub_text)
@@ -2114,16 +2531,16 @@ class MainWindow(QMainWindow):
                 self.subsub_name_combo.setCurrentIndex(idx_ss)
             else:
                 # On ajoute
-                self.subsub_name_combo.addItem(new_subsub_text)
+                self.subsub_name_combo.addItem(new_subsub_text, userData=item_data)
                 self.subsub_name_combo.setCurrentIndex(self.subsub_name_combo.count() - 1)
             self.subsub_name_combo.blockSignals(False)
 
         self._update_quantity_label(selected)
         self.quantity_label.setVisible(True)
         self.quantity_input.setVisible(True)
-        has_mass = self._consumable_has_mass_data(selected)
-        self.origine_label.setVisible(has_mass)
-        self.origine_row_widget.setVisible(has_mass)
+        show_origin = self._should_show_origin_selector(selected)
+        self.origine_label.setVisible(show_origin)
+        self.origine_row_widget.setVisible(show_origin)
 
         self.update_unit()
         self._update_prix_unitaire()
@@ -2146,29 +2563,27 @@ class MainWindow(QMainWindow):
 
         code_nacres_full = selected["code_nacres"]
         consommable_name = selected["consommable"]
+        conditionnement = selected.get("conditionnement", "")
 
-        # Pour les liquides : lookup direct dans data_liquides
-        if selected.get("source") == "liquid":
-            prix_info = self.data_manager.get_liquid_prix_unitaire_info(
-                code_nacres_full.strip(), consommable_name.strip()
-            )
-        else:
-            # Récupérer le Code NOM (4-5 chars IJM) depuis data_masse
-            code_nom = self.data_manager.get_code_nom(code_nacres_full.strip(), consommable_name.strip())
-            if code_nom is None:
-                code_nom = code_nacres_full.strip()  # fallback sur Code NACRES
-            prix_info = self.data_manager.get_prix_unitaire_info(code_nom, consommable_name)
+        prix_info = self.data_manager.get_prix_unitaire_info(
+            code_nacres_full.strip(),
+            consommable_name,
+            conditionnement,
+        )
         if prix_info and prix_info.get("prix_unitaire") is not None:
             prix = prix_info["prix_unitaire"]
             self._current_prix_unitaire = prix
-            condt = prix_info.get("conditionnement", "")
-            condt_text = str(condt or "").strip()
             price_source = str(prix_info.get("source_catalogue") or "").strip()
             source_label = "catalogue IJM" if price_source else "base consommables"
-            if condt_text and condt_text.lower() != "nan":
+            nb_unites = prix_info.get("nb_unites", "")
+            try:
+                nb_val = int(float(nb_unites)) if nb_unites not in ("", None) else None
+            except (ValueError, TypeError):
+                nb_val = None
+            if nb_val and nb_val > 1:
                 label_text = (
                     f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €  |  "
-                    f"Conditionnement vendu : {condt_text}"
+                    f"Conditionnement : {nb_val} unités"
                 )
             else:
                 label_text = f"ℹ  Prix par unité vendue ({source_label}) : {prix:.4f} €"
@@ -2264,6 +2679,7 @@ class MainWindow(QMainWindow):
             ("Unités par conditionnement vendu", prix_info.get("nb_unites")),
             ("Prix par unité vendue", prix_info.get("prix_unitaire")),
             ("Source catalogue", source_catalogue),
+            ("Validation", prix_info.get("validation")),
             ("Score de rapprochement", prix_info.get("score_match")),
         ]
 
@@ -2426,21 +2842,26 @@ class MainWindow(QMainWindow):
             return False
         if selected.get("source") == "liquid":
             return True
-        code_nacres = selected["code_nacres"]
-        consommable_name = selected["consommable"]
-        df = self.data_masse
-        mask = (
-            self._nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
-            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        solid_row = self._find_consumable_mass_row(
+            selected["code_nacres"],
+            selected["consommable"],
+            selected.get("conditionnement", ""),
         )
-        row = df[mask]
-        if row.empty:
+        if solid_row is None:
             return False
-        solid_row = row.iloc[0]
         if self._solid_row_liquid_factor(solid_row) is not None:
             return True
-        masse = row[self.data_manager.MASSE_G_COL].iloc[0]
+        masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
         return not (pd.isna(masse) or str(masse).strip() == "")
+
+    def _should_show_origin_selector(self, selected):
+        """Demande la provenance dès qu'un consommable est sélectionné.
+
+        La provenance reste utile même si les données de masse sont incomplètes :
+        elle est conservée dans l'historique, et le calcul transport s'active dès
+        qu'une masse exploitable existe.
+        """
+        return selected is not None
 
     def _solid_row_liquid_factor(self, solid_row):
         factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")
@@ -2453,15 +2874,13 @@ class MainWindow(QMainWindow):
         )
 
     def _is_solid_liquid_product(self, solid_row):
-        if solid_row is None:
-            return False
-        factor_col = getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source")
-        unit_col = getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide")
-        volume_col = getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)")
-        return bool(
-            clean_text(solid_row.get(factor_col, "")) or
-            clean_text(solid_row.get(unit_col, "")) or
-            safe_float(solid_row.get(volume_col, 0.0), default=0.0) > 0
+        return looks_like_liquid_commercial_product(
+            solid_row,
+            factor_col=getattr(self.data_manager, "FACTEUR_LIQUIDE_SOURCE_COL", "Facteur liquide source"),
+            unit_col=getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"),
+            volume_col=getattr(self.data_manager, "VOLUME_FLACON_COL", "Volume flacon (mL)"),
+            name_col=getattr(self.data_manager, "CONSOMMABLE_COL", "Consommable"),
+            code_col=getattr(self.data_manager, "CODE_NACRES_COL", "Code NACRES"),
         )
 
     def _update_masse_warning(self):
@@ -2485,6 +2904,7 @@ class MainWindow(QMainWindow):
             liq_row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             unit = clean_text(liq_row.get("Unité", "") if liq_row is not None else "").casefold()
             is_volume_based = unit in {"ml", "millilitre", "millilitres"} or (
@@ -2520,18 +2940,14 @@ class MainWindow(QMainWindow):
 
         self.contenant_warning_label.setVisible(False)
 
-        code_nacres = selected["code_nacres"]
-        consommable_name = selected["consommable"]
-        df = self.data_masse
-        mask = (
-            self._nacres_code_mask(df[self.data_manager.CODE_NACRES_COL], code_nacres) &
-            (df[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
+        solid_row = self._find_consumable_mass_row(
+            selected["code_nacres"],
+            selected["consommable"],
+            selected.get("conditionnement", ""),
         )
-        row = df[mask]
-
-        if row.empty:
+        if solid_row is None:
             self.masse_manquante_label.setText(
-                "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+                "⚠  Masse non enregistrée pour ce consommable : le calcul CO₂ sera incomplet."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #92400e; background-color: #fef3c7; "
@@ -2539,8 +2955,6 @@ class MainWindow(QMainWindow):
             )
             self.masse_manquante_label.setVisible(True)
             return
-
-        solid_row = row.iloc[0]
         if self._is_solid_liquid_product(solid_row):
             factor_row = self._solid_row_liquid_factor(solid_row)
             factor_name = clean_text(solid_row.get(
@@ -2584,9 +2998,18 @@ class MainWindow(QMainWindow):
             return
 
         masse = solid_row.get(self.data_manager.MASSE_G_COL, "")
+        materiau = str(solid_row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
         if pd.isna(masse) or str(masse).strip() == "":
             self.masse_manquante_label.setText(
-                "⚠  Masse non enregistrée pour ce consommable — le calcul CO₂ sera incomplet."
+                "⚠  Masse non enregistrée pour ce consommable : le calcul CO₂ sera incomplet."
+            )
+            self.masse_manquante_label.setStyleSheet(
+                "color: #92400e; background-color: #fef3c7; "
+                "border: 1px solid #f59e0b; border-radius: 4px; padding: 4px 8px;"
+            )
+        elif not materiau:
+            self.masse_manquante_label.setText(
+                "⚠  Matériau du produit non disponible : calcul du eCO₂ par la masse non disponible."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #92400e; background-color: #fef3c7; "
@@ -2594,7 +3017,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.masse_manquante_label.setText(
-                "✔  Masse disponible — calcul eCO₂ par la masse effectué."
+                "✔  Masse disponible : calcul eCO₂ par la masse effectué."
             )
             self.masse_manquante_label.setStyleSheet(
                 "color: #166534; background-color: #dcfce7; "
@@ -2677,6 +3100,7 @@ class MainWindow(QMainWindow):
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if row is None:
                 return
@@ -2689,6 +3113,7 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if solid_row is not None and self._is_solid_liquid_product(solid_row):
                 unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
@@ -2718,13 +3143,9 @@ class MainWindow(QMainWindow):
             return 0.0
         code = selected.get("code_nacres", "")
         name = selected.get("consommable", "")
-        df_row = self.data_masse[
-            self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code) &
-            (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == name.strip())
-        ]
-        if df_row.empty:
+        row = self._find_consumable_mass_row(code, name, selected.get("conditionnement", ""))
+        if row is None:
             return 0.0
-        row = df_row.iloc[0]
         if self._is_solid_liquid_product(row):
             return 0.0
         materiau = str(row.get(self.data_manager.MATERIAU_COL, "") or "").strip()
@@ -2738,12 +3159,14 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             row = self._solid_row_liquid_factor(solid_row) if solid_row is not None else None
         else:
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
         if row is None:
             return False
@@ -2756,6 +3179,7 @@ class MainWindow(QMainWindow):
             row = self.data_manager.get_liquid_data(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             unit = "mL"
             if row is not None:
@@ -2775,6 +3199,7 @@ class MainWindow(QMainWindow):
             solid_row = self._find_consumable_mass_row(
                 selected.get("code_nacres", ""),
                 selected.get("consommable", ""),
+                selected.get("conditionnement", ""),
             )
             if solid_row is not None and self._is_solid_liquid_product(solid_row):
                 unit = clean_text(solid_row.get(getattr(self.data_manager, "UNITE_LIQUIDE_COL", "Unité liquide"), "")) or "mL"
@@ -2786,17 +3211,14 @@ class MainWindow(QMainWindow):
                 self.fe_massique_input.setVisible(not has_factor)
                 return
             masse_g = self._get_masse_unitaire_g(selected)
-            if masse_g > 0:
+            if masse_g and masse_g > 0:
                 self._current_masse_unitaire_g = masse_g
                 self.quantity_label.setText("Quantité (g) :")
-                self.fe_massique_label.setText("Facteur d'émission (kg eCO₂/kg) :")
-                self.fe_massique_label.setVisible(True)
-                self.fe_massique_input.setVisible(True)
             else:
                 self._current_masse_unitaire_g = None
                 self.quantity_label.setText("Quantité (unités) :")
-                self.fe_massique_label.setVisible(False)
-                self.fe_massique_input.setVisible(False)
+            self.fe_massique_label.setVisible(False)
+            self.fe_massique_input.setVisible(False)
 
     def update_quantity_visibility(self):
         """
@@ -2831,8 +3253,22 @@ class MainWindow(QMainWindow):
             subsub, name = '', subsub_name
         return subsub.strip(), name.strip()
     
+    def _raise_existing_data_mass_window(self):
+        """Ramène au premier plan la fenêtre déjà ouverte. Retourne True si elle existait."""
+        if (
+            self.data_mass_window is not None
+            and isValid(self.data_mass_window)
+            and self.data_mass_window.isVisible()
+        ):
+            self.data_mass_window.raise_()
+            self.data_mass_window.activateWindow()
+            return True
+        return False
+
     def open_data_mass_window(self):
         """Ouvre la fenêtre de gestion pré-remplie avec le consommable sélectionné."""
+        if self._raise_existing_data_mass_window():
+            return
         if not self.has_selected_consumable():
             return
 
@@ -2852,24 +3288,31 @@ class MainWindow(QMainWindow):
             prefill_code=prefill_code,
             prefill_name=prefill_name,
             prefill_source=prefill_source,
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
+            prefill_source_url=self._supplier_url_for_consumable(),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
 
     def open_data_mass_window_new(self):
         """Ouvre la fenêtre de gestion avec le formulaire vierge pour ajouter un nouveau consommable."""
+        if self._raise_existing_data_mass_window():
+            return
         self.data_mass_window = DataMassWindow(
             parent=self,
             data_materials=self.data_materials,
             base_path=self.data_manager.base_path,
             user_path=self.data_manager.user_path,
             mode_filter="consumable",
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
 
     def open_emission_factor_window(self):
         """Ouvre la fenêtre dédiée aux facteurs d'émission matériaux/liquides."""
+        if self._raise_existing_data_mass_window():
+            return
         self.data_mass_window = DataMassWindow(
             parent=self,
             data_materials=self.data_materials,
@@ -2877,6 +3320,7 @@ class MainWindow(QMainWindow):
             user_path=self.data_manager.user_path,
             mode_filter="factor",
             initial_mode=DataMassWindow.MODE_SOLID_FACTOR,
+            sqlite_path=getattr(self.data_manager, "sqlite_path", None),
         )
         self.data_mass_window.data_added.connect(self._reload_consumables_data)
         self.data_mass_window.show()
@@ -2884,29 +3328,14 @@ class MainWindow(QMainWindow):
     def _reload_consumables_data(self):
         """Recharge les DataFrames de consommables dans le DataManager après un ajout."""
         try:
-            if os.path.exists(self.data_manager.data_masse_path):
-                self.data_manager.data_masse = pd.read_hdf(self.data_manager.data_masse_path)
-                self.data_masse = self.data_manager.get_data_masse()
-            if os.path.exists(self.data_manager.liq_path):
-                self.data_manager.data_liquides = pd.read_hdf(self.data_manager.liq_path)
-            else:
-                self.data_manager.data_liquides = pd.DataFrame()
+            self.data_manager.reload()
+            self.data_masse = self.data_manager.get_data_masse()
             self.data_liquides = self.data_manager.get_data_liquides()
-            user_materials_path = os.path.join(
-                self.data_manager.user_path,
-                "data",
-                "mass_factors",
-                self.data_manager.DATA_MATERIALS_FILENAME,
-            )
-            materials_path = (
-                user_materials_path
-                if os.path.exists(user_materials_path) else
-                self.data_manager.data_materials_path
-            )
-            if os.path.exists(materials_path):
-                self.data_manager.data_materials_path = materials_path
-                self.data_manager.data_materials = pd.read_hdf(materials_path)
-                self.data_materials = self.data_manager.get_data_materials()
+            self.data_materials = self.data_manager.get_data_materials()
+            self._rebuild_search_indexes()
+            if self.category_combo is not None:
+                self.update_subsubcategory_names()
+                self.update_nacres_visibility()
         except Exception as e:
             QMessageBox.warning(self, "Rechargement données",
                                 f"Impossible de recharger les consommables : {e}")
@@ -2960,6 +3389,7 @@ class MainWindow(QMainWindow):
                     "unit": data.get("unit", ""),
                     "quantity": data.get("quantity", 0.0),
                     "consommable": data.get("consommable", ""),
+                    "conditionnement": data.get("conditionnement", ""),
                     "origine": data.get("origine", self.data_manager.TRANSPORT_DEFAULT),
                     "electricity_type": data.get("electricity_type", ""),
                 })
@@ -3042,6 +3472,7 @@ class MainWindow(QMainWindow):
         if selected_consumable:
             code_nacres = selected_consumable["code_nacres"] or code_nacres
             consommable = selected_consumable["consommable"] or "NA"
+        conditionnement = selected_consumable.get("conditionnement", "") if selected_consumable else ""
             
         # Lecture du champ input_field => c'est un nombre "km/jour" si Véhicules, "€" si Achats, etc.
         try:
@@ -3098,38 +3529,27 @@ class MainWindow(QMainWindow):
             'days': days,
             'code_nacres': code_nacres,
             'consommable': consommable,
+            'conditionnement': conditionnement,
             'quantity': quantity,
             'origine': self.origine_combo.currentText() if self.origine_combo and self.origine_combo.isVisible() else self.data_manager.TRANSPORT_DEFAULT,
             'custom_fe': custom_fe,
         }
 
-                # --- Enrichissement des données massiques pour le bilan carbone ---
-        # --- Enrichissement des données pour le calcul massique ---
         if category == 'Achats' and consommable and consommable != 'NA':
-            # Recherche de la ligne correspondante dans data_masse
-            df_row = self.data_masse[
-                self._nacres_code_mask(self.data_masse[self.data_manager.CODE_NACRES_COL], code_nacres) &
-                (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == consommable.strip())
-            ]
-            if not df_row.empty:
-                row = df_row.iloc[0]
-                # Masse et matériau du produit
-                data_dict['masse_unitaire'] = safe_float(row.get(self.data_manager.MASSE_G_COL, 0.0))
-                data_dict['materiau_conso']   = row.get(self.data_manager.MATERIAU_COL, "")
-                # Masse et matériau de l'emballage
-                data_dict['masse_emballage']  = safe_float(row.get(self.data_manager.MASSE_EMBALLAGE_COL, 0.0))
-                data_dict['materiau_emballage'] = row.get(self.data_manager.MATERIAU_EMBALLAGE_COL, "")
-                # Masse et matériau du conditionnement
-                data_dict['masse_conditionnement'] = safe_float(
-                    row.get(self.data_manager.MASSE_CONDITIONNEMENT_COL, 0.0)
+            row = self._find_consumable_mass_row(code_nacres, consommable, conditionnement)
+            if row is not None:
+                data_dict['masse_unitaire'] = safe_float(
+                    row.get(self.data_manager.MASSE_G_COL, 0.0)
                 )
-                data_dict['materiau_conditionnement'] = row.get(self.data_manager.MATERIAU_CONDITIONNEMENT_COL, "")
-        # print("Debug - data_dict :", data_dict)
-        # Appel unifié
+
         ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
+        breakdown = self.carbon_calculator.last_breakdown
         if msg:
-            self._result_show_error(msg)
-            return
+            if msg.startswith("WARN:"):
+                QMessageBox.warning(self, "Matériaux non trouvés", msg[5:])
+            else:
+                self._result_show_error(msg)
+                return
 
         new_data = {
             'category': category,
@@ -3146,9 +3566,11 @@ class MainWindow(QMainWindow):
             'total_mass': tm,
             'code_nacres': code_nacres,
             'consommable': consommable,
+            'conditionnement': conditionnement,
             'unit': self.current_unit,
             'quantity': quantity,
             'origine': data_dict['origine'],
+            'breakdown': breakdown,
         }
 
         self.create_or_update_history_item(new_data)
@@ -3186,11 +3608,10 @@ class MainWindow(QMainWindow):
                                     data_manager=self.data_manager)
         if dialog.exec() == QDialog.Accepted:
             modified_data = dialog.modified_data
-            # print("Debug - Nouveau self.modified_data :", modified_data)
-
             # On suppose que modified_data['value'] = val/jour
             # et modified_data['days'] = days.
             ep, ep_err, em, em_err, tm, msg_price = self.carbon_calculator.compute_emission_data(modified_data)
+            modified_data['breakdown'] = self.carbon_calculator.last_breakdown
             if msg_price:
                 self._result_show_error(msg_price)
                 return
@@ -3276,7 +3697,7 @@ class MainWindow(QMainWindow):
             _fmt("Consommables (méthode masse)", total_mass, mass_err),
         ]))
 
-    def _find_consumable_mass_row(self, code_nacres, consommable):
+    def _find_consumable_mass_row(self, code_nacres, consommable, packaging=""):
         if self.data_masse is None or self.data_masse.empty:
             return None
         mask = (
@@ -3284,9 +3705,15 @@ class MainWindow(QMainWindow):
             (self.data_masse[self.data_manager.CONSOMMABLE_COL].astype(str).str.strip() == clean_text(consommable))
         )
         rows = self.data_masse[mask]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in rows.columns:
+            exact_pack = rows[rows[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                rows = exact_pack
         return rows.iloc[0] if not rows.empty else None
 
-    def _find_liquid_row(self, code_nacres, consommable):
+    def _find_liquid_row(self, code_nacres, consommable, packaging=""):
         if self.data_liquides is None or self.data_liquides.empty:
             return None
         mask = self._nacres_code_mask(self.data_liquides[self.data_manager.CODE_NACRES_COL], code_nacres)
@@ -3294,16 +3721,23 @@ class MainWindow(QMainWindow):
         if product_col is not None and clean_text(consommable):
             mask &= product_col.astype(str).str.strip() == clean_text(consommable)
         rows = self.data_liquides[mask]
+        pack = clean_text(packaging)
+        condt_col = getattr(self.data_manager, "CONDT_IJM_COL", "condt_ijm")
+        if pack and condt_col in rows.columns:
+            exact_pack = rows[rows[condt_col].fillna("").astype(str).str.strip() == pack]
+            if not exact_pack.empty:
+                rows = exact_pack
         return rows.iloc[0] if not rows.empty else None
 
     def _mass_detail_lines(self, data):
         code_nacres = clean_text(data.get("code_nacres"))
         consommable = clean_text(data.get("consommable"))
+        conditionnement = clean_text(data.get("conditionnement"))
         quantity = safe_float(data.get("quantity"), default=0.0)
         if not code_nacres or code_nacres == "NA" or not consommable or consommable == "NA" or quantity <= 0:
             return []
 
-        solid_row = self._find_consumable_mass_row(code_nacres, consommable)
+        solid_row = self._find_consumable_mass_row(code_nacres, consommable, conditionnement)
         if solid_row is not None:
             factor_row = self._solid_row_liquid_factor(solid_row)
             if factor_row is not None:
@@ -3353,7 +3787,7 @@ class MainWindow(QMainWindow):
                 lines.append(f"Masse comptabilisée eCO₂ : {total_mass:.4f} kg")
             return lines
 
-        liquid_row = self._find_liquid_row(code_nacres, consommable)
+        liquid_row = self._find_liquid_row(code_nacres, consommable, conditionnement)
         if liquid_row is not None:
             unit = clean_text(liquid_row.get("Unité", "")) or "mL"
             unit_clean = unit.casefold()
@@ -3387,10 +3821,13 @@ class MainWindow(QMainWindow):
 
         code_nacres = clean_text(data.get("code_nacres"))
         consommable = clean_text(data.get("consommable"))
+        conditionnement = clean_text(data.get("conditionnement"))
         if code_nacres and code_nacres != "NA":
             lines.append(f"Code NACRES : {code_nacres}")
         if consommable and consommable != "NA":
             lines.append(f"Consommable : {consommable}")
+            if conditionnement:
+                lines.append(f"Conditionnement : {conditionnement}")
             lines.append(f"Quantité : {format_quantity(data.get('quantity'))}")
             unit = display_unit(data.get("unit")) or "€"
             lines.append(f"Valeur : {safe_float(data.get('value')):.2f} {unit}")
@@ -3415,6 +3852,7 @@ class MainWindow(QMainWindow):
         tm          = data.get('total_mass', 0.0)
         code_nacres = data.get('code_nacres', 'NA')
         consommable = data.get('consommable', 'NA')
+        conditionnement = clean_text(data.get('conditionnement', ''))
         quantity    = data.get('quantity', 0.0)
         subcategory_display, _ = format_subcategory_label(subcategory)
         is_consumable_item = (
@@ -3441,7 +3879,8 @@ class MainWindow(QMainWindow):
             parts = [p for p in (subcategory, code_nacres, name) if _valid(p)]
             element = " : ".join(parts)
         elif is_consumable_item:
-            element = f"{subcategory_display} : {consommable}"
+            suffix = f" - {conditionnement}" if conditionnement else ""
+            element = f"{subcategory_display} : {consommable}{suffix}"
         else:
             parts = [p for p in (subcategory_display[:20], code_nacres, name) if _valid(p)]
             element = " : ".join(parts)
@@ -3490,7 +3929,205 @@ class MainWindow(QMainWindow):
         self.history_list.setItem(row, 3, price_item)
         self.history_list.setItem(row, 4, mass_item)
 
+        # Attacher le breakdown détaillé à la ligne pour le panneau "Détail".
+        # Utilise UserRole + 1 (UserRole est déjà pris par `data`).
+        breakdown = data.get('breakdown')
+        if breakdown:
+            cell0.setData(Qt.UserRole + 1, breakdown)
+
         return row
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Panneau "Détail du calcul" (production / fin de vie)
+    # ─────────────────────────────────────────────────────────────────────
+
+    _BREAKDOWN_PLACEHOLDER = (
+        "Sélectionner une ligne ci-dessus pour voir le détail du calcul "
+        "(production et fin de vie par composant)."
+    )
+
+    def _init_breakdown_panel(self, parent_layout):
+        """Crée le panneau de détail sous l'historique. Vide tant qu'aucune
+        ligne n'est sélectionnée (ou si la ligne sélectionnée n'a pas de
+        décomposition disponible : machine, véhicule, liquide…).
+        """
+        self.breakdown_panel = QGroupBox("Détail du calcul")
+        self.breakdown_panel.setStyleSheet(
+            "QGroupBox { color: black; font-weight: bold; "
+            "border: 1px solid #d1d5db; border-radius: 4px; "
+            "margin-top: 8px; padding-top: 12px; }"
+            "QGroupBox::title { subcontrol-origin: margin; "
+            "subcontrol-position: top left; padding: 0 4px; }"
+        )
+        layout = QVBoxLayout(self.breakdown_panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        # Ligne de placeholder (visible quand rien à afficher)
+        self.breakdown_placeholder = QLabel(self._BREAKDOWN_PLACEHOLDER)
+        self.breakdown_placeholder.setStyleSheet("color: #6b7280; font-style: italic;")
+        self.breakdown_placeholder.setWordWrap(True)
+        layout.addWidget(self.breakdown_placeholder)
+
+        # Résumé agrégé (production / EoL consommable / EoL emballage / total)
+        self.breakdown_summary = QLabel("")
+        self.breakdown_summary.setStyleSheet("color: black; font-weight: normal;")
+        self.breakdown_summary.setTextFormat(Qt.RichText)
+        self.breakdown_summary.setWordWrap(True)
+        self.breakdown_summary.setVisible(False)
+        layout.addWidget(self.breakdown_summary)
+
+        # Tableau des composants
+        self.breakdown_table = QTableWidget()
+        self.breakdown_table.setColumnCount(6)
+        self.breakdown_table.setHorizontalHeaderLabels([
+            "Composant", "Matériau", "Masse (kg)",
+            "Production (kgCO₂e)", "Fin de vie (kgCO₂e)", "Filière / facteur EoL",
+        ])
+        self.breakdown_table.verticalHeader().setVisible(False)
+        self.breakdown_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.breakdown_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.breakdown_table.setFocusPolicy(Qt.NoFocus)
+        header = self.breakdown_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        self.breakdown_table.setStyleSheet(
+            "QTableWidget { color: black; }"
+            "QHeaderView::section { color: black; font-weight: 600; "
+            "background-color: #f3f4f6; padding: 2px; }"
+        )
+        self.breakdown_table.setMaximumHeight(150)
+        self.breakdown_table.setVisible(False)
+        layout.addWidget(self.breakdown_table)
+
+        # Avertissement qualité (DASRI : 1/5, ±50 %)
+        self.breakdown_quality_warning = QLabel("")
+        self.breakdown_quality_warning.setStyleSheet(
+            "color: #92400e; background-color: #fef3c7; "
+            "border: 1px solid #fcd34d; border-radius: 3px; "
+            "padding: 4px 6px;"
+        )
+        self.breakdown_quality_warning.setWordWrap(True)
+        self.breakdown_quality_warning.setVisible(False)
+        layout.addWidget(self.breakdown_quality_warning)
+
+        parent_layout.addWidget(self.breakdown_panel)
+
+    def _update_breakdown_panel(self):
+        """Met à jour le panneau "Détail du calcul" en fonction de la ligne
+        sélectionnée. Lit le breakdown attaché via setData(Qt.UserRole + 1).
+        """
+        selected_items = self.history_list.selectedItems()
+        if not selected_items:
+            self._show_breakdown_placeholder()
+            return
+
+        # Plusieurs lignes sélectionnées → on n'affiche pas de détail (ambigu)
+        selected_rows = {item.row() for item in selected_items}
+        if len(selected_rows) != 1:
+            self._show_breakdown_placeholder(
+                "Plusieurs lignes sélectionnées — sélectionner une seule ligne pour voir son détail."
+            )
+            return
+
+        row = next(iter(selected_rows))
+        cell0 = self.history_list.item(row, 0)
+        breakdown = cell0.data(Qt.UserRole + 1) if cell0 is not None else None
+
+        if not breakdown or not breakdown.get("components"):
+            self._show_breakdown_placeholder(
+                "Pas de décomposition disponible pour cette ligne "
+                "(machine, véhicule ou consommable sans facteur masse)."
+            )
+            return
+
+        self._render_breakdown(breakdown, row)
+
+    def _show_breakdown_placeholder(self, text: str | None = None):
+        self.breakdown_placeholder.setText(text or self._BREAKDOWN_PLACEHOLDER)
+        self.breakdown_placeholder.setVisible(True)
+        self.breakdown_summary.setVisible(False)
+        self.breakdown_table.setVisible(False)
+        self.breakdown_quality_warning.setVisible(False)
+
+    def _render_breakdown(self, breakdown: dict, row: int):
+        """Rend la décomposition dans le panneau."""
+        self.breakdown_placeholder.setVisible(False)
+
+        totals = breakdown.get("totals", {})
+        prod = totals.get("production", 0.0)
+        eol_c = totals.get("eol_consommable", 0.0)
+        eol_p = totals.get("eol_packaging", 0.0)
+        total = totals.get("total", 0.0)
+        mass = totals.get("mass_kg", 0.0)
+        filiere = breakdown.get("filiere_consommable")
+
+        # Nom de la ligne courante (colonne "Élément")
+        elem_item = self.history_list.item(row, 1)
+        elem_label = elem_item.text() if elem_item else ""
+
+        filiere_txt = f" — filière <b>{filiere}</b>" if filiere else ""
+        self.breakdown_summary.setText(
+            f"<b>{elem_label}</b> — masse totale {mass*1000:.2f} g{filiere_txt}<br>"
+            f"Production&nbsp;: <b>{prod:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"Fin de vie consommable&nbsp;: <b>{eol_c:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"Fin de vie emballage&nbsp;: <b>{eol_p:.4f}</b> kgCO₂e &nbsp;|&nbsp; "
+            f"<u>Total&nbsp;: {total:.4f} kgCO₂e</u>"
+        )
+        self.breakdown_summary.setVisible(True)
+
+        # Tableau des composants
+        components = breakdown.get("components", [])
+        self.breakdown_table.setRowCount(len(components))
+        for i, c in enumerate(components):
+            slot = c.get("slot", c.get("type", ""))
+            mat = c.get("material", "")
+            mass_kg = c.get("mass_kg_total", 0.0)
+            prod_co2 = c.get("production", {}).get("co2", 0.0)
+            eol = c.get("eol", {})
+            eol_co2 = eol.get("co2", 0.0)
+            filiere_or_factor = (
+                eol.get("filiere")
+                or (eol.get("factor_name") or "")
+                or ("— (matériau sans EoL)" if eol.get("missing") else "")
+            )
+
+            items_text = [
+                slot,
+                mat,
+                f"{mass_kg:.6f}",
+                f"{prod_co2:.4f}",
+                f"{eol_co2:.4f}",
+                filiere_or_factor,
+            ]
+            for col, text in enumerate(items_text):
+                item = QTableWidgetItem(text)
+                if col >= 2:
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                if eol.get("missing") and col >= 4:
+                    item.setForeground(QColor("#9ca3af"))
+                self.breakdown_table.setItem(i, col, item)
+        self.breakdown_table.setVisible(True)
+
+        # Avertissement qualité (DASRI = 1/5, ±50 %)
+        if filiere == "DASRI":
+            self.breakdown_quality_warning.setText(
+                "⚠ <b>Données DASRI ADEME peu précises</b> : qualité 1/5, incertitude ±50 %, "
+                "fiche v23.10 expirée. Cross-check Rizan et al. 2021 (1.074 kgCO₂e/kg) "
+                "pour le même ordre de grandeur."
+            )
+            self.breakdown_quality_warning.setVisible(True)
+        elif filiere == "DIS":
+            self.breakdown_quality_warning.setText(
+                "ℹ Données DIS ADEME : qualité 3/5, incertitude ±20 %."
+            )
+            self.breakdown_quality_warning.setVisible(True)
+        else:
+            self.breakdown_quality_warning.setVisible(False)
 
     def delete_selected_calculation(self):
         """
@@ -3533,14 +4170,14 @@ class MainWindow(QMainWindow):
         """
         Exporte les données de l'historique des calculs vers un fichier.
 
-        Ouvre une boîte de dialogue pour permettre à l'utilisateur de choisir le format de fichier (CSV, Excel, HDF5),
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de choisir le format de fichier,
         puis enregistre les données de l'historique dans le fichier sélectionné. Affiche un message de confirmation ou d'erreur.
         """
         from PySide6.QtWidgets import QFileDialog
         import pandas as pd
         file_name, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer l'historique", "",
-            "Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5);;Tous les fichiers (*)"
+            self, "Enregistrer l'historique", "historique_labeco2.json",
+            "Fichier JSON (*.json);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Tous les fichiers (*)"
         )
         if not file_name:
             return
@@ -3559,16 +4196,27 @@ class MainWindow(QMainWindow):
         df = pd.DataFrame(rows)
         _, ext = os.path.splitext(file_name)
         ext = ext.lower()
+        if not ext:
+            file_name += ".json"
+            ext = ".json"
 
         try:
-            if ext == '.csv':
+            if ext == '.json':
+                payload = {
+                    "format": "LABeCO2 history",
+                    "version": 1,
+                    "items": rows,
+                }
+                with open(file_name, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+            elif ext == '.csv':
                 df.to_csv(file_name, index=False, sep=';')
             elif ext == '.xlsx':
                 df.to_excel(file_name, index=False)
-            elif ext == '.h5':
-                df.to_hdf(file_name, key='history', mode='w')
             else:
-                df.to_csv(file_name, index=False, sep=';')
+                file_name += ".json"
+                with open(file_name, "w", encoding="utf-8") as f:
+                    json.dump({"format": "LABeCO2 history", "version": 1, "items": rows}, f, ensure_ascii=False, indent=2)
             QMessageBox.information(self, "Export", f"Exporté avec succès dans {file_name}")
         except Exception as e:
             QMessageBox.warning(self, "Erreur Export", f"{e}")
@@ -3577,7 +4225,7 @@ class MainWindow(QMainWindow):
         """
         Importe des données dans l'historique des calculs à partir d'un fichier.
 
-        Ouvre une boîte de dialogue pour permettre à l'utilisateur de sélectionner un fichier (CSV, Excel, HDF5),
+        Ouvre une boîte de dialogue pour permettre à l'utilisateur de sélectionner un fichier,
         lit les données du fichier, convertit les colonnes attendues, et ajoute les éléments à l'historique.
         Affiche un message de confirmation ou d'erreur.
         """
@@ -3585,7 +4233,7 @@ class MainWindow(QMainWindow):
         import pandas as pd
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Importer l'historique", "",
-            "Tous les fichiers (*);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx);;Fichier HDF5 (*.h5 *.hdf5)"
+            "Tous les fichiers (*);;Fichier JSON (*.json);;Fichier CSV (*.csv);;Fichier Excel (*.xlsx)"
         )
         if not file_name:
             return
@@ -3593,14 +4241,19 @@ class MainWindow(QMainWindow):
         _, ext = os.path.splitext(file_name)
         ext = ext.lower()
         try:
-            if ext == '.csv':
+            if ext == '.json':
+                with open(file_name, encoding="utf-8") as f:
+                    payload = json.load(f)
+                rows = payload.get("items", payload) if isinstance(payload, dict) else payload
+                if not isinstance(rows, list):
+                    raise ValueError("Le JSON ne contient pas de liste d'éléments.")
+                df = pd.DataFrame(rows)
+            elif ext == '.csv':
                 # keep_default_na=False : empêche pandas de convertir 'NA' en NaN
                 # (sinon astype(str) produit la chaîne 'nan')
                 df = pd.read_csv(file_name, sep=';', keep_default_na=False)
             elif ext == '.xlsx':
                 df = pd.read_excel(file_name)
-            elif ext == '.h5':
-                df = pd.read_hdf(file_name, key='history')
             else:
                 df = pd.read_csv(file_name, sep=';', keep_default_na=False)
         except Exception as e:
@@ -3681,6 +4334,7 @@ class MainWindow(QMainWindow):
             }
 
             ep, ep_err, em, em_err, tm, msg = self.carbon_calculator.compute_emission_data(data_dict)
+            machine_breakdown = self.carbon_calculator.last_breakdown
             if msg:
                 QMessageBox.warning(self, 'Erreur', msg)
                 return
@@ -3701,6 +4355,7 @@ class MainWindow(QMainWindow):
                 'code_nacres': 'NA',
                 'consommable': 'NA',
                 'quantity': 0,
+                'breakdown': machine_breakdown,
             }
 
             self.create_or_update_history_item(new_data)
@@ -4163,6 +4818,10 @@ avant toute intégration fiable.
                 <b><a href="https://entrepot.recherche.data.gouv.fr/dataset.xhtml?persistentId=doi:10.57745/HZNS3S">Labos 1point5 (PER1p5) - Données achats</a></b><br>
                 Données PER1p5 pour les achats (NACRES vers facteurs d'émission macro / méso / micro).<br>
                 M. De Paepe, L. Jeanneau, J. Mariette, O. Aumont, A. Estevez-Torres, <i>Purchases dominate the carbon footprint of research laboratories</i>, bioRxiv 2023 (<a href="https://doi.org/10.1101/2023.04.04.535626">https://doi.org/10.1101/2023.04.04.535626</a>).
+            </li>
+            <li>
+                <b><a href="https://www.amue.fr/publications/actualites/details/nomenclature-nacres-mise-a-jour-ce-mois-de-mars-2026">AMUE - Nomenclature NACRES mise à jour en mars 2026</a></b><br>
+                Source de la nomenclature NACRES 2026 utilisée pour les nouveaux codes et leur statut de mise à jour.
             </li>
             <li>
                 <b><a href="https://base-empreinte.ademe.fr/">Base Carbone®</a></b><br>

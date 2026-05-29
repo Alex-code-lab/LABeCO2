@@ -1,0 +1,84 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\geometry{margin=2.2cm}
+
+\title{LABeCO2 -- Documentation des donnees}
+\author{LABeCO2}
+\date{Mise a jour : 2026-05-18}
+
+\begin{document}
+\maketitle
+
+\section{Source de verite}
+
+LABeCO2 utilise SQLite comme source de verite pour les facteurs, les
+consommables, les codes NACRES, les sources et les contributions.
+
+\begin{itemize}
+  \item \texttt{data/labeco2\_reference.sqlite} : base de reference livree avec l'application.
+  \item \texttt{private/labeco2.sqlite} : base de travail locale en mode developpement.
+  \item \texttt{scenarios/manips\_type.sqlite} : base des manipulations types.
+\end{itemize}
+
+Au lancement, l'application resout le chemin SQLite de travail. Si cette base
+n'existe pas, elle est initialisee par copie de
+\texttt{data/labeco2\_reference.sqlite}.
+
+\section{Tables principales}
+
+\begin{tabular}{lll}
+\toprule
+Table & Role & Remarques \\
+\midrule
+\texttt{purchase\_factors} & Facteurs achats/prix & Facteurs historiques GES/Labo1point5 consolides \\
+\texttt{commercial\_products} & Produits commerciaux & Solides et liquides commerciaux \\
+\texttt{product\_components} & Composants materiaux & Composants calculables avec masse renseignee \\
+\texttt{materials} & Materiaux & Reliens aux facteurs d'emission materiaux \\
+\texttt{emission\_factors} & Facteurs CO2e & Facteurs liquides et materiaux \\
+\texttt{nacres\_codes} & Codes NACRES & Alimente les listes de selection de l'IHM \\
+\texttt{transport\_factors} & Facteurs transport & Origine, distance et facteur par kg \\
+\texttt{sources} & Sources documentaires & Traçabilite des ajouts et validations \\
+\texttt{contributors} & Contributeurs & Auteurs des donnees \\
+\bottomrule
+\end{tabular}
+
+\section{Validation et revisions}
+
+Les tables metier portent un statut : \texttt{draft}, \texttt{validated} ou
+\texttt{deprecated}. Lorsqu'une entree validee est modifiee, une revision est
+creee et l'ancienne entree est conservee comme depreciee. L'outil
+\texttt{tools/lab\_admin.py} permet de valider, fusionner et auditer les
+contributions SQLite.
+
+\section{Exports et contributions}
+
+Les contributions peuvent etre exportees et importees via les outils :
+
+\begin{itemize}
+  \item \texttt{tools/export\_contribution.py}
+  \item \texttt{tools/import\_contribution.py}
+  \item \texttt{tools/export\_excel.py}
+\end{itemize}
+
+L'historique utilisateur de l'application est exporte en JSON, CSV ou Excel.
+Les scenarios de calcul sont stockes hors des bases de reference afin de
+separer les donnees metier validees des sessions utilisateur.
+
+\section{Controles de coherence}
+
+Les controles recommandes avant diffusion sont :
+
+\begin{itemize}
+  \item \texttt{pytest -q}
+  \item \texttt{PRAGMA quick\_check}
+  \item \texttt{PRAGMA foreign\_key\_check}
+  \item audit via \texttt{tools/lab\_admin.py}
+\end{itemize}
+
+\end{document}

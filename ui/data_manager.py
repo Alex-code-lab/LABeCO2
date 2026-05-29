@@ -7,8 +7,11 @@
 
 import os
 import pandas as pd
-from utils.data_loader import load_data  # Ajuster si nécessaire selon ta structure
-from ui.display_utils import clean_text, normalize_nacres_prefix
+from ui.display_utils import (
+    clean_text,
+    looks_like_liquid_commercial_product,
+    normalize_nacres_prefix,
+)
 
 class DataManager:
     """
@@ -39,6 +42,7 @@ class DataManager:
     MATERIAU3_COL     = "Matériau troisième materiaux"
     MASSE_EMBALLAGE_COL = "Masse emballage unitaire (g)"
     MATERIAU_EMBALLAGE_COL = "Matériau emballage"
+    NOMBRE_PAR_EMBALLAGE_COL = "Nbr par emballage secondaire"
     MASSE_CONDITIONNEMENT_COL = "Masse condionnement (g)"
     MATERIAU_CONDITIONNEMENT_COL = "Matériau conditionnement"
     NOMBRE_PAR_COND_COL = "Nbr par conditionnement"
@@ -46,6 +50,12 @@ class DataManager:
     # Spécifique matériaux
     MATERIAU_NAME_COL = "Materiau"
     EQUIV_CO2_COL = "Equivalent CO₂ (kg eCO₂/kg)"
+    EQUIV_CO2_EOL_COL = "EoL Facteur CO₂ (kg eCO₂/kg)"
+    UNCERTAINTY_EOL_COL = "EoL Incertitude"
+    EOL_FACTOR_NAME_COL = "EoL Nom facteur"
+    EOL_LIST_NAME_COL = "Nom"
+    EOL_LIST_FACTOR_COL = "Facteur CO₂ (kg eCO₂/kg)"
+    EOL_LIST_UNCERTAINTY_COL = "Incertitude"
 
     # Colonnes prix consommables. "Prix du conditionnement" est la source de
     # vérité; les anciennes colonnes *_ijm restent lues en fallback pour les
@@ -63,65 +73,56 @@ class DataManager:
     CODE_IJM_COL = "code_ijm"
     MARQUE_IJM_COL = "marque_ijm"
     SCORE_MATCH_COL = "score_match"
+    VALIDATION_STATUS_COL = "Statut validation"
+    VALIDATION_NATURE_COL = "Nature validation"
 
-    # Chemins par défaut
-    DATA_MASSE_FILENAME = "data_eCO2_masse_consommable.hdf5"
-    DATA_MATERIALS_FILENAME = "empreinte_carbone_materiaux.h5"
-    DATA_LIQUID_CONSOMMABLES = "data_eCO2_liquides_consommable.hdf5"
-    DATA_TRANSPORT_FILENAME = "data_transport_origins.hdf5"
+    SQLITE_ENV_VAR = "LABECO2_SQLITE_PATH"
     TRANSPORT_ORIGINE_COL = "Origine"
     TRANSPORT_FACTOR_COL = "Facteur transport (kg CO₂e/kg)"
     TRANSPORT_UNCERT_COL = "Incertitude"
     TRANSPORT_DEFAULT = "Inconnue (défaut)"
 
 
-    def __init__(self, base_path, user_path=None):
+    def __init__(self, base_path, user_path=None, sqlite_path=None):
         """
         :param base_path: Répertoire des données en lecture seule (bundlées).
         :param user_path: Répertoire des données modifiables (persistant).
                           Si None, identique à base_path (mode développement).
+        :param sqlite_path: Base SQLite à lire.
         """
         self.base_path = base_path
         self.user_path = user_path if user_path is not None else base_path
-
-        # Charger la data principale
-        self.main_data = load_data()
-
-        # Données modifiables → user_path
-        self.data_masse_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MASSE_FILENAME)
-        user_materials_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
-        base_materials_path = os.path.join(base_path, "data", "mass_factors", self.DATA_MATERIALS_FILENAME)
-        self.data_materials_path = user_materials_path if os.path.exists(user_materials_path) else base_materials_path
-
-        # Charger data_masse
-        if not os.path.exists(self.data_masse_path):
-            raise FileNotFoundError(f"Fichier {self.data_masse_path} introuvable.")
-        self.data_masse = pd.read_hdf(self.data_masse_path)
-        if self.CODE_NACRES_COL not in self.data_masse.columns:
-            raise KeyError(f"La colonne '{self.CODE_NACRES_COL}' est introuvable dans data_masse.")
-        # Nettoyage rapide du DataFrame pour supprimer les lignes vides
-        self.data_masse.dropna(subset=[self.CONSOMMABLE_COL], inplace=True)
-
-        # Charger data_materials
-        if not os.path.exists(self.data_materials_path):
-            raise FileNotFoundError(f"Fichier {self.data_materials_path} introuvable.")
-        self.data_materials = pd.read_hdf(self.data_materials_path)
-
-        # Charger consommables liquides (produits chimiques / bioproduits)
-        self.liq_path = os.path.join(self.user_path, "data", "mass_factors", self.DATA_LIQUID_CONSOMMABLES)
-        if os.path.exists(self.liq_path):
-            self.data_liquides = pd.read_hdf(self.liq_path)
-        else:
-            self.data_liquides = pd.DataFrame()  # vide si absent
-
-        # Charger les facteurs de transport par origine géographique
-        transport_path = os.path.join(base_path, "data", "mass_factors", self.DATA_TRANSPORT_FILENAME)
-        if os.path.exists(transport_path):
-            self.data_transport = pd.read_hdf(transport_path)
-        else:
-            self.data_transport = pd.DataFrame()
+        self.sqlite_path = (
+            sqlite_path
+            if sqlite_path is not None else
+            os.environ.get(self.SQLITE_ENV_VAR)
+        )
+        if not self.sqlite_path:
+            raise ValueError("DataManager nécessite un chemin SQLite.")
+        self._load_from_sqlite(self.sqlite_path)
 
         # Charger les prix du catalogue IJM (optionnel)
+        self.data_prix_ijm = self._load_prix_ijm()
+
+    def _load_from_sqlite(self, sqlite_path):
+        from ui.sqlite_legacy_adapter import load_legacy_dataframes
+
+        frames = load_legacy_dataframes(sqlite_path)
+        self.main_data = frames["main_data"]
+        self.data_masse = frames["data_masse"]
+        self.data_materials = frames["data_materials"]
+        self.data_liquides = frames["data_liquides"]
+        self.data_transport = frames["data_transport"]
+        self.data_eol_factors = frames.get("data_eol_factors")
+        if self.data_eol_factors is None:
+            import pandas as pd
+            self.data_eol_factors = pd.DataFrame(columns=["Nom", "Facteur CO₂ (kg eCO₂/kg)", "Incertitude", "Source"])
+
+    def reload(self):
+        """Recharge les DataFrames depuis la base SQLite active."""
+        if not self.sqlite_path:
+            raise ValueError("Aucune base SQLite active pour recharger les données.")
+        self._load_from_sqlite(self.sqlite_path)
         self.data_prix_ijm = self._load_prix_ijm()
 
     def get_main_data(self):
@@ -183,7 +184,81 @@ class DataManager:
         raw_unc = filtered.get(self.UNCERTAINTY_COL, pd.Series([0.0])).iloc[0]
         incert_mat = 0.0 if pd.isna(raw_unc) else float(raw_unc)
         return co2_par_kg, incert_mat
-    
+
+    def get_material_eol_data(self, material_name):
+        """Retourne (co2_par_kg_eol, incert_eol, eol_factor_name) pour un matériau.
+
+        Renvoie (None, None, None) si le matériau n'a pas de mapping EoL (par
+        exemple : métaux récupérés en mâchefers, sans facteur EoL associé).
+        Le calculateur doit alors ignorer la contribution EoL de ce composant.
+        """
+        import pandas as pd
+
+        if pd.isna(material_name) or not isinstance(material_name, str):
+            return None, None, None
+
+        df_mat = self.data_materials
+        if self.EQUIV_CO2_EOL_COL not in df_mat.columns:
+            return None, None, None
+
+        mask = df_mat[self.MATERIAU_NAME_COL].astype(str).str.strip() == material_name.strip()
+        filtered = df_mat[mask]
+        if filtered.empty:
+            return None, None, None
+
+        raw_co2 = filtered[self.EQUIV_CO2_EOL_COL].iloc[0]
+        if pd.isna(raw_co2):
+            return None, None, None
+        co2_eol = float(raw_co2)
+
+        raw_unc = filtered[self.UNCERTAINTY_EOL_COL].iloc[0] if self.UNCERTAINTY_EOL_COL in filtered.columns else None
+        incert_eol = 0.0 if (raw_unc is None or pd.isna(raw_unc)) else float(raw_unc)
+
+        raw_name = filtered[self.EOL_FACTOR_NAME_COL].iloc[0] if self.EOL_FACTOR_NAME_COL in filtered.columns else ""
+        factor_name = "" if pd.isna(raw_name) else str(raw_name).strip()
+
+        return co2_eol, incert_eol, factor_name
+
+    def get_eol_factor_by_name(self, factor_name):
+        """Retourne (co2_par_kg, incertitude) pour un facteur EoL donné par son nom.
+
+        Utilisé par le calculateur pour résoudre les facteurs filière (DASRI / DIS)
+        à partir du nom retourné par ui.end_of_life.factor_name_for_nacres().
+        Renvoie (None, None) si le facteur n'existe pas.
+        """
+        import pandas as pd
+
+        if not factor_name:
+            return None, None
+
+        df = self.data_eol_factors
+        if df is None or df.empty:
+            return None, None
+
+        mask = df[self.EOL_LIST_NAME_COL].astype(str).str.strip() == str(factor_name).strip()
+        filtered = df[mask]
+        if filtered.empty:
+            return None, None
+
+        raw_co2 = filtered[self.EOL_LIST_FACTOR_COL].iloc[0]
+        co2 = 0.0 if pd.isna(raw_co2) else float(raw_co2)
+        raw_unc = filtered[self.EOL_LIST_UNCERTAINTY_COL].iloc[0]
+        unc = 0.0 if pd.isna(raw_unc) else float(raw_unc)
+        return co2, unc
+
+    def get_filiere_factor(self, code_nacres):
+        """Retourne (co2_par_kg, incertitude, filiere) pour le facteur filière (DASRI ou
+        DIS) à appliquer au consommable, déterminé à partir du code NACRES.
+
+        La filière est résolue via ui.end_of_life ; si le facteur correspondant
+        n'est pas trouvé en base, renvoie (None, None, filiere).
+        """
+        from ui.end_of_life import filiere_for_nacres, factor_name_for_nacres
+        filiere = filiere_for_nacres(code_nacres)
+        factor_name = factor_name_for_nacres(code_nacres)
+        co2, unc = self.get_eol_factor_by_name(factor_name)
+        return co2, unc, filiere
+
     def get_data_liquides(self):
         """Retourne la DataFrame des consommables liquides."""
         return self.data_liquides
@@ -236,7 +311,7 @@ class DataManager:
         Retourne un DataFrame vide si absent.
         """
         candidates = [
-            os.path.join(self.base_path, "tools", "scraping", "output", "prix_ijm_2025.csv"),
+            os.path.join(self.base_path, "tools", "migration", "scraping", "output", "prix_ijm_2025.csv"),
             os.path.join(self.base_path, "data_prix", "prix_ijm_2025.csv"),
         ]
         for path in candidates:
@@ -248,22 +323,6 @@ class DataManager:
                 except Exception:
                     pass
         return pd.DataFrame()
-
-    def get_code_nom(self, code_nacres_full, consommable_name):
-        """
-        Retourne le Code NOM (code NACRES IJM, ex: 'HA01') correspondant à un consommable
-        identifié par son Code NACRES complet et son nom.
-        """
-        if self.CODE_NOM_COL not in self.data_masse.columns:
-            return None
-        mask = (
-            self.nacres_code_mask(self.data_masse[self.CODE_NACRES_COL], code_nacres_full) &
-            (self.data_masse[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip())
-        )
-        filtered = self.data_masse[mask]
-        if filtered.empty:
-            return None
-        return str(filtered[self.CODE_NOM_COL].iloc[0]).strip()
 
     @staticmethod
     def _clean_cell(value):
@@ -314,6 +373,19 @@ class DataManager:
         def get(col_name):
             return self._clean_cell(row.get(col_name, ""))
 
+        def validation_label():
+            status_labels = {
+                "validated": "Validé",
+                "draft": "Draft",
+                "deprecated": "Déprécié",
+            }
+            raw_status = get(self.VALIDATION_STATUS_COL)
+            nature = get(self.VALIDATION_NATURE_COL)
+            if not raw_status and not nature:
+                return ""
+            status = status_labels.get(raw_status.casefold(), raw_status)
+            return " - ".join(part for part in (status, nature.lower() if nature else "") if part)
+
         prix_conditionnement = self._row_price_conditionnement(row)
         nb_unites = self._row_nb_conditionnement(row)
         prix_unitaire = self._row_prix_unitaire(row)
@@ -329,9 +401,24 @@ class DataManager:
             "marque": get(self.MARQUE_IJM_COL),
             "score_match": get(self.SCORE_MATCH_COL),
             "source_catalogue": get(self.SOURCE_CATALOGUE_IJM_COL),
+            "validation": validation_label(),
         }
 
-    def _find_prix_unitaire_row(self, code_nacres, consommable_name=""):
+    def _row_packaging_label(self, row) -> str:
+        return self._clean_cell(row.get(self.CONDT_IJM_COL, ""))
+
+    def _filter_rows_by_packaging(self, rows, packaging):
+        pack = clean_text(packaging)
+        if not pack or rows.empty:
+            return rows
+        if self.CONDT_IJM_COL not in rows.columns:
+            return rows
+        exact_pack = rows[
+            rows[self.CONDT_IJM_COL].fillna("").astype(str).str.strip() == pack
+        ]
+        return exact_pack if not exact_pack.empty else rows
+
+    def _find_prix_unitaire_row(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne la ligne data_masse contenant le prix IJM le plus pertinent.
         Retourne None si aucun prix disponible.
@@ -353,6 +440,7 @@ class DataManager:
             exact = candidates[
                 candidates[self.CONSOMMABLE_COL].astype(str).str.strip() == consommable_name.strip()
             ]
+            exact = self._filter_rows_by_packaging(exact, packaging)
             if not exact.empty:
                 for _, row in exact.iterrows():
                     if self._row_has_price(row):
@@ -362,6 +450,7 @@ class DataManager:
         # Garder seulement les lignes avec un prix
         has_price = candidates.apply(self._row_has_price, axis=1)
         price_cands = candidates[has_price]
+        price_cands = self._filter_rows_by_packaging(price_cands, packaging)
         if price_cands.empty:
             return None
 
@@ -382,23 +471,23 @@ class DataManager:
 
         return best_row
 
-    def get_prix_unitaire_info(self, code_nacres, consommable_name=""):
+    def get_prix_unitaire_info(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne les métadonnées du produit IJM utilisé pour le prix unitaire.
         Retourne None si aucun prix disponible.
         """
-        row = self._find_prix_unitaire_row(code_nacres, consommable_name)
+        row = self._find_prix_unitaire_row(code_nacres, consommable_name, packaging)
         if row is None:
             return None
         return self._prix_info_from_row(row)
 
-    def get_prix_unitaire(self, code_nacres, consommable_name=""):
+    def get_prix_unitaire(self, code_nacres, consommable_name="", packaging=""):
         """
         Retourne (prix_unitaire, designation, condt) depuis data_masse.
         Recherche par Code NACRES (4 chars) puis fuzzy match sur le nom.
         Retourne (None, None, None) si aucun prix disponible.
         """
-        info = self.get_prix_unitaire_info(code_nacres, consommable_name)
+        info = self.get_prix_unitaire_info(code_nacres, consommable_name, packaging)
         if not info:
             return None, None, None
 
@@ -408,66 +497,7 @@ class DataManager:
             info["conditionnement"],
         )
 
-    def get_liquid_prix_unitaire_info(self, code_nacres, produit_name=""):
-        """
-        Retourne les métadonnées de prix pour un consommable liquide (data_liquides).
-        Cherche par code NACRES puis fuzzy match sur Produit.
-        Retourne None si aucun prix disponible.
-        """
-        from difflib import SequenceMatcher
-        if self.data_liquides.empty:
-            return None
-        df = self.data_liquides
-        if self.PRIX_CONDITIONNEMENT_COL not in df.columns and self.PRIX_UNITAIRE_COL not in df.columns:
-            return None
-        mask = self.nacres_code_mask(df[self.CODE_NACRES_COL], code_nacres)
-        candidates = df[mask]
-        if candidates.empty:
-            return None
-
-        if produit_name:
-            exact = candidates[
-                candidates["Produit"].astype(str).str.strip() == produit_name.strip()
-            ]
-            if not exact.empty:
-                for _, row in exact.iterrows():
-                    if self._row_has_price(row):
-                        candidates = exact
-                        break
-                else:
-                    return None
-
-        has_price = candidates.apply(self._row_has_price, axis=1)
-        price_cands = candidates[has_price]
-        if price_cands.empty:
-            return None
-        if len(price_cands) == 1 or not produit_name:
-            row = price_cands.iloc[0]
-        else:
-            name_lower = produit_name.lower()
-            best_score, best_row = -1.0, price_cands.iloc[0]
-            for _, r in price_cands.iterrows():
-                score = SequenceMatcher(None, name_lower, str(r.get("Produit", "")).lower()).ratio()
-                if score > best_score:
-                    best_score, best_row = score, r
-            row = best_row
-        prix_conditionnement = self._row_price_conditionnement(row)
-        nb_unites = self._row_nb_conditionnement(row)
-        prix_unitaire = self._row_prix_unitaire(row)
-        return {
-            "prix_unitaire": prix_unitaire,
-            "consommable": self._clean_cell(row.get("Produit", "")),
-            "designation": self._clean_cell(row.get(self.DESIGNATION_IJM_COL, "")) or self._clean_cell(row.get("Produit", "")),
-            "conditionnement": self._clean_cell(row.get(self.CONDT_IJM_COL, "")),
-            "nb_unites": "" if nb_unites is None else nb_unites,
-            "prix_ht": "" if prix_conditionnement is None else prix_conditionnement,
-            "code_ijm": self._clean_cell(row.get(self.CODE_IJM_COL, "")),
-            "marque": self._clean_cell(row.get(self.MARQUE_IJM_COL, "")),
-            "score_match": self._clean_cell(row.get(self.SCORE_MATCH_COL, "")),
-            "source_catalogue": self._clean_cell(row.get(self.SOURCE_CATALOGUE_IJM_COL, "")),
-        }
-
-    def get_liquid_data(self, code_nacres, produit=None):
+    def get_liquid_data(self, code_nacres, produit=None, packaging=""):
         """
         Cherche un consommable liquide par code NACRES.
         Retourne la Series de la ligne si trouvée, sinon None.
@@ -480,9 +510,10 @@ class DataManager:
         if produit_clean and "Produit" in df.columns:
             mask &= df["Produit"].astype(str).str.strip() == produit_clean
         filtered = df[mask]
+        filtered = self._filter_rows_by_packaging(filtered, packaging)
         return filtered.iloc[0] if not filtered.empty else None
 
-    def get_consumable_row(self, code_nacres, consommable_name):
+    def get_consumable_row(self, code_nacres, consommable_name, packaging=""):
         if self.data_masse.empty:
             return None
         df = self.data_masse
@@ -491,17 +522,32 @@ class DataManager:
             (df[self.CONSOMMABLE_COL].astype(str).str.strip() == clean_text(consommable_name))
         )
         rows = df[mask]
+        rows = self._filter_rows_by_packaging(rows, packaging)
         return rows.iloc[0] if not rows.empty else None
 
-    def get_consumable_liquid_factor_data(self, code_nacres, consommable_name):
+    def get_consumable_liquid_factor_data(self, code_nacres, consommable_name, packaging=""):
         """
         Retourne (ligne consommable, ligne facteur liquide) pour un produit
         commercial stocké dans la base consommables mais lié à un facteur de
         la base Liquides & Solvants.
+
+        Résolution principale par emission_factor_id (stable au renommage),
+        puis fallback par nom texte si l'identifiant est absent.
         """
-        product_row = self.get_consumable_row(code_nacres, consommable_name)
+        product_row = self.get_consumable_row(code_nacres, consommable_name, packaging)
         if product_row is None:
             return None, None
+
+        # Résolution par ID (SQLite) — insensible aux renommages
+        factor_id = self._clean_cell(product_row.get("emission_factor_id", ""))
+        if factor_id:
+            df_liq = self.data_liquides
+            if "factor_id" in df_liq.columns:
+                match = df_liq[df_liq["factor_id"].astype(str) == factor_id]
+                if not match.empty:
+                    return product_row, match.iloc[0]
+
+        # Fallback par nom texte si factor_id est absent.
         factor_name = self._clean_cell(product_row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, ""))
         if not factor_name:
             return product_row, None
@@ -509,10 +555,11 @@ class DataManager:
         return product_row, factor_row
 
     def is_liquid_commercial_row(self, row):
-        if row is None:
-            return False
-        return bool(
-            self._clean_cell(row.get(self.FACTEUR_LIQUIDE_SOURCE_COL, "")) or
-            self._clean_cell(row.get(self.UNITE_LIQUIDE_COL, "")) or
-            self._to_float_or_none(row.get(self.VOLUME_FLACON_COL, None)) is not None
+        return looks_like_liquid_commercial_product(
+            row,
+            factor_col=self.FACTEUR_LIQUIDE_SOURCE_COL,
+            unit_col=self.UNITE_LIQUIDE_COL,
+            volume_col=self.VOLUME_FLACON_COL,
+            name_col=self.CONSOMMABLE_COL,
+            code_col=self.CODE_NACRES_COL,
         )

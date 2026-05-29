@@ -2,13 +2,13 @@
 
 /* Style général de l'application */
 QMainWindow {
-    background-color: #f6ffffff; /* Gris très clair similaire au fond macOS */
+    background-color: #F6F6F6; /* Gris très clair similaire au fond macOS */
 }
 
 /* Style des QLabel */
 QLabel {
     color: #333333; /* Texte gris foncé pour une bonne lisibilité */
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif; /* Polices système pour une apparence native */
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial; /* Polices système pour une apparence native */
     font-size: 14px; /* Taille de police standard */
 }
 
@@ -18,7 +18,7 @@ QLineEdit {
     border: 1px solid #C0C0C0; /* Bordure grise claire */
     border-radius: 4px; /* Coins légèrement arrondis */
     padding: 4px 8px; /* Espacement interne pour un meilleur confort de saisie */
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
     color: #000000;
 }
@@ -35,7 +35,7 @@ QLineEdit:disabled {
     border: 1px solid #C0C0C0;
     border-radius: 4px;
     padding: 6px 12px;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
 } */
 
@@ -46,7 +46,7 @@ QPushButton {
     border: 1px solid #a9a9a9;
     border-radius: 4px;
     padding: 2px 8px;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
 }
 QPushButton:hover {
@@ -74,6 +74,7 @@ QComboBox {
 
 QComboBox QAbstractItemView {
     background-color: #FFFFFF !important; /* Forcer la liste déroulante en blanc */
+    color: #000000;                       /* Texte lisible aussi en thème sombre */
     selection-background-color: #B0D0FF;   /* Couleur au survol/sélection */
     selection-color: #000000;             /* Texte au survol/sélection */
 }
@@ -84,7 +85,7 @@ QListWidget {
     background-color: #FFFFFF;
     border: 1px solid #C0C0C0;
     border-radius: 4px;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
     color: #000000;
 }
@@ -155,7 +156,7 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
 /* Style des QMessageBox */
 QMessageBox {
     background-color: #FFFFFF;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
     color: #333333;
 }
@@ -163,7 +164,7 @@ QMessageBox {
 /* Style des QDialog */
 QDialog {
     background-color: #FFFFFF;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
     color: #333333;
 }
@@ -173,14 +174,14 @@ QToolTip {
     background-color: #FFFFE0;
     color: #000000;
     border: 1px solid #C0C0C0;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 12px;
 }
 
 /* Style des QInputDialog */
 QInputDialog {
     background-color: #FFFFFF;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, Arial;
     font-size: 14px;
     color: #333333;
 }

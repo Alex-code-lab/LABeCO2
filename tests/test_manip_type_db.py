@@ -24,6 +24,7 @@ class TestManipsTypeDB(unittest.TestCase):
                             "days": 1,
                             "quantity": 2.0,
                             "consommable": "Tube centrifugeuse 15 mL",
+                            "conditionnement": "1x500",
                             "origine": "Europe",
                         }
                     ],
@@ -34,6 +35,7 @@ class TestManipsTypeDB(unittest.TestCase):
 
                 self.assertEqual(len(items), 1)
                 self.assertEqual(items[0]["origine"], "Europe")
+                self.assertEqual(items[0]["conditionnement"], "1x500")
             finally:
                 db.close()
 

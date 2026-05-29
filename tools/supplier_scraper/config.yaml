@@ -1,0 +1,91 @@
+# Configuration exemple du scraper fournisseur LABeCO2.
+#
+# Les fournisseurs doivent rester très limités. Avant d'ajouter des URLs :
+# - vérifier les conditions d'utilisation du site ;
+# - renseigner un contact réel dans le User-Agent ;
+# - limiter start_urls à des pages utiles, pas à tout le catalogue.
+
+database_path: private/labeco2.sqlite
+dry_run: true
+
+local_capture:
+  enabled: true
+  database_path: private/supplier_scraping_lab.sqlite
+  # En dry-run, la base LABeCO2 n'est pas modifiée, mais cette base privée
+  # reçoit les observations larges pour éviter de refaire les mêmes passages.
+  capture_during_dry_run: true
+
+logging:
+  level: INFO
+
+request:
+  user_agent: "LABeCO2 research carbon-footprint tool - contact: labeco2.contact@gmail.com"
+  min_delay_seconds: 10
+  max_delay_seconds: 30
+  timeout_seconds: 30
+  respect_robots_txt: true
+  use_cache: true
+  cache_dir: ".cache/labeco2_supplier_scraper"
+  stop_status_codes: [403, 429]
+
+limits:
+  max_pages_per_run: 500
+  max_products_per_run: 200
+
+suppliers:
+  - name: "VWR"
+    enabled: false
+    base_url: "https://www.vwr.com/"
+    allowed_domains: ["www.vwr.com"]
+    start_urls:
+      - "https://www.vwr.com/fr/en/product/9695384/vwr-nitrilelight-nitrile-gloves"
+    crawl_url_patterns:
+      - "/fr/en/search"
+      - "/fr/en/category"
+    product_url_patterns:
+      - "/fr/en/product/"
+    deny_url_patterns:
+      - "/login"
+      - "/cart"
+      - "/checkout"
+    generic_category: "gants nitrile"
+    ref_patterns:
+      - '(?:Référence|Reference|Product code|Code produit)\s*[:#-]?\s*(?P<ref>[A-Z0-9._-]{4,})'
+      - '\b(?P<ref>[A-Z][0-9]{3,}[A-Z0-9._-]*)\b'
+    url_ref_patterns:
+      - '/product/(?P<ref>[0-9]+)/'
+    name_patterns:
+      - '<h1[^>]*>(?P<name>.*?)</h1>'
+    packaging_patterns:
+      - '(?:Conditionnement|Packaging|Pack size|Taille du pack|Pack of)\s*[:#-]?\s*(?P<pack>[^\n\r]{1,120})'
+
+  - name: "Fisher Scientific"
+    enabled: true
+    base_url: "https://www.fishersci.fr/"
+    allowed_domains: ["www.fishersci.fr"]
+    start_urls:
+      - "https://www.fishersci.fr/fr/fr/browse/90111011/bo%C3%AEtes-de-culture-cellulaire"
+      - "https://www.fishersci.fr/fr/fr/browse/90168054/Tubes"
+    crawl_url_patterns:
+      - "/shop/products"
+      - "/fr/fr/search"
+      - "/fr/fr/browse"
+    product_url_patterns:
+      - "/shop/products/"
+    deny_url_patterns:
+      - "/login"
+      - "/cart"
+      - "/checkout"
+    generic_category: ""
+    expand_variant_refs: true
+    ref_patterns:
+      - '(?:Référence|Reference|Catalog number|Cat\. No\.|Code produit)\s*[:#-]?\s*(?P<ref>[A-Z0-9._-]{4,})'
+      - '\b(?P<ref>[A-Z0-9]{4,}[-.][A-Z0-9._-]+)\b'
+    url_ref_patterns:
+      - '/shop/products/[^/]+/(?P<ref>[0-9A-Z]+)'
+    variant_ref_patterns:
+      - '_productServiceResponse\.siblings\s*=\s*\[(?P<refs>[^\]]+)\]'
+    name_patterns:
+      - '<h1[^>]*>(?P<name>.*?)</h1>'
+    packaging_patterns:
+      - '(?:Conditionnement|Packaging|Pack size|Unit Size)\s*[:#-]?\s*(?P<pack>[^\n\r]{1,120})'

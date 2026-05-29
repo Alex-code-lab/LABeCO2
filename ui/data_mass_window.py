@@ -8,16 +8,48 @@ import os
 import sys
 import html
 import re
+import logging
+import sqlite3
 from datetime import date
 import pandas as pd
 from PySide6.QtWidgets import (
     QMainWindow, QMessageBox, QVBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QWidget, QComboBox, QHBoxLayout, QLabel, QFileDialog, QToolTip,
-    QScrollArea, QSizePolicy
+    QScrollArea, QSizePolicy, QListView
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor, QDoubleValidator, QIntValidator
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QCursor, QDesktopServices, QDoubleValidator, QIntValidator
+from ui.display_utils import looks_like_liquid_commercial_product
+from ui.nacres_metadata import load_nacres_options
+from ui.sqlite_legacy_adapter import SQLITE_ID_COL, load_legacy_dataframes
+from ui.sqlite_writer import (
+    normalize_key,
+    upsert_commercial_product,
+    upsert_liquid_factor,
+    upsert_material_factor,
+)
+
+logger = logging.getLogger(__name__)
+SQLITE_PATH_ENV_VAR = "LABECO2_SQLITE_PATH"
+_NACRES_NEW_NO_FE_COLOR = QColor(255, 210, 150)
+_NACRES_NEW_NO_FE_TOOLTIP = (
+    "Nouveau code NACRES 2026 : le projet GES 1point5 n'a pas encore défini "
+    "de facteur d'émission pour cette catégorie."
+)
+
+
+def clean_sqlite_id(value):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    return text or None
+
 
 class DataMassWindow(QMainWindow):
     data_added = Signal()
@@ -36,8 +68,9 @@ class DataMassWindow(QMainWindow):
         "Matériau deuxieme materiaux": "Matériau secondaire du consommable",
         "Masse unitaire troisième materiaux (g)": "Masse du troisième matériau par unité (g)",
         "Matériau troisième materiaux": "Troisième matériau du consommable",
-        "Masse emballage unitaire (g)": "Masse de l'emballage secondaire par unité (g)",
+        "Masse emballage unitaire (g)": "Masse de l'emballage secondaire (g)",
         "Matériau emballage": "Matériau de l'emballage secondaire",
+        "Nbr par emballage secondaire": "Unités partageant l'emballage secondaire",
         "Masse condionnement (g)": "Masse du conditionnement primaire complet ou du contenant vide (g)",
         "Matériau conditionnement": "Matériau du conditionnement primaire ou du contenant",
         "Nbr par conditionnement": "Unités par conditionnement vendu",
@@ -61,7 +94,8 @@ class DataMassWindow(QMainWindow):
 
     def __init__(self, parent=None, data_materials=None, base_path=None,
                  user_path=None, prefill_code=None, prefill_name=None,
-                 prefill_source="solid", initial_mode=None, mode_filter="consumable"):
+                 prefill_source="solid", initial_mode=None, mode_filter="consumable",
+                 sqlite_path=None, prefill_source_url=""):
         super().__init__(parent)
 
         self.mode_filter = mode_filter or "consumable"
@@ -81,17 +115,14 @@ class DataMassWindow(QMainWindow):
             else:
                 base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-        # user_path : dossier persistant pour les HDF5 modifiables
         if user_path is None:
             user_path = base_path
         self._user_path = user_path
+        self.sqlite_path = sqlite_path or os.environ.get(SQLITE_PATH_ENV_VAR)
+        if not self.sqlite_path:
+            raise ValueError("DataMassWindow nécessite un chemin SQLite.")
 
-        self.nacres_hdf5_file = os.path.join(base_path, "data", "mass_factors", "nacres_2022.h5")
-        self._all_nacres = []  # Will store (code, description)
-
-        # HDF5 modifiable → user_path
-        self.hdf5_file = os.path.join(user_path, "data", "mass_factors", "data_eCO2_masse_consommable.hdf5")
-        self.hdf5_materials = os.path.join(user_path, "data", "mass_factors", "empreinte_carbone_materiaux.h5")
+        self._all_nacres = []
 
         self.columns = [
             "Consommable",
@@ -108,6 +139,7 @@ class DataMassWindow(QMainWindow):
             "Matériau troisième materiaux",
             "Masse emballage unitaire (g)",
             "Matériau emballage",
+            "Nbr par emballage secondaire",
             "Masse condionnement (g)",
             "Matériau conditionnement",
             "Nbr par conditionnement",
@@ -153,12 +185,13 @@ class DataMassWindow(QMainWindow):
             "Signature",
         ]
 
-        # Fichier pour les consommables liquides (modifiable → user_path)
-        self.hdf5_liquids = os.path.join(user_path, "data", "mass_factors", "data_eCO2_liquides_consommable.hdf5")
-
         # Charger ou initialiser les données
         self.data = self.charger_ou_initialiser_donnees()
         self.prefill_row_index = None
+        self._prefill_liq_id = None
+        self._prefill_solid_material_id = None
+        self._factor_original_values: dict = {}
+        self._factor_editing_dirty: bool = False
 
         # data_materials transmis par MainWindow
         # data_materials doit contenir 'Materiau' et 'eCO2_kg'
@@ -173,46 +206,18 @@ class DataMassWindow(QMainWindow):
         if prefill_code or prefill_name:
             self.prefill_consumable(prefill_code or "", prefill_name or "", source=prefill_source)
 
+        # Pré-remplit la source avec l'URL fournisseur si rien n'est déjà
+        # renseigné côté source : pratique pour récupérer NACRES / prix sur la
+        # page du fournisseur sans avoir à recopier l'URL à la main.
+        prefill_url = (prefill_source_url or "").strip()
+        if prefill_url and not self.source_input.text().strip():
+            self.source_input.setText(prefill_url)
+
     def charger_ou_initialiser_donnees(self):
-        if os.path.exists(self.hdf5_file):
-            try:
-                df = pd.read_hdf(self.hdf5_file)
-            except Exception as e:
-                QMessageBox.warning(self, "Erreur", f"Impossible de charger le fichier HDF5 : {e}")
-                df = pd.DataFrame(columns=self.columns)
-        else:
-            df = pd.DataFrame([{
-                "Consommable": "Tube Falcon 15ml",
-                "Marque": "N/A",
-                "Référence": "N/A",
-                "Code CAS": "",
-                "Catégorie": "Consommable",
-                "Code NACRES": "NB13",
-                "Masse unitaire (g)": 6.7,
-                "Matériau consommable": "Polypropylène (PP)",
-                "Masse unitaire deuxieme materiaux (g)": "N/A",
-                "Matériau deuxieme materiaux": "N/A",
-                "Masse unitaire troisième materiaux (g)": "",
-                "Matériau troisième materiaux": "",
-                "Masse emballage unitaire (g)": "N/A",
-                "Matériau emballage": "N/A",
-                "Masse condionnement (g)": "N/A",
-                "Matériau conditionnement": "N/A",
-                "Nbr par conditionnement": "N/A",
-                "Prix du conditionnement": "",
-                "date d'ajout": "",
-                "Source": "",
-                "Signature": "Alexandre Souchaud",
-                "Source catalogue IJM": "",
-                "Lien / Note / Remarque": "",
-                "condt_ijm": "",
-                "designation_ijm": "",
-                "code_ijm": "",
-                "marque_ijm": "",
-                "score_match": "",
-            }], columns=self.columns)
-            self.sauvegarder_donnees(df)
-        # --- Harmoniser les colonnes manquantes ---
+        if self._uses_sqlite():
+            return self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+
+        df = pd.DataFrame(columns=self.columns)
         data = self.migrate_source_signature_columns(df, mode="solid")
         for col in self.columns:
             if col not in data.columns:
@@ -223,14 +228,97 @@ class DataMassWindow(QMainWindow):
         if df is None:
             df = self.data
 
-        directory = os.path.dirname(self.hdf5_file)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        if self._uses_sqlite():
+            self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+            return
 
+        data = self.migrate_source_signature_columns(df, mode="solid")
+        for col in self.columns:
+            if col not in data.columns:
+                data[col] = ""
+        self.data = data.reindex(columns=self.columns)
+        return
+
+    def _upsert_commercial_product(self, row_dict, existing_id=None):
+        if not self._uses_sqlite():
+            self.data = self.ajouter_objet_df(self.data, row_dict)
+            return None
+        product_id = upsert_commercial_product(
+            self.sqlite_path,
+            row_dict,
+            existing_id=existing_id,
+        )
+        self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+        return product_id
+
+    def _current_dataframe_and_columns(self):
+        mode = self.current_mode()
+        if mode == self.MODE_LIQUID_FACTOR:
+            return self.data_liquids, self.columns_liquids
+        if mode == self.MODE_SOLID_FACTOR:
+            return self.data_materials, self.columns_materials
+        return self.data, self.columns
+
+    def _normalise_import_columns(self, df):
+        reverse_labels = {label: col for col, label in self.COLUMN_DISPLAY_LABELS.items()}
+        renamed = df.rename(columns={col: reverse_labels.get(col, col) for col in df.columns})
+        return renamed
+
+    def _import_rows_from_dataframe(self, df):
+        mode = self.current_mode()
+        imported = 0
+        if mode == self.MODE_SOLID_FACTOR:
+            for _, row in df.iterrows():
+                if str(row.get("Materiau", "")).strip():
+                    upsert_material_factor(self.sqlite_path, row.to_dict())
+                    imported += 1
+            self.data_materials = self.load_material_df()
+        elif mode == self.MODE_LIQUID_FACTOR:
+            for _, row in df.iterrows():
+                if str(row.get("Produit", "")).strip():
+                    upsert_liquid_factor(self.sqlite_path, row.to_dict())
+                    imported += 1
+            self.data_liquids = self.load_liquid_df()
+        else:
+            for _, row in df.iterrows():
+                if str(row.get("Consommable", "")).strip():
+                    upsert_commercial_product(
+                        self.sqlite_path,
+                        row.to_dict(),
+                        existing_id=self._sqlite_row_id(row),
+                    )
+                    imported += 1
+            self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+        return imported
+
+    def _uses_sqlite(self):
+        return bool(getattr(self, "sqlite_path", None))
+
+    def _load_sqlite_frame(self, key, columns, include_sqlite_id=False):
+        frames = load_legacy_dataframes(self.sqlite_path)
+        df = frames[key].copy()
+        for col in columns:
+            if col not in df.columns:
+                df[col] = ""
+        if include_sqlite_id and SQLITE_ID_COL not in df.columns:
+            df[SQLITE_ID_COL] = ""
+        ordered_columns = columns + ([SQLITE_ID_COL] if include_sqlite_id else [])
+        return df.reindex(columns=ordered_columns)
+
+    def _reload_sqlite_frames(self):
+        self.data = self._load_sqlite_frame("data_masse", self.columns, include_sqlite_id=True)
+        self.data_materials = self._load_sqlite_frame("data_materials", self.columns_materials)
+        self.data_liquids = self._load_sqlite_frame("data_liquides", self.columns_liquids)
+
+    @staticmethod
+    def _sqlite_row_id(row):
+        if row is None:
+            return None
         try:
-            df.to_hdf(self.hdf5_file, key='data', mode='w')
-        except Exception as e:
-            QMessageBox.warning(self, "Erreur", f"Impossible de sauvegarder le fichier HDF5 : {e}")
+            value = row.get(SQLITE_ID_COL, "")
+        except AttributeError:
+            value = ""
+        return clean_sqlite_id(value)
 
     @staticmethod
     def _clean_cell(value):
@@ -247,6 +335,33 @@ class DataMassWindow(QMainWindow):
         return bool(
             re.search(r"https?://|www\.|doi\s*:|doi\.org|10\.\d{4,9}/", text, flags=re.IGNORECASE)
         )
+
+    @staticmethod
+    def _looks_like_url(value):
+        """Détecte si la valeur contient une URL ou un DOI ouvrable dans un navigateur."""
+        text = (value or "").strip()
+        if not text:
+            return False
+        return bool(
+            re.search(r"https?://|www\.|doi\.org/|10\.\d{4,9}/", text, flags=re.IGNORECASE)
+        )
+
+    def _open_text_url(self, value):
+        """Ouvre l'URL contenue dans `value` dans le navigateur par défaut."""
+        text = (value or "").strip()
+        if not text:
+            return
+        # Extrait la première URL explicite si le champ contient plus de texte.
+        match = re.search(r"https?://\S+|www\.\S+|10\.\d{4,9}/\S+", text)
+        if match:
+            url = match.group(0)
+        else:
+            url = text
+        if url.lower().startswith("www."):
+            url = "https://" + url
+        elif url.lower().startswith("10."):
+            url = "https://doi.org/" + url
+        QDesktopServices.openUrl(QUrl(url))
 
     def migrate_source_signature_columns(self, df, mode):
         """Convertit l'ancien champ mixte sans le réécrire dans les bases."""
@@ -321,16 +436,25 @@ class DataMassWindow(QMainWindow):
     def update_action_button_text(self):
         if not hasattr(self, "add_button"):
             return
-        if self.prefill_row_index is not None or getattr(self, "_prefill_liq_produit", None):
+        mode = self.current_mode()
+        editing_factor = (
+            (mode == self.MODE_LIQUID_FACTOR and bool(getattr(self, "_prefill_liq_id", None)))
+            or (mode == self.MODE_SOLID_FACTOR and bool(getattr(self, "_prefill_solid_material_id", None)))
+        )
+        if editing_factor:
+            self.add_button.setText("Enregistrer les modifications")
+        elif self.prefill_row_index is not None or getattr(self, "_prefill_liq_produit", None):
             self.add_button.setText("Enregistrer les informations")
-            return
-        labels = {
-            self.MODE_SOLID_CONSUMABLE: "Ajouter le consommable solide",
-            self.MODE_LIQUID_CONSUMABLE: "Ajouter le consommable liquide",
-            self.MODE_SOLID_FACTOR: "Ajouter le facteur solide",
-            self.MODE_LIQUID_FACTOR: "Ajouter le facteur liquide",
-        }
-        self.add_button.setText(labels.get(self.current_mode(), "Ajouter l'objet"))
+        else:
+            labels = {
+                self.MODE_SOLID_CONSUMABLE: "Ajouter le consommable solide",
+                self.MODE_LIQUID_CONSUMABLE: "Ajouter le consommable liquide",
+                self.MODE_SOLID_FACTOR: "Ajouter le facteur solide",
+                self.MODE_LIQUID_FACTOR: "Ajouter le facteur liquide",
+            }
+            self.add_button.setText(labels.get(mode, "Ajouter l'objet"))
+        self._update_add_button_color()
+        self._update_factor_status_label()
 
     def create_material_selector(self, combo):
         selector = QWidget()
@@ -423,21 +547,25 @@ class DataMassWindow(QMainWindow):
             mats = self.data_materials['Materiau'].dropna().unique().tolist()
         else:
             mats = ["Polypropylène (PP)", "Polyéthylène (PE)"]
+        mats_with_empty = [""] + mats
 
         # Second matériau (optionnel)
         self.masse2_input = QLineEdit()
         self.materiau2_combo = QComboBox()
-        self.materiau2_combo.addItems(mats)
+        self.materiau2_combo.addItems(mats_with_empty)
 
         # Emballage
         self.masse_emb_input = QLineEdit()
         self.mat_emb_combo = QComboBox()
-        self.mat_emb_combo.addItems(mats)
+        self.mat_emb_combo.addItems(mats_with_empty)
+        self.nbr_emb_input = QLineEdit()
+        self.nbr_emb_input.setValidator(QIntValidator(1, 999999, self))
+        self.nbr_emb_input.setPlaceholderText("Laissez vide si l'emballage est propre à 1 unité")
 
         # Conditionnement
         self.masse_cond_input = QLineEdit()
         self.mat_cond_combo = QComboBox()
-        self.mat_cond_combo.addItems(mats)
+        self.mat_cond_combo.addItems(mats_with_empty)
         self.nbr_cond_input = QLineEdit()
         self.nbr_cond_input.setValidator(QIntValidator(1, 999999, self))
         self.nbr_cond_input.setPlaceholderText("ex: 50 tubes par boîte, 1 bouteille par flacon")
@@ -466,6 +594,9 @@ class DataMassWindow(QMainWindow):
 
         # Instead of form_layout.addRow("Code NACRES:", self.nacres_input)
         self.nacres_combo = QComboBox()
+        self.nacres_combo.setView(QListView())
+        self.nacres_combo.setMaxVisibleItems(15)
+        self.nacres_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         nacres_layout = QVBoxLayout()
         nacres_layout.setContentsMargins(0, 0, 0, 0)
         nacres_layout.addWidget(self.nacres_combo)
@@ -486,7 +617,7 @@ class DataMassWindow(QMainWindow):
 
         # Peupler la liste des matériaux depuis data_materials
         self.materiau_combo = QComboBox()
-        self.materiau_combo.addItems(mats)
+        self.materiau_combo.addItems(mats_with_empty)
 
         self.source_input = QLineEdit()
         self.source_input.setPlaceholderText("Article, lien, DOI, documentation...")
@@ -531,8 +662,11 @@ class DataMassWindow(QMainWindow):
             for _, row in self.data_liquids.iterrows():
                 name = str(row.get("Produit", "") or "").strip()
                 code = str(row.get("Code NACRES", "") or "").strip()[:4]
+                factor_id = str(row.get("factor_id", "") or "").strip()
                 if name:
-                    self.liquid_factor_combo.addItem(f"{name} ({code})", name)
+                    self.liquid_factor_combo.addItem(
+                        f"{name} ({code})", {"factor_id": factor_id, "name": name}
+                    )
         self.liquid_factor_combo.currentIndexChanged.connect(self.on_commercial_liquid_factor_selected)
         self.manual_liquid_factor_name_input = QLineEdit()
         self.manual_liquid_factor_name_input.setPlaceholderText("ex: Acétone, Éthanol, DMEM...")
@@ -550,8 +684,15 @@ class DataMassWindow(QMainWindow):
         )
         self.masse_emb_widget = self.create_helped_field(
             self.masse_emb_input,
-            "Emballage secondaire si présent : carton externe, film plastique, intercalaire, suremballage. "
-            "Laissez vide s'il n'y en a pas ou si la masse est inconnue."
+            "Masse totale de l'emballage secondaire (carton externe, film plastique, sachet, intercalaire). "
+            "Si plusieurs unités partagent cet emballage, renseigner cette masse pour l'ensemble "
+            "puis indiquer le nombre d'unités à côté. Laissez vide s'il n'y a pas d'emballage secondaire."
+        )
+        self.nbr_emb_widget = self.create_helped_field(
+            self.nbr_emb_input,
+            "Nombre d'unités du consommable qui partagent ce même emballage secondaire. "
+            "Exemple : 50 si un sachet plastique regroupe 50 tubes. Laissez vide (≡ 1) si l'emballage "
+            "n'enveloppe qu'une seule unité (sleeve individuel d'une pipette)."
         )
         self.form_layout.addRow("Copier un facteur existant :", self.liquid_copy_factor_combo)
         self.form_layout.addRow("Utiliser un facteur existant / créer un nouveau facteur :", self.liquid_factor_combo)
@@ -580,6 +721,7 @@ class DataMassWindow(QMainWindow):
         self.add_section_header("Emballage secondaire (si présent)", mode="consumable")
         self.form_layout.addRow("Matériau emballage secondaire:", self.mat_emb_row_widget)
         self.form_layout.addRow("Masse emballage secondaire (g):", self.masse_emb_widget)
+        self.form_layout.addRow("Unités partageant l'emballage secondaire:", self.nbr_emb_widget)
 
         self.register_required_field(self.type_combo, "Type d'objet")
         self.register_required_field(self.nacres_widget, "Code NACRES", control=self.nacres_combo)
@@ -618,8 +760,40 @@ class DataMassWindow(QMainWindow):
         self.register_required_field(self.factor_input, "Facteur CO₂")
 
         self.add_section_header("Source et notes")
-        self.form_layout.addRow("Lien / Note / Remarque:", self.lien_input)
-        self.form_layout.addRow("Source (article/lien):", self.source_input)
+        # Lien / Note / Remarque : QLineEdit + bouton qui ouvre le lien si valide.
+        lien_row = QHBoxLayout()
+        lien_row.setContentsMargins(0, 0, 0, 0)
+        lien_row.addWidget(self.lien_input)
+        self.btn_open_lien = QPushButton("Ouvrir ↗")
+        self.btn_open_lien.setToolTip("Ouvre le lien dans le navigateur si le champ contient une URL.")
+        self.btn_open_lien.setMaximumWidth(110)
+        self.btn_open_lien.setEnabled(False)
+        self.btn_open_lien.clicked.connect(lambda: self._open_text_url(self.lien_input.text()))
+        self.lien_input.textChanged.connect(
+            lambda t: self.btn_open_lien.setEnabled(self._looks_like_url(t))
+        )
+        lien_row.addWidget(self.btn_open_lien)
+        lien_widget = QWidget()
+        lien_widget.setLayout(lien_row)
+        self.form_layout.addRow("Lien / Note / Remarque:", lien_widget)
+
+        # Source (article/lien) : même traitement.
+        source_row = QHBoxLayout()
+        source_row.setContentsMargins(0, 0, 0, 0)
+        source_row.addWidget(self.source_input)
+        self.btn_open_source = QPushButton("Ouvrir ↗")
+        self.btn_open_source.setToolTip("Ouvre la source dans le navigateur si le champ contient une URL.")
+        self.btn_open_source.setMaximumWidth(110)
+        self.btn_open_source.setEnabled(False)
+        self.btn_open_source.clicked.connect(lambda: self._open_text_url(self.source_input.text()))
+        self.source_input.textChanged.connect(
+            lambda t: self.btn_open_source.setEnabled(self._looks_like_url(t))
+        )
+        source_row.addWidget(self.btn_open_source)
+        source_widget = QWidget()
+        source_widget.setLayout(source_row)
+        self.form_layout.addRow("Source (article/lien):", source_widget)
+
         self.form_layout.addRow("Signature (nom/équipe/labo):", self.signature_input)
         self.register_required_field(self.source_input, "Source")
         self.register_required_field(self.signature_input, "Signature")
@@ -644,9 +818,16 @@ class DataMassWindow(QMainWindow):
         self.form_scroll_area.setWidget(form_container)
         main_layout.addWidget(self.form_scroll_area, 1)
 
+        action_bar = QHBoxLayout()
         self.add_button = QPushButton("Ajouter l'objet")
         self.add_button.clicked.connect(self.ajouter_objet_utilisateur)
-        main_layout.addWidget(self.add_button)
+        action_bar.addWidget(self.add_button, 1)
+        self.new_factor_button = QPushButton("✕  Effacer la sélection")
+        self.new_factor_button.setToolTip("Désélectionner le facteur et revenir à la saisie d'un nouveau facteur")
+        self.new_factor_button.clicked.connect(self._clear_factor_form)
+        self.new_factor_button.setVisible(False)
+        action_bar.addWidget(self.new_factor_button)
+        main_layout.addLayout(action_bar)
 
         export_import_layout = QHBoxLayout()
         self.export_button = QPushButton("⬆ Exporter la base de données")
@@ -656,6 +837,15 @@ class DataMassWindow(QMainWindow):
         export_import_layout.addWidget(self.export_button)
         export_import_layout.addWidget(self.import_button)
         main_layout.addLayout(export_import_layout)
+
+        self.factor_status_label = QLabel(
+            "Sélectionnez un facteur dans le tableau ci-dessous pour le modifier, "
+            "ou remplissez le formulaire pour en créer un nouveau."
+        )
+        self.factor_status_label.setWordWrap(True)
+        self.factor_status_label.setStyleSheet("color: #6b7280; font-style: italic; padding: 4px 0;")
+        self.factor_status_label.setVisible(False)
+        main_layout.addWidget(self.factor_status_label)
 
         # Tableau des données
         self.table = QTableWidget()
@@ -683,6 +873,7 @@ class DataMassWindow(QMainWindow):
         # Applique la visibilité initiale (solide)
         self.update_form_visibility()
         self.update_action_button_text()
+        self.table.itemSelectionChanged.connect(self._on_factor_table_row_selected)
         self.nacres_search.textChanged.connect(self.filter_nacres_list)
         self.nacres_combo.currentIndexChanged.connect(self.update_required_indicators)
         self.type_combo.currentIndexChanged.connect(self.update_required_indicators)
@@ -696,6 +887,12 @@ class DataMassWindow(QMainWindow):
             self.uncert_input
         ):
             field.textChanged.connect(self.update_required_indicators)
+        for field in (
+            self.nom_input, self.dens_input, self.conc_input,
+            self.factor_input, self.uncert_input, self.lien_input,
+            self.source_input, self.signature_input,
+        ):
+            field.textChanged.connect(self._on_factor_form_field_changed)
         self.load_nacres_list()
         self.update_required_indicators()
         self.update_price_preview()
@@ -714,26 +911,23 @@ class DataMassWindow(QMainWindow):
         self.afficher_donnees()                   # recharge la table avec le bon DF
 
     def load_nacres_list(self):
-        if not os.path.exists(self.nacres_hdf5_file):
-            print(f"[INFO] Fichier '{self.nacres_hdf5_file}' introuvable.")
+        if not self._uses_sqlite():
+            self._all_nacres = []
             return
 
         try:
-            df_nacres = pd.read_hdf(self.nacres_hdf5_file)
-            self._all_nacres = []
-            for _, row in df_nacres.iterrows():
-                code = str(row.iloc[0])
-                desc = str(row.iloc[1])
-                self._all_nacres.append((code, desc))
+            with sqlite3.connect(self.sqlite_path) as conn:
+                self._all_nacres = load_nacres_options(conn)
             self.filter_nacres_list()
         except Exception as e:
-            print(f"[ERROR] Impossible de charger la liste NACRES: {e}")
+            self._all_nacres = []
+            logger.exception("Impossible de charger la liste NACRES depuis SQLite : %s", e)
 
     def load_liquid_df(self):
-        if os.path.exists(self.hdf5_liquids):
-            df_liq = pd.read_hdf(self.hdf5_liquids)
-        else:
-            df_liq = pd.DataFrame(columns=self.columns_liquids)
+        if self._uses_sqlite():
+            return self._load_sqlite_frame("data_liquides", self.columns_liquids)
+
+        df_liq = pd.DataFrame(columns=self.columns_liquids)
         df_liq = self.migrate_source_signature_columns(df_liq, mode="liquid")
         for col in self.columns_liquids:
             if col not in df_liq.columns:
@@ -741,9 +935,10 @@ class DataMassWindow(QMainWindow):
         return df_liq.reindex(columns=self.columns_liquids)
 
     def load_material_df(self, initial_df=None):
-        if os.path.exists(self.hdf5_materials):
-            df_mat = pd.read_hdf(self.hdf5_materials)
-        elif initial_df is not None:
+        if self._uses_sqlite():
+            return self._load_sqlite_frame("data_materials", self.columns_materials)
+
+        if initial_df is not None:
             df_mat = initial_df.copy()
         else:
             df_mat = pd.DataFrame(columns=self.columns_materials)
@@ -761,9 +956,21 @@ class DataMassWindow(QMainWindow):
         return df_mat.reindex(columns=self.columns_materials)
 
     def save_material_factor(self, obj_dict):
-        directory = os.path.dirname(self.hdf5_materials)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        if self._uses_sqlite():
+            try:
+                upsert_material_factor(
+                    self.sqlite_path,
+                    obj_dict,
+                    existing_id=self._prefill_solid_material_id,
+                )
+                self._prefill_solid_material_id = None
+                self.data_materials = self.load_material_df()
+                if self.current_mode() == self.MODE_SOLID_FACTOR:
+                    self.afficher_donnees()
+                return True
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le matériau dans SQLite : {e}")
+                return False
 
         df_mat = self.load_material_df(self.data_materials)
         material_name = str(obj_dict.get("Materiau", "")).strip()
@@ -779,19 +986,25 @@ class DataMassWindow(QMainWindow):
             df_mat = pd.concat([df_mat, new_line], ignore_index=True)
 
         df_mat = df_mat.reindex(columns=self.columns_materials)
-        df_mat.to_hdf(self.hdf5_materials, key="data", mode="w")
         self.data_materials = df_mat
         if self.current_mode() == self.MODE_SOLID_FACTOR:
             self.afficher_donnees()
+        return True
 
     def filter_nacres_list(self):
         search_text = self.nacres_search.text().strip().lower()
         self.nacres_combo.clear()
         self.nacres_combo.addItem("Sélectionnez un code NACRES...", None)
-        for (code, desc) in self._all_nacres:
+        for option in self._all_nacres:
+            code = option.code
+            desc = option.label
             if search_text in code.lower() or search_text in desc.lower():
                 display_text = f"{code} - {desc}"
                 self.nacres_combo.addItem(display_text, code)
+                idx = self.nacres_combo.count() - 1
+                if option.is_new_without_labo1point5_fe:
+                    self.nacres_combo.setItemData(idx, _NACRES_NEW_NO_FE_COLOR, Qt.BackgroundRole)
+                    self.nacres_combo.setItemData(idx, _NACRES_NEW_NO_FE_TOOLTIP, Qt.ToolTipRole)
         self.update_required_indicators()
 
     def show_material_info(self, material_combo, button):
@@ -922,23 +1135,26 @@ class DataMassWindow(QMainWindow):
         is_consumable = self.is_consumable_mode()
         is_factor = self.is_factor_mode()
         manual_liquid_factor = self.is_manual_liquid_factor_selected()
+        _label_alias = {
+            (self.MODE_SOLID_FACTOR, "Consommable"): "Matériau",
+            (self.MODE_LIQUID_FACTOR, "Consommable"): "Liquide / solvant",
+        }
         for item in self.required_fields:
             field = item["field"]
             control = item["control"]
             label = item["label"]
             label_text = item["label_text"]
+            display_text = _label_alias.get((mode, label_text), label_text)
             active = not field.isHidden()
             if is_factor and label_text in {"Marque", "Référence", "Code NACRES", "Unités par conditionnement vendu", "Prix"}:
                 active = False
-            if mode == self.MODE_LIQUID_FACTOR and label_text in {"Référence", "Code NACRES"}:
-                active = not field.isHidden()
             if mode == self.MODE_SOLID_CONSUMABLE and label_text in {"Facteur liquide/solvant", "Nom du nouveau facteur", "Volume vendu par unité", "Densité", "Facteur CO₂"}:
                 active = False
             if mode == self.MODE_LIQUID_CONSUMABLE and label_text in {"Nom du nouveau facteur", "Densité", "Facteur CO₂", "Source"} and not manual_liquid_factor:
                 active = False
             if mode == self.MODE_LIQUID_CONSUMABLE and label_text == "Nom du nouveau facteur":
                 active = manual_liquid_factor
-            if mode == self.MODE_LIQUID_FACTOR and label_text in {"Marque", "Unités par conditionnement vendu", "Prix", "Volume vendu par unité"}:
+            if mode == self.MODE_LIQUID_FACTOR and label_text in {"Marque", "Référence", "Code NACRES", "Unités par conditionnement vendu", "Prix", "Volume vendu par unité"}:
                 active = False
             if mode == self.MODE_SOLID_FACTOR and label_text in {"Marque", "Référence", "Code NACRES", "Unités par conditionnement vendu", "Prix", "Facteur liquide/solvant", "Nom du nouveau facteur", "Volume vendu par unité", "Densité"}:
                 active = False
@@ -946,17 +1162,17 @@ class DataMassWindow(QMainWindow):
                 active = False
 
             if not active:
-                label.setText(f"{label_text}:")
+                label.setText(f"{display_text}:")
                 label.setStyleSheet("")
                 control.setStyleSheet("")
                 continue
 
             filled = self.is_required_field_filled(control)
             if filled:
-                label.setText(f"✓ {label_text}:")
+                label.setText(f"✓ {display_text}:")
                 label.setStyleSheet("color: #15803d; font-weight: 600;")
             else:
-                label.setText(f"✗ {label_text}:")
+                label.setText(f"✗ {display_text}:")
                 label.setStyleSheet("color: #dc2626; font-weight: 600;")
             self.set_required_style(control, filled)
 
@@ -1121,16 +1337,23 @@ class DataMassWindow(QMainWindow):
         materiau2    = self.materiau2_combo.currentText()
         masse_emb_str= self.masse_emb_input.text().strip().replace(',', '.')
         mat_emb      = self.mat_emb_combo.currentText()
+        nbr_emb      = self.nbr_emb_input.text().strip()
         masse_cond_str = self.masse_cond_input.text().strip().replace(',', '.')
         mat_cond     = self.mat_cond_combo.currentText()
         nbr_cond     = self.nbr_cond_input.text().strip()
         price_text   = self.price_input.text().strip()
         liquid_factor_source = ""
+        liquid_factor_id = ""
         liquid_volume = ""
         manual_liquid_factor = self.is_manual_liquid_factor_selected()
         manual_liquid_factor_name = self.manual_liquid_factor_name_input.text().strip()
         if is_liquid_consumable:
-            liquid_factor_source = self.liquid_factor_combo.currentData() or ""
+            combo_data = self.liquid_factor_combo.currentData()
+            if isinstance(combo_data, dict):
+                liquid_factor_source = combo_data.get("name", "") or ""
+                liquid_factor_id = combo_data.get("factor_id", "") or ""
+            else:
+                liquid_factor_source = combo_data or ""
             liquid_volume = self.solid_liquid_volume_input.text().strip().replace(',', '.')
         lien_note    = self.lien_input.text().strip()
         source = self.source_input.text().strip()
@@ -1189,7 +1412,7 @@ class DataMassWindow(QMainWindow):
                 return
 
         if is_liq:
-            required_ok = all([nom, reference, nacres, dens, facteur, source, signature])
+            required_ok = all([nom, dens, facteur, source, signature])
         elif is_solid_factor:
             required_ok = all([nom, facteur, source, signature])
         elif manual_liquid_factor:
@@ -1203,6 +1426,7 @@ class DataMassWindow(QMainWindow):
             return
 
         nbr_cond_value = None
+        nbr_emb_value = None
         if is_consumable:
             try:
                 nbr_cond_value = int(nbr_cond)
@@ -1215,6 +1439,20 @@ class DataMassWindow(QMainWindow):
                     "Le nombre d'unités par conditionnement vendu doit être un entier positif."
                 )
                 return
+
+            if nbr_emb:
+                try:
+                    nbr_emb_value = int(nbr_emb)
+                    if nbr_emb_value <= 0:
+                        raise ValueError
+                except ValueError:
+                    QMessageBox.warning(
+                        self,
+                        "Erreur",
+                        "Le nombre d'unités partageant l'emballage secondaire doit être un entier positif "
+                        "(laissez vide si l'emballage est propre à une seule unité)."
+                    )
+                    return
 
             try:
                 if is_solid_consumable:
@@ -1289,9 +1527,9 @@ class DataMassWindow(QMainWindow):
             nouvel_objet = {
                 "Produit": nom,
                 "Type": "Liquide",
-                "Code NACRES": nacres,
-                "CAS": reference,
-                "Référence": reference,
+                "Code NACRES": "",
+                "CAS": "",
+                "Référence": "",
                 "Unité": "mL",
                 "Densité (g/mL)": dens,
                 "Concentration (mg/mL)": conc,
@@ -1325,8 +1563,12 @@ class DataMassWindow(QMainWindow):
                     "date d'ajout": date.today().isoformat(),
                     "Note": lien_note,
                 }
-                self.save_liquid(manual_factor_row)
+                saved_factor_id = self.save_liquid(manual_factor_row)
+                if saved_factor_id is False:
+                    return
                 liquid_factor_source = manual_liquid_factor_name
+                if saved_factor_id and saved_factor_id is not True:
+                    liquid_factor_id = str(saved_factor_id)
 
             nouvel_objet = {col: "" for col in self.columns}
             if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
@@ -1348,12 +1590,14 @@ class DataMassWindow(QMainWindow):
                 "Matériau troisième materiaux": "",
                 "Masse emballage unitaire (g)": masse_emb_str,
                 "Matériau emballage": mat_emb,
+                "Nbr par emballage secondaire": nbr_emb_value,
                 "Masse condionnement (g)": masse_cond_str,
                 "Matériau conditionnement": mat_cond,
                 "Nbr par conditionnement": nbr_cond_value,
                 "Unité liquide": "mL" if is_liquid_consumable else "",
                 "Volume flacon (mL)": liquid_volume,
                 "Facteur liquide source": liquid_factor_source,
+                "emission_factor_id": liquid_factor_id,
                 "date d'ajout": date.today().isoformat(),
                 "Lien / Note / Remarque": lien_note,
                 "Source": source,
@@ -1364,16 +1608,28 @@ class DataMassWindow(QMainWindow):
                 nouvel_objet.update(price_fields)
 
         if is_solid_factor:
-            self.save_material_factor(nouvel_objet)
+            if self.save_material_factor(nouvel_objet) is False:
+                return
         elif is_liq:
-            self.save_liquid(nouvel_objet)
+            if self.save_liquid(nouvel_objet) is False:
+                return
         else:
-            if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
+            if self._uses_sqlite():
+                existing_id = None
+                if self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
+                    existing_id = self._sqlite_row_id(self.data.loc[self.prefill_row_index])
+                try:
+                    self._upsert_commercial_product(nouvel_objet, existing_id=existing_id)
+                except Exception as e:
+                    QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le consommable dans SQLite : {e}")
+                    return
+            elif self.prefill_row_index is not None and self.prefill_row_index in self.data.index:
                 for col in self.columns:
                     self.data.at[self.prefill_row_index, col] = nouvel_objet.get(col, "")
             else:
                 self.data = self.ajouter_objet_df(self.data, nouvel_objet)
-            self.sauvegarder_donnees()
+            if not self._uses_sqlite():
+                self.sauvegarder_donnees()
 
         # Efface les champs
         self.nom_input.clear()
@@ -1385,6 +1641,7 @@ class DataMassWindow(QMainWindow):
         self.materiau2_combo.setCurrentIndex(0)
         self.masse_emb_input.clear()
         self.mat_emb_combo.setCurrentIndex(0)
+        self.nbr_emb_input.clear()
         self.masse_cond_input.clear()
         self.mat_cond_combo.setCurrentIndex(0)
         self.nbr_cond_input.clear()
@@ -1409,6 +1666,12 @@ class DataMassWindow(QMainWindow):
         self.mat_emb_liq_combo.setCurrentIndex(0)
         self.prefill_row_index = None
         self._prefill_liq_produit = None
+        self._prefill_liq_id = None
+        self._prefill_solid_material_id = None
+        self._factor_original_values = {}
+        self._factor_editing_dirty = False
+        if hasattr(self, "new_factor_button"):
+            self.new_factor_button.setVisible(False)
         self.update_action_button_text()
         self.update_required_indicators()
         self.update_price_preview()
@@ -1419,25 +1682,25 @@ class DataMassWindow(QMainWindow):
         self.afficher_donnees()
 
     def save_liquid(self, obj_dict):
-        """Ajoute une ligne au fichier HDF5 des liquides."""
-        # Charger ou créer DF
-        if os.path.exists(self.hdf5_liquids):
+        """Ajoute ou met à jour un facteur liquide."""
+        if self._uses_sqlite():
             try:
-                df_liq = pd.read_hdf(self.hdf5_liquids)
-            except Exception:
-                df_liq = pd.DataFrame(columns=self.columns_liquids)
-        else:
-            df_liq = pd.DataFrame(columns=self.columns_liquids)
+                factor_uuid = upsert_liquid_factor(
+                    self.sqlite_path,
+                    obj_dict,
+                    existing_id=self._prefill_liq_id,
+                )
+                self._prefill_liq_produit = None
+                self._prefill_liq_id = None
+                self.data_liquids = self.load_liquid_df()
+                if self.current_mode() == self.MODE_LIQUID_FACTOR:
+                    self.afficher_donnees()
+                return factor_uuid
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Impossible d'écrire le liquide dans SQLite : {e}")
+                return False
 
-        df_liq = self.migrate_source_signature_columns(df_liq, mode="liquid")
-
-        # Assurer toutes les colonnes
-        for col in self.columns_liquids:
-            if col not in df_liq.columns:
-                df_liq[col] = ""
-        df_liq = df_liq.reindex(columns=self.columns_liquids)
-
-        # Mise à jour si enrichissement ou facteur du même nom déjà existant.
+        df_liq = self.load_liquid_df()
         target_name = getattr(self, '_prefill_liq_produit', None) or str(obj_dict.get("Produit", "")).strip()
         if target_name:
             mask = df_liq["Produit"].astype(str).str.strip() == target_name
@@ -1448,18 +1711,17 @@ class DataMassWindow(QMainWindow):
                         df_liq[col] = ""
                     df_liq.at[idx, col] = val
                 self._prefill_liq_produit = None
-                df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
                 self.data_liquids = df_liq
                 if self.current_mode() == self.MODE_LIQUID_FACTOR:
                     self.afficher_donnees()
-                return
+                return True
 
         new_line = pd.DataFrame([obj_dict]).reindex(columns=self.columns_liquids)
         df_liq = pd.concat([df_liq, new_line], ignore_index=True)
-        df_liq.to_hdf(self.hdf5_liquids, key='data', mode='w')
         self.data_liquids = df_liq
         if self.current_mode() == self.MODE_LIQUID_FACTOR:
             self.afficher_donnees()
+        return True
 
     def ajouter_objet_df(self, df, objet):
         nouvel_objet = pd.DataFrame([objet])
@@ -1556,8 +1818,8 @@ class DataMassWindow(QMainWindow):
             set_label(self.nom_input, "Consommable:")
 
         set_visible(self.brand_input, is_consumable)
-        set_visible(self.ref_input, is_consumable or is_liquid_factor)
-        set_visible(self.nacres_widget, is_consumable or is_liquid_factor)
+        set_visible(self.ref_input, is_consumable)
+        set_visible(self.nacres_widget, is_consumable)
 
         # Champs propres aux solides
         for w in (
@@ -1567,7 +1829,7 @@ class DataMassWindow(QMainWindow):
             set_visible(w, is_solid_consumable)
 
         for w in (
-            self.masse_emb_input, self.mat_emb_row_widget,
+            self.masse_emb_input, self.mat_emb_row_widget, self.nbr_emb_input,
             self.masse_cond_input, self.mat_cond_row_widget,
             self.nbr_cond_input, self.price_row_widget, self.price_preview_label,
         ):
@@ -1608,98 +1870,330 @@ class DataMassWindow(QMainWindow):
             set_visible(w, False)
 
         self.is_liquid = is_liquid_factor
+        if hasattr(self, "new_factor_button"):
+            _editing = (
+                bool(getattr(self, "_prefill_liq_id", None))
+                or bool(getattr(self, "_prefill_solid_material_id", None))
+            )
+            self.new_factor_button.setVisible((is_solid_factor or is_liquid_factor) and _editing)
+        if hasattr(self, "factor_status_label"):
+            self.factor_status_label.setVisible(is_solid_factor or is_liquid_factor)
         self.update_action_button_text()
         self.update_required_indicators()
         self.update_price_preview()
 
     def export_database(self):
         """
-        Exporte la base de données consommables vers un fichier HDF5 ou CSV
-        choisi par l'utilisateur.
+        Exporte la table affichée vers un CSV réimportable.
         """
+        df, _cols = self._current_dataframe_and_columns()
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Exporter la base de données",
-            "base_consommables_LABeCO2.hdf5",
-            "HDF5 (*.hdf5 *.h5);;CSV (*.csv)"
+            "base_labeco2.csv",
+            "CSV (*.csv)"
         )
         if not path:
             return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
         try:
-            if path.lower().endswith(".csv"):
-                self.data.rename(columns=self.COLUMN_DISPLAY_LABELS).to_csv(path, index=False, encoding="utf-8")
-            else:
-                self.data.to_hdf(path, key="data", mode="w", complevel=5)
+            df.to_csv(path, index=False, encoding="utf-8")
             QMessageBox.information(
                 self, "Export réussi",
-                f"{len(self.data)} consommables exportés vers :\n{path}"
+                f"{len(df)} ligne(s) exportée(s) vers :\n{path}"
             )
         except Exception as e:
             QMessageBox.critical(self, "Erreur export", f"Impossible d'exporter :\n{e}")
 
     def import_database(self):
         """
-        Importe une base de données mise à jour (HDF5) pour remplacer la base locale.
-        Un backup automatique est créé avant le remplacement.
+        Importe un CSV dans la base SQLite en respectant le mode affiché.
         """
+        if not self._uses_sqlite():
+            QMessageBox.warning(self, "SQLite requis", "L'import nécessite une base SQLite active.")
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Charger une mise à jour de la base de données",
             "",
-            "HDF5 (*.hdf5 *.h5)"
+            "CSV (*.csv)"
         )
         if not path:
             return
 
         try:
-            new_df = pd.read_hdf(path)
+            new_df = pd.read_csv(path)
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de lire le fichier :\n{e}")
             return
+        new_df = self._normalise_import_columns(new_df)
         new_df = self.migrate_source_signature_columns(new_df, mode="solid")
 
-        # Vérification minimale : la colonne Consommable doit exister
-        if "Consommable" not in new_df.columns and "Code NACRES" not in new_df.columns:
+        mode = self.current_mode()
+        required_by_mode = {
+            self.MODE_SOLID_FACTOR: "Materiau",
+            self.MODE_LIQUID_FACTOR: "Produit",
+            self.MODE_SOLID_CONSUMABLE: "Consommable",
+            self.MODE_LIQUID_CONSUMABLE: "Consommable",
+        }
+        required_col = required_by_mode.get(mode, "Consommable")
+        if required_col not in new_df.columns:
             QMessageBox.warning(
                 self, "Format invalide",
-                "Le fichier ne semble pas être une base de consommables LABeCO2 valide."
+                f"Le CSV doit contenir la colonne '{required_col}' pour le mode affiché."
             )
             return
 
         confirm = QMessageBox.question(
             self, "Confirmer la mise à jour",
-            f"Remplacer la base actuelle ({len(self.data)} entrées) "
-            f"par le nouveau fichier ({len(new_df)} entrées) ?\n\n"
-            f"Un backup sera créé automatiquement.",
+            f"Importer {len(new_df)} ligne(s) dans la base SQLite active ?",
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
             return
 
         try:
-            import shutil
-            backup_path = self.hdf5_file + ".backup"
-            if os.path.exists(self.hdf5_file):
-                shutil.copy2(self.hdf5_file, backup_path)
-
-            new_df.to_hdf(self.hdf5_file, key="data", mode="w", complevel=5)
-            self.data = new_df
-            # Harmoniser les colonnes manquantes
-            for col in self.columns:
-                if col not in self.data.columns:
-                    self.data[col] = ""
-            self.data = self.data.reindex(columns=self.columns)
-
+            imported = self._import_rows_from_dataframe(new_df)
             self.afficher_donnees()
-            self.data_added.emit()  # recharge dans la fenêtre principale
+            self.data_added.emit()
 
             QMessageBox.information(
                 self, "Mise à jour réussie",
-                f"Base mise à jour : {len(new_df)} consommables chargés.\n"
-                f"Backup sauvegardé : {backup_path}"
+                f"{imported} ligne(s) importée(s) dans SQLite."
             )
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de mettre à jour la base :\n{e}")
+
+    # ------------------------------------------------------------------
+    # Sélection dans le tableau → pré-remplissage du formulaire (facteurs)
+    # ------------------------------------------------------------------
+
+    def _on_factor_table_row_selected(self) -> None:
+        """Appelé quand la sélection du tableau change. En mode facteur uniquement."""
+        mode = self.current_mode()
+        if mode not in (self.MODE_SOLID_FACTOR, self.MODE_LIQUID_FACTOR):
+            return
+        r = self.table.currentRow()
+        if r < 0 or not self.table.selectedItems():
+            return
+        if mode == self.MODE_LIQUID_FACTOR:
+            if r >= len(self.data_liquids):
+                return
+            self._prefill_form_from_liquid_row(self.data_liquids.iloc[r])
+        else:
+            if r >= len(self.data_materials):
+                return
+            self._prefill_form_from_material_row(self.data_materials.iloc[r])
+        self.update_action_button_text()
+        self.update_required_indicators()
+
+    def _prefill_form_from_liquid_row(self, row) -> None:
+        def _v(col):
+            v = row.get(col, "")
+            return "" if pd.isna(v) else str(v).strip()
+
+        # Clear originals so dirty check returns False during fill
+        self._factor_original_values = {}
+        self._factor_editing_dirty = False
+
+        self.nom_input.setText(_v("Produit"))
+        dens = _v("Densité (g/mL)")
+        if dens:
+            self.dens_input.setText(dens)
+        conc = _v("Concentration (mg/mL)")
+        if conc:
+            self.conc_input.setText(conc)
+        co2 = _v("Facteur CO₂ (kg CO₂e/kg)")
+        if co2:
+            self.factor_input.setText(co2)
+        uncert = _v("Incertitude (%)")  # déjà ×100 via l'adaptateur SQLite
+        if uncert:
+            self.uncert_input.setText(uncert)
+        self.source_input.setText(_v("Source"))
+        self.signature_input.setText(_v("Signature"))
+        self.lien_input.setText(_v("Note"))
+
+        self._prefill_liq_id = _v("factor_id") or None
+        self._prefill_liq_produit = _v("Produit")
+
+        # Snapshot values after fill so we can detect user edits
+        self._factor_original_values = self._get_factor_field_values()
+        self._factor_editing_dirty = False
+        if hasattr(self, "new_factor_button"):
+            self.new_factor_button.setVisible(bool(self._prefill_liq_id))
+
+    def _prefill_form_from_material_row(self, row) -> None:
+        def _v(col):
+            v = row.get(col, "")
+            return "" if pd.isna(v) else str(v).strip()
+
+        # Clear originals so dirty check returns False during fill
+        self._factor_original_values = {}
+        self._factor_editing_dirty = False
+
+        name = _v("Materiau")
+        self.nom_input.setText(name)
+        co2 = _v("Equivalent CO₂ (kg eCO₂/kg)")
+        if co2:
+            self.factor_input.setText(co2)
+        raw_uncert = _v("uncertainty")
+        if raw_uncert:
+            try:
+                self.uncert_input.setText(f"{float(raw_uncert) * 100:g}")
+            except ValueError:
+                pass
+        self.source_input.setText(_v("Source"))
+        self.signature_input.setText(_v("Signature"))
+
+        self._prefill_solid_material_id = self._lookup_material_id_by_name(name)
+
+        # Snapshot values after fill so we can detect user edits
+        self._factor_original_values = self._get_factor_field_values()
+        self._factor_editing_dirty = False
+        if hasattr(self, "new_factor_button"):
+            self.new_factor_button.setVisible(bool(self._prefill_solid_material_id))
+
+    def _lookup_material_id_by_name(self, name: str) -> str | None:
+        if not self._uses_sqlite() or not name:
+            return None
+        try:
+            name_key = normalize_key(name)
+            with sqlite3.connect(self.sqlite_path) as conn:
+                row = conn.execute(
+                    "SELECT id FROM materials WHERE name_key = ?"
+                    " AND status != 'deprecated' LIMIT 1",
+                    (name_key,),
+                ).fetchone()
+            return row[0] if row else None
+        except Exception:
+            return None
+
+    def _get_factor_field_values(self) -> dict:
+        """Snapshot des champs du formulaire facteur pour détecter les modifications."""
+        return {
+            "nom": self.nom_input.text(),
+            "dens": self.dens_input.text(),
+            "conc": self.conc_input.text(),
+            "factor": self.factor_input.text(),
+            "uncert": self.uncert_input.text(),
+            "source": self.source_input.text(),
+            "signature": self.signature_input.text(),
+            "lien": self.lien_input.text(),
+        }
+
+    def _check_factor_dirty(self) -> bool:
+        if not self._factor_original_values:
+            return False
+        current = self._get_factor_field_values()
+        return any(
+            current.get(k, "").strip() != self._factor_original_values.get(k, "").strip()
+            for k in self._factor_original_values
+        )
+
+    def _all_required_factor_fields_filled(self) -> bool:
+        mode = self.current_mode()
+        nom = self.nom_input.text().strip()
+        facteur = self.factor_input.text().strip()
+        source = self.source_input.text().strip()
+        signature = self.signature_input.text().strip()
+        if mode == self.MODE_LIQUID_FACTOR:
+            dens = self.dens_input.text().strip()
+            return all([nom, dens, facteur, source, signature])
+        if mode == self.MODE_SOLID_FACTOR:
+            return all([nom, facteur, source, signature])
+        return False
+
+    def _on_factor_form_field_changed(self) -> None:
+        mode = self.current_mode()
+        if mode not in (self.MODE_SOLID_FACTOR, self.MODE_LIQUID_FACTOR):
+            return
+        editing = (
+            bool(getattr(self, "_prefill_liq_id", None))
+            or bool(getattr(self, "_prefill_solid_material_id", None))
+        )
+        if editing:
+            self._factor_editing_dirty = self._check_factor_dirty()
+        self._update_add_button_color()
+        self._update_factor_status_label()
+
+    def _update_add_button_color(self) -> None:
+        if not hasattr(self, "add_button"):
+            return
+        mode = self.current_mode()
+        if mode not in (self.MODE_SOLID_FACTOR, self.MODE_LIQUID_FACTOR):
+            self.add_button.setStyleSheet("")
+            return
+        editing = (
+            bool(getattr(self, "_prefill_liq_id", None))
+            or bool(getattr(self, "_prefill_solid_material_id", None))
+        )
+        if editing and self._factor_editing_dirty:
+            self.add_button.setStyleSheet(
+                "QPushButton { background-color: #dc2626; color: white; font-weight: 600;"
+                " border-radius: 4px; padding: 6px 12px; }"
+                "QPushButton:hover { background-color: #b91c1c; }"
+            )
+        elif self._all_required_factor_fields_filled():
+            self.add_button.setStyleSheet(
+                "QPushButton { background-color: #16a34a; color: white; font-weight: 600;"
+                " border-radius: 4px; padding: 6px 12px; }"
+                "QPushButton:hover { background-color: #15803d; }"
+            )
+        else:
+            self.add_button.setStyleSheet("")
+
+    def _update_factor_status_label(self) -> None:
+        if not hasattr(self, "factor_status_label"):
+            return
+        mode = self.current_mode()
+        if mode not in (self.MODE_SOLID_FACTOR, self.MODE_LIQUID_FACTOR):
+            self.factor_status_label.setVisible(False)
+            return
+        self.factor_status_label.setVisible(True)
+        editing_liq = bool(getattr(self, "_prefill_liq_id", None))
+        editing_solid = bool(getattr(self, "_prefill_solid_material_id", None))
+        if editing_liq or editing_solid:
+            name = self.nom_input.text().strip()
+            if self._factor_editing_dirty:
+                self.factor_status_label.setText(
+                    f"⚠ Modifications en attente pour « {name} » — pensez à enregistrer."
+                )
+                self.factor_status_label.setStyleSheet(
+                    "color: #dc2626; font-style: italic; padding: 4px 0; font-weight: 600;"
+                )
+            else:
+                self.factor_status_label.setText(
+                    f"Facteur « {name} » sélectionné — modifiez les champs puis enregistrez."
+                )
+                self.factor_status_label.setStyleSheet(
+                    "color: #15803d; font-style: italic; padding: 4px 0;"
+                )
+        else:
+            self.factor_status_label.setText(
+                "Sélectionnez un facteur dans le tableau ci-dessous pour le modifier, "
+                "ou remplissez le formulaire pour en créer un nouveau."
+            )
+            self.factor_status_label.setStyleSheet("color: #6b7280; font-style: italic; padding: 4px 0;")
+
+    def _clear_factor_form(self) -> None:
+        """Efface le formulaire et repasse en mode 'nouveau facteur'."""
+        self._prefill_liq_id = None
+        self._prefill_liq_produit = None
+        self._prefill_solid_material_id = None
+        self._factor_original_values = {}
+        self._factor_editing_dirty = False
+        self.table.clearSelection()
+        for field in (
+            self.nom_input, self.dens_input, self.conc_input,
+            self.factor_input, self.uncert_input, self.lien_input,
+            self.source_input, self.signature_input,
+        ):
+            field.clear()
+        if hasattr(self, "new_factor_button"):
+            self.new_factor_button.setVisible(False)
+        self.update_action_button_text()
+        self.update_required_indicators()
 
     def prefill_consumable(self, code_nacres, consommable_name, source="solid"):
         """
@@ -1709,6 +2203,7 @@ class DataMassWindow(QMainWindow):
         """
         self.prefill_row_index = None
         self._prefill_liq_produit = None
+        self._prefill_liq_id = None
         self.update_action_button_text()
 
         def _clean_value(value):
@@ -1755,6 +2250,7 @@ class DataMassWindow(QMainWindow):
             if not rows.empty:
                 row = rows.iloc[0]
                 self._prefill_liq_produit = consommable_name.strip()
+                self._prefill_liq_id = clean_sqlite_id(row.get("factor_id", ""))
                 self.add_button.setText("Enregistrer les informations")
 
                 def _fill(field, col):
@@ -1810,7 +2306,7 @@ class DataMassWindow(QMainWindow):
         if idx != -1:
             self.nacres_combo.setCurrentIndex(idx)
 
-        # ── Données existantes dans le HDF5 ───────────────────────────────────
+        # ── Données existantes dans la base chargée ───────────────────────────
         mask = (
             (self.data["Code NACRES"].astype(str).str.strip().str.upper() == code4) &
             (self.data["Consommable"].astype(str).str.strip() == consommable_name.strip())
@@ -1819,11 +2315,7 @@ class DataMassWindow(QMainWindow):
 
         if not rows.empty:
             row = rows.iloc[0]
-            is_liquid_product = bool(
-                _clean_value(row.get("Facteur liquide source", "")) or
-                _clean_value(row.get("Unité liquide", "")) or
-                _clean_value(row.get("Volume flacon (mL)", ""))
-            )
+            is_liquid_product = looks_like_liquid_commercial_product(row)
             if is_liquid_product:
                 _set_mode(self.MODE_LIQUID_CONSUMABLE)
             self.prefill_row_index = rows.index[0]
@@ -1840,7 +2332,18 @@ class DataMassWindow(QMainWindow):
             _fill(self.masse2_input,    "Masse unitaire deuxieme materiaux (g)")
             _fill(self.masse_emb_input, "Masse emballage unitaire (g)")
             _fill(self.masse_cond_input,"Masse condionnement (g)")
-            _fill(self.nbr_cond_input,  "Nbr par conditionnement")
+            nbr_raw = row.get("Nbr par conditionnement", "")
+            if not pd.isna(nbr_raw) and str(nbr_raw).strip() not in ("", "nan", "none"):
+                try:
+                    self.nbr_cond_input.setText(str(int(float(nbr_raw))))
+                except (ValueError, TypeError):
+                    self.nbr_cond_input.setText(str(nbr_raw).strip())
+            nbr_emb_raw = row.get("Nbr par emballage secondaire", "")
+            if not pd.isna(nbr_emb_raw) and str(nbr_emb_raw).strip() not in ("", "nan", "none", "1"):
+                try:
+                    self.nbr_emb_input.setText(str(int(float(nbr_emb_raw))))
+                except (ValueError, TypeError):
+                    self.nbr_emb_input.setText(str(nbr_emb_raw).strip())
             _fill(self.solid_liquid_volume_input, "Volume flacon (mL)")
             if not self.nbr_cond_input.text().strip():
                 _fill(self.nbr_cond_input, "nb_unites_ijm")
@@ -1891,7 +2394,7 @@ class DataMassWindow(QMainWindow):
         else:
             # Consommable IJM-only : pré-remplir ce qu'on sait depuis data_masse étendu
             # (marque dans la colonne Marque si dispo)
-            full_data = self.data  # data déjà chargée depuis HDF5 complet
+            full_data = self.data
             mask2 = full_data["Code NACRES"].astype(str).str.strip().str.upper() == code4
             ijm_rows = full_data[mask2]
             name_match = ijm_rows[
@@ -1922,8 +2425,8 @@ class DataMassWindow(QMainWindow):
         Calcule l'eCO2 total pour un consommable donné en additionnant :
           - matériau principal
           - deuxième matériau (si masse > 0)
-          - emballage
-          - conditionnement (divisé par Nbr par conditionnement)
+          - emballage secondaire (divisé par Nbr par emballage secondaire si > 1)
+          - conditionnement primaire (divisé par Nbr par conditionnement)
 
         :param consommable_name: str, nom du consommable dans self.data
         :param quantite: int, quantité d'unités
@@ -1971,13 +2474,22 @@ class DataMassWindow(QMainWindow):
             if masse_g <= 0 or materiau == "" or pd.isna(masse_g):
                 continue
 
-            # Cas conditionnement : diviser par Nb par cond.
+            # Cas conditionnement primaire : diviser par Nbr par conditionnement
             if col_masse == "Masse condionnement (g)":
                 nb = last_obj.get("Nbr par conditionnement", 1)
                 try:
                     nb = float(nb) if nb else 1
                     if nb > 0:
                         masse_g /= nb
+                except (ValueError, TypeError):
+                    pass
+            # Cas emballage secondaire : diviser par Nbr par emballage secondaire si renseigné
+            elif col_masse == "Masse emballage unitaire (g)":
+                nb_emb = last_obj.get("Nbr par emballage secondaire", 1)
+                try:
+                    nb_emb = float(nb_emb) if nb_emb else 1
+                    if nb_emb > 0:
+                        masse_g /= nb_emb
                 except (ValueError, TypeError):
                     pass
 
@@ -2003,3 +2515,103 @@ class DataMassWindow(QMainWindow):
             f"Détails:\n{details_str}\n"
             f"eCO₂ total: {total_eCO2:.4f} kg CO₂e"
         )
+
+    # ------------------------------------------------------------------
+    # Pré-remplissage admin : édition d'un facteur d'émission existant
+    # ------------------------------------------------------------------
+
+    def prefill_factor_from_sqlite(self, factor_id: str) -> None:
+        """Pré-remplit le formulaire depuis un facteur d'émission existant (admin)."""
+        import sqlite3 as _sl
+
+        try:
+            conn = _sl.connect(self.sqlite_path)
+            conn.row_factory = _sl.Row
+            factor = conn.execute(
+                """
+                SELECT ef.*,
+                       s.title AS _source_title,
+                       c.name  AS _contributor_name
+                FROM emission_factors ef
+                LEFT JOIN sources      s ON s.id = ef.source_id
+                LEFT JOIN contributors c ON c.id = ef.contributor_id
+                WHERE ef.id = ?
+                """,
+                (factor_id,),
+            ).fetchone()
+            if factor is None:
+                conn.close()
+                return
+            factor = dict(factor)
+
+            material_id = None
+            if factor.get("factor_type") == "material":
+                row = conn.execute(
+                    "SELECT id FROM materials WHERE emission_factor_id = ? LIMIT 1",
+                    (factor_id,),
+                ).fetchone()
+                if row:
+                    material_id = row[0]
+            conn.close()
+        except Exception:
+            return
+
+        def _set_mode(mode):
+            idx = self.type_combo.findData(mode)
+            if idx != -1:
+                self.type_combo.blockSignals(True)
+                self.type_combo.setCurrentIndex(idx)
+                self.type_combo.blockSignals(False)
+                self.on_type_changed(idx)
+
+        def _fmt(v) -> str:
+            if v is None:
+                return ""
+            try:
+                f = float(v)
+                return f"{f:g}"
+            except (TypeError, ValueError):
+                return str(v)
+
+        source    = factor.get("_source_title", "") or ""
+        signature = factor.get("_contributor_name", "") or ""
+        co2       = factor.get("co2_factor")
+        uncert    = factor.get("uncertainty")
+
+        if factor.get("factor_type") == "liquid":
+            _set_mode(self.MODE_LIQUID_FACTOR)
+            self.update_form_visibility()
+            self.afficher_donnees()
+
+            self.nom_input.setText(factor.get("name", "") or "")
+            if factor.get("density_g_ml") is not None:
+                self.dens_input.setText(_fmt(factor["density_g_ml"]))
+            if factor.get("concentration_mg_ml") is not None:
+                self.conc_input.setText(_fmt(factor["concentration_mg_ml"]))
+            if co2 is not None:
+                self.factor_input.setText(_fmt(co2))
+            if uncert is not None:
+                self.uncert_input.setText(_fmt(uncert * 100))
+            self.source_input.setText(source)
+            self.signature_input.setText(signature)
+
+            self._prefill_liq_id = factor_id
+            self._prefill_liq_produit = factor.get("name", "")
+
+        elif factor.get("factor_type") == "material":
+            _set_mode(self.MODE_SOLID_FACTOR)
+            self.update_form_visibility()
+            self.afficher_donnees()
+
+            self.nom_input.setText(factor.get("name", "") or "")
+            if co2 is not None:
+                self.factor_input.setText(_fmt(co2))
+            if uncert is not None:
+                self.uncert_input.setText(_fmt(uncert * 100))
+            self.source_input.setText(source)
+            self.signature_input.setText(signature)
+
+            self._prefill_solid_material_id = material_id
+
+        self.add_button.setText("Enregistrer les modifications")
+        self.update_required_indicators()

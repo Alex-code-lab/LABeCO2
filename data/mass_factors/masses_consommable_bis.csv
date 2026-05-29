@@ -2,23 +2,24 @@ ID,Consommable,Marque,Référence,Code CAS,Catégorie,Code NACRES,Masse unitaire
 1,Tube centrifugeuse 15 mL,Falcon,352096,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","6,7",Polypropylène (PP),,,,,,,Souchaud,
 2,Tube centrifugeuse 50 mL,BIOLOGIX,10*9502,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","14,35",Polypropylène (PP),,,,,,,Souchaud,
 3,Seringue 5 mL,Terumo,1SS05LE1,,Consommable,NB03 Seringues en plastique et aiguilles,"1,9",Polypropylène (PP),,,,,,,Souchaud,
-4,Boite de Pétri 35 x 10 mm,Falcon,351008,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"4,6",Polypropylène (PP),,,,,,,Souchaud,
-5,Serological pipette 5 mL individually wrapped,Starlab,E4860-0005,,Consommable,NB04 Pipettes a usage unique,"7,9",Verre,,,,,,,Souchaud,
+4,Boite de Pétri 35 x 10 mm,Falcon,351008,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"4,6",Polystyrène (PS),,,,,,,Souchaud,corrigé 2026-05-28 : matériau PP→PS (Falcon 351008 = polystyrène vierge)
+5,Serological pipette 5 mL individually wrapped,Starlab,E4860-0005,,Consommable,NB04 Pipettes a usage unique,"7,9",Polystyrène (PS),,,,,,,Souchaud,corrigé 2026-05-28 : matériau Verre→PS (Starlab E4860 = polystyrène USP Class VI)
 6,"T-25 Tissue Culture Flask, green plug seal cap",CytoOne,CC7682-4825,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"20,9",Polystyrène (PS),,,,,,,Souchaud,
 7,"T-75 Tissue Culture Flask, green plug seal cap",CytoOne,CC7682-4175,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"60,62",Polystyrène (PS),,,,,,,Souchaud,
 8,"T-225 Tissue Culture Flask, green plug seal cap",CytoOne,CC7682-4225,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"149,5",Polystyrène (PS),,,,,,,Souchaud,
 9,"200 µl Pointe TipOne®, Naturel",Starlab,S1111-0810-C,,Consommable,NB02 Pointes (cones) pour micropipettes mono-canal et multi-canaux,"0,28",Polypropylène (PP),,,,,,https://www.starlabgroup.com/FR-fr/product/200-ul-pointe-tipone-naturel-pf-sl-920673.html,Souchaud,https://www.starlabgroup.com/FR-fr/product/200-ul-pointe-tipone-naturel-pf-sl-920673.html
 10,"1 000 µl Pointe graduée TipOne®, Bleu",Starlab,S1111-6811-C,,Consommable,NB02 Pointes (cones) pour micropipettes mono-canal et multi-canaux,"0,547",Polypropylène (PP),,,,,,https://www.starlabgroup.com/FR-fr/product/1-nbsp-000-ul-pointe-graduee-tipone-bleu-pf-sl-921051.html,Souchaud,https://www.starlabgroup.com/FR-fr/product/1-nbsp-000-ul-pointe-graduee-tipone-bleu-pf-sl-921051.html
 11,"1 000 µl Pointe non graduée TipOne® Filtre, Naturel (stérile)",Starlab,S1126-7710-C,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","0,768",Polypropylène (PP),,,,,,,Souchaud,
-12,1.5 mL FlipTube Standard,Hamilton,235454,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","0,83",Polypropylène (PP),,,,,,,Souchaud,
-13,Paire de gant latex powder free M (7-8),,,,Consommable,HA01 Epi : gants a usage unique,12,Latex,,,,,,,Souchaud,
+12,1.5 mL FlipTube Standard,Hamilton,235454,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","0,83",Polypropylène (PP),,,,,,,Souchaud,corrigé 2026-05-28 : matériau Latex→PP et masse 12→0.83g (Hamilton FlipTube = PP vierge ~1g)
+13,Paire de gant latex powder free M (7-8),,,,Consommable,HA01 Epi : gants a usage unique,12,Latex,,,,,,,Souchaud,À VALIDER : pas de marque/référence renseignée. Masse 12g pour une paire = élevé (typique 8-10g pour M). À reconfirmer.
 14,Paire de gants (taille M) ambidextres Kimtech Purple Nitrile,Kimberly-Clark,90627,,Consommable,HA01 Epi : gants a usage unique,"13,7",Nitrile,,,,,,,Souchaud,
-15,Paire de gants (taille L) ambidextres Kimtech Purple Nitrile,Kimberly-Clark,90628,,Consommable,HA01 Epi : gants a usage unique,"16,85",Nitrile,,,,,,,Souchaud,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,
+15,Paire de gants (taille L) ambidextres Kimtech Purple Nitrile,Kimberly-Clark,90628,,Consommable,HA01 Epi : gants a usage unique,"16,85",Nitrile,,,,,,,Souchaud,"corrigé 2026-05-28 : matériau PP→Nitrile, NACRES NB13→HA01 (Kimtech 90628 = nitrile)"
+16,Falcon® Tube with conical bottom 50 ml (bulk),Falcon®,352070,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","14,35",Polypropylène (PP),0,,"5,189",Carton,500,,Knörr / Lespay Aguilera,"corrigé 2026-05-28 : matériau PS→PP, masse 8.15→14.35g, NACRES NB13→NB11 (Falcon 352070 = PP, cf datasheet Corning)"
+17,TPP Tissue Culture Dish 60,TPP,93060,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"2,151",Polystyrène (PS),"0,575",,"88,61",Carton,100,,Knörr / Lespay Aguilera,"corrigé 2026-05-28 : matériau PP→PS, NACRES NB03→NB13 (TPP 93060 = polystyrène pour culture tissulaire)"
+18,1ml Terumo Leur Slip Syringes,TERUMO,BS-01T,,Consommable,NB03 Seringues en plastique et aiguilles,,,,,,,,,,À VALIDER : masse et matériau totalement manquants. Typique pour seringue 1mL : ~2g PP corps + élastomère piston.
+19,"Polypropylene Centrifuge tube, Sterile 50 ml - CentriStar Cap - 25 bulk",Corning®,430829,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","14,0",Polypropylène (PP),0,,"15,282",Carton,25,,Knörr / Lespay Aguilera,"corrigé 2026-05-28 : matériau PET→PP, NACRES NB13→NB11 (Corning 430829 = PP corps, HDPE bouchon). À VALIDER : masse 14g estimée par cohérence avec autres 50mL, datasheet exacte non trouvée."
+20,Pipette for cell culture 2 ml Falcon®,Falcon®,357507,,Consommable,NB04 Pipettes a usage unique,"5,275",Polystyrène (PS),"0,482",,"60,678",Carton,100,,Knörr / Lespay Aguilera,
+21,Pipette for cell culture 25 ml + 11 ml Falcon®,Falcon®,357535,,Consommable,NB04 Pipettes a usage unique,"14,661",Polystyrène (PS),"1,91",,"14,991",,,,Knörr / Lespay Aguilera,À VALIDER : Nbr par conditionnement manquant. Datasheet Corning indique 100 unités/sleeve.
+22,Falcon® Tube with conical bottom 15 ml (bulk),Falcon®,352096,,Consommable,"NB11 Microtubes, cryotubes, tubes a usage unique","6,749",Polypropylène (PP),0,,"10,584",Carton,50,,Knörr / Lespay Aguilera,À VALIDER : doublon avec ID 1 (même référence Falcon 352096). À fusionner ou supprimer.
+23,TPP Tissue Culture Dish 100,TPP,93100,,Consommable,NB13 Culture cellulaire eucaryote : consommables en plastique specifiques,"24,2251",Polystyrène (PS),0,,"8,856",Carton,10,,Knörr / Lespay Aguilera,
+24,"Dropper Bottle, LDPE with white closure 15ml",ThermoScientific,2750-9050,,Consommable,"NB43 Vaisselle de laboratoire reutilisable en verre, plastique, porcelaine","3,74",Low-density Polyéthylène (LDPE),"0,992",Polyéthylène (PE),"2,788",Carton,25,"36,06",Souchaud,https://www.thermofisher.com/order/catalog/product/2750-9050

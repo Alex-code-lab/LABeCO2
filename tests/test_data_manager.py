@@ -194,6 +194,8 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
             "code_ijm": "P001",
             "marque_ijm": "MARQUE",
             "score_match": "",
+            "Statut validation": "draft",
+            "Nature validation": "Modification",
         }])
 
         info = dm.get_prix_unitaire_info("NB11", "Tube IJM")
@@ -202,6 +204,54 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
         self.assertAlmostEqual(info["prix_unitaire"], 0.14)
         self.assertEqual(info["prix_ht"], 70.0)
         self.assertEqual(info["source_catalogue"], "Catalogue IJM 2025")
+        self.assertEqual(info["validation"], "Draft - modification")
+
+    def test_prix_unitaire_distingue_le_conditionnement(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Prix du conditionnement": 12.0,
+                "Nbr par conditionnement": 1,
+                "condt_ijm": "1 kg",
+            },
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Prix du conditionnement": 45.0,
+                "Nbr par conditionnement": 1,
+                "condt_ijm": "5 kg",
+            },
+        ])
+
+        info = dm.get_prix_unitaire_info("NA25", "Talc", "5 kg")
+
+        self.assertIsNotNone(info)
+        self.assertEqual(info["conditionnement"], "5 kg")
+        self.assertEqual(info["prix_ht"], 45.0)
+
+    def test_get_consumable_row_distingue_le_conditionnement(self):
+        dm = _make_dm()
+        dm.data_masse = pd.DataFrame([
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Masse unitaire (g)": 1000,
+                "condt_ijm": "1 kg",
+            },
+            {
+                "Code NACRES": "NA25",
+                "Consommable": "Talc",
+                "Masse unitaire (g)": 5000,
+                "condt_ijm": "5 kg",
+            },
+        ])
+
+        row = dm.get_consumable_row("NA25", "Talc", "5 kg")
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["Masse unitaire (g)"], 5000)
 
     def test_ligne_manuelle_exacte_sans_prix_ne_fuzzy_match_pas(self):
         dm = _make_dm()
@@ -224,6 +274,127 @@ class TestPrixUnitaireCanonique(unittest.TestCase):
         info = dm.get_prix_unitaire_info("NB11", "Tube manuel")
 
         self.assertIsNone(info)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# is_liquid_commercial_row
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestIsLiquidCommercialRow(unittest.TestCase):
+
+    def _row(self, facteur='', unite='', volume=0, code='', nom=''):
+        return pd.Series({
+            DataManager.CODE_NACRES_COL: code,
+            DataManager.CONSOMMABLE_COL: nom,
+            DataManager.FACTEUR_LIQUIDE_SOURCE_COL: facteur,
+            DataManager.UNITE_LIQUIDE_COL:          unite,
+            DataManager.VOLUME_FLACON_COL:          volume,
+        })
+
+    def test_none_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(None))
+
+    def test_volume_positif_seul_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(self._row(volume=500)))
+
+    def test_volume_positif_code_na_retourne_true(self):
+        dm = _make_dm()
+        self.assertTrue(dm.is_liquid_commercial_row(
+            self._row(unite='mL', volume=500, code='NA21', nom='Solution test 500ml')
+        ))
+
+    def test_objet_solide_avec_capacite_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(
+            self._row(unite='mL', volume=300, code='HA11', nom='BOITE à DÉCHETS 300ml')
+        ))
+
+    def test_volume_zero_retourne_false(self):
+        """Régression : Volume flacon = 0 ne doit pas classifier comme liquide."""
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(self._row(volume=0)))
+
+    def test_volume_zero_float_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(self._row(volume=0.0)))
+
+    def test_facteur_renseigne_retourne_true(self):
+        dm = _make_dm()
+        self.assertTrue(dm.is_liquid_commercial_row(self._row(facteur='Éthanol')))
+
+    def test_unite_renseignee_retourne_true(self):
+        dm = _make_dm()
+        self.assertTrue(dm.is_liquid_commercial_row(
+            self._row(unite='mL', code='NB22', nom='Acrylamide solution 500ml')
+        ))
+
+    def test_tous_vides_retourne_false(self):
+        dm = _make_dm()
+        self.assertFalse(dm.is_liquid_commercial_row(self._row()))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# get_consumable_liquid_factor_data
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGetConsumableLiquidFactorData(unittest.TestCase):
+
+    def _masse_df(self, code='NA02', nom='Acétone 1L', facteur='Acétone',
+                  unite='mL', volume=1000):
+        return pd.DataFrame([{
+            DataManager.CODE_NACRES_COL:            code,
+            DataManager.CONSOMMABLE_COL:            nom,
+            DataManager.FACTEUR_LIQUIDE_SOURCE_COL: facteur,
+            DataManager.UNITE_LIQUIDE_COL:          unite,
+            DataManager.VOLUME_FLACON_COL:          volume,
+        }])
+
+    def _liquides_df(self, code='NA02', produit='Acétone'):
+        return pd.DataFrame([{
+            DataManager.CODE_NACRES_COL: code,
+            'Produit':                   produit,
+            'Facteur CO₂ (kg CO₂e/kg)': 2.1,
+        }])
+
+    def test_produit_absent_retourne_none_none(self):
+        dm = _make_dm()
+        dm.data_masse   = pd.DataFrame(columns=[
+            DataManager.CODE_NACRES_COL, DataManager.CONSOMMABLE_COL,
+            DataManager.FACTEUR_LIQUIDE_SOURCE_COL,
+        ])
+        dm.data_liquides = pd.DataFrame()
+        product_row, factor_row = dm.get_consumable_liquid_factor_data('ZZ99', 'Inconnu')
+        self.assertIsNone(product_row)
+        self.assertIsNone(factor_row)
+
+    def test_pas_de_facteur_source_retourne_row_et_none(self):
+        """Produit trouvé mais sans Facteur liquide source → (product_row, None)."""
+        dm = _make_dm()
+        dm.data_masse = self._masse_df(facteur='')
+        dm.data_liquides = pd.DataFrame()
+        product_row, factor_row = dm.get_consumable_liquid_factor_data('NA02', 'Acétone 1L')
+        self.assertIsNotNone(product_row)
+        self.assertIsNone(factor_row)
+
+    def test_facteur_trouve_retourne_les_deux(self):
+        dm = _make_dm()
+        dm.data_masse   = self._masse_df()
+        dm.data_liquides = self._liquides_df()
+        product_row, factor_row = dm.get_consumable_liquid_factor_data('NA02', 'Acétone 1L')
+        self.assertIsNotNone(product_row)
+        self.assertIsNotNone(factor_row)
+        self.assertEqual(str(factor_row['Produit']), 'Acétone')
+
+    def test_facteur_absent_de_data_liquides_retourne_none(self):
+        """Facteur source renseigné mais absent de data_liquides → (product_row, None)."""
+        dm = _make_dm()
+        dm.data_masse   = self._masse_df(facteur='SolvantInconnu')
+        dm.data_liquides = self._liquides_df(produit='Acétone')  # 'SolvantInconnu' absent
+        product_row, factor_row = dm.get_consumable_liquid_factor_data('NA02', 'Acétone 1L')
+        self.assertIsNotNone(product_row)
+        self.assertIsNone(factor_row)
 
 
 if __name__ == "__main__":
