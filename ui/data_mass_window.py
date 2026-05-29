@@ -68,8 +68,9 @@ class DataMassWindow(QMainWindow):
         "Matériau deuxieme materiaux": "Matériau secondaire du consommable",
         "Masse unitaire troisième materiaux (g)": "Masse du troisième matériau par unité (g)",
         "Matériau troisième materiaux": "Troisième matériau du consommable",
-        "Masse emballage unitaire (g)": "Masse de l'emballage secondaire par unité (g)",
+        "Masse emballage unitaire (g)": "Masse de l'emballage secondaire (g)",
         "Matériau emballage": "Matériau de l'emballage secondaire",
+        "Nbr par emballage secondaire": "Unités partageant l'emballage secondaire",
         "Masse condionnement (g)": "Masse du conditionnement primaire complet ou du contenant vide (g)",
         "Matériau conditionnement": "Matériau du conditionnement primaire ou du contenant",
         "Nbr par conditionnement": "Unités par conditionnement vendu",
@@ -138,6 +139,7 @@ class DataMassWindow(QMainWindow):
             "Matériau troisième materiaux",
             "Masse emballage unitaire (g)",
             "Matériau emballage",
+            "Nbr par emballage secondaire",
             "Masse condionnement (g)",
             "Matériau conditionnement",
             "Nbr par conditionnement",
@@ -556,6 +558,9 @@ class DataMassWindow(QMainWindow):
         self.masse_emb_input = QLineEdit()
         self.mat_emb_combo = QComboBox()
         self.mat_emb_combo.addItems(mats_with_empty)
+        self.nbr_emb_input = QLineEdit()
+        self.nbr_emb_input.setValidator(QIntValidator(1, 999999, self))
+        self.nbr_emb_input.setPlaceholderText("Laissez vide si l'emballage est propre à 1 unité")
 
         # Conditionnement
         self.masse_cond_input = QLineEdit()
@@ -679,8 +684,15 @@ class DataMassWindow(QMainWindow):
         )
         self.masse_emb_widget = self.create_helped_field(
             self.masse_emb_input,
-            "Emballage secondaire si présent : carton externe, film plastique, intercalaire, suremballage. "
-            "Laissez vide s'il n'y en a pas ou si la masse est inconnue."
+            "Masse totale de l'emballage secondaire (carton externe, film plastique, sachet, intercalaire). "
+            "Si plusieurs unités partagent cet emballage, renseigner cette masse pour l'ensemble "
+            "puis indiquer le nombre d'unités à côté. Laissez vide s'il n'y a pas d'emballage secondaire."
+        )
+        self.nbr_emb_widget = self.create_helped_field(
+            self.nbr_emb_input,
+            "Nombre d'unités du consommable qui partagent ce même emballage secondaire. "
+            "Exemple : 50 si un sachet plastique regroupe 50 tubes. Laissez vide (≡ 1) si l'emballage "
+            "n'enveloppe qu'une seule unité (sleeve individuel d'une pipette)."
         )
         self.form_layout.addRow("Copier un facteur existant :", self.liquid_copy_factor_combo)
         self.form_layout.addRow("Utiliser un facteur existant / créer un nouveau facteur :", self.liquid_factor_combo)
@@ -709,6 +721,7 @@ class DataMassWindow(QMainWindow):
         self.add_section_header("Emballage secondaire (si présent)", mode="consumable")
         self.form_layout.addRow("Matériau emballage secondaire:", self.mat_emb_row_widget)
         self.form_layout.addRow("Masse emballage secondaire (g):", self.masse_emb_widget)
+        self.form_layout.addRow("Unités partageant l'emballage secondaire:", self.nbr_emb_widget)
 
         self.register_required_field(self.type_combo, "Type d'objet")
         self.register_required_field(self.nacres_widget, "Code NACRES", control=self.nacres_combo)
@@ -1324,6 +1337,7 @@ class DataMassWindow(QMainWindow):
         materiau2    = self.materiau2_combo.currentText()
         masse_emb_str= self.masse_emb_input.text().strip().replace(',', '.')
         mat_emb      = self.mat_emb_combo.currentText()
+        nbr_emb      = self.nbr_emb_input.text().strip()
         masse_cond_str = self.masse_cond_input.text().strip().replace(',', '.')
         mat_cond     = self.mat_cond_combo.currentText()
         nbr_cond     = self.nbr_cond_input.text().strip()
@@ -1412,6 +1426,7 @@ class DataMassWindow(QMainWindow):
             return
 
         nbr_cond_value = None
+        nbr_emb_value = None
         if is_consumable:
             try:
                 nbr_cond_value = int(nbr_cond)
@@ -1424,6 +1439,20 @@ class DataMassWindow(QMainWindow):
                     "Le nombre d'unités par conditionnement vendu doit être un entier positif."
                 )
                 return
+
+            if nbr_emb:
+                try:
+                    nbr_emb_value = int(nbr_emb)
+                    if nbr_emb_value <= 0:
+                        raise ValueError
+                except ValueError:
+                    QMessageBox.warning(
+                        self,
+                        "Erreur",
+                        "Le nombre d'unités partageant l'emballage secondaire doit être un entier positif "
+                        "(laissez vide si l'emballage est propre à une seule unité)."
+                    )
+                    return
 
             try:
                 if is_solid_consumable:
@@ -1561,6 +1590,7 @@ class DataMassWindow(QMainWindow):
                 "Matériau troisième materiaux": "",
                 "Masse emballage unitaire (g)": masse_emb_str,
                 "Matériau emballage": mat_emb,
+                "Nbr par emballage secondaire": nbr_emb_value,
                 "Masse condionnement (g)": masse_cond_str,
                 "Matériau conditionnement": mat_cond,
                 "Nbr par conditionnement": nbr_cond_value,
@@ -1611,6 +1641,7 @@ class DataMassWindow(QMainWindow):
         self.materiau2_combo.setCurrentIndex(0)
         self.masse_emb_input.clear()
         self.mat_emb_combo.setCurrentIndex(0)
+        self.nbr_emb_input.clear()
         self.masse_cond_input.clear()
         self.mat_cond_combo.setCurrentIndex(0)
         self.nbr_cond_input.clear()
@@ -1798,7 +1829,7 @@ class DataMassWindow(QMainWindow):
             set_visible(w, is_solid_consumable)
 
         for w in (
-            self.masse_emb_input, self.mat_emb_row_widget,
+            self.masse_emb_input, self.mat_emb_row_widget, self.nbr_emb_input,
             self.masse_cond_input, self.mat_cond_row_widget,
             self.nbr_cond_input, self.price_row_widget, self.price_preview_label,
         ):
@@ -2307,6 +2338,12 @@ class DataMassWindow(QMainWindow):
                     self.nbr_cond_input.setText(str(int(float(nbr_raw))))
                 except (ValueError, TypeError):
                     self.nbr_cond_input.setText(str(nbr_raw).strip())
+            nbr_emb_raw = row.get("Nbr par emballage secondaire", "")
+            if not pd.isna(nbr_emb_raw) and str(nbr_emb_raw).strip() not in ("", "nan", "none", "1"):
+                try:
+                    self.nbr_emb_input.setText(str(int(float(nbr_emb_raw))))
+                except (ValueError, TypeError):
+                    self.nbr_emb_input.setText(str(nbr_emb_raw).strip())
             _fill(self.solid_liquid_volume_input, "Volume flacon (mL)")
             if not self.nbr_cond_input.text().strip():
                 _fill(self.nbr_cond_input, "nb_unites_ijm")
@@ -2388,8 +2425,8 @@ class DataMassWindow(QMainWindow):
         Calcule l'eCO2 total pour un consommable donné en additionnant :
           - matériau principal
           - deuxième matériau (si masse > 0)
-          - emballage
-          - conditionnement (divisé par Nbr par conditionnement)
+          - emballage secondaire (divisé par Nbr par emballage secondaire si > 1)
+          - conditionnement primaire (divisé par Nbr par conditionnement)
 
         :param consommable_name: str, nom du consommable dans self.data
         :param quantite: int, quantité d'unités
@@ -2437,13 +2474,22 @@ class DataMassWindow(QMainWindow):
             if masse_g <= 0 or materiau == "" or pd.isna(masse_g):
                 continue
 
-            # Cas conditionnement : diviser par Nb par cond.
+            # Cas conditionnement primaire : diviser par Nbr par conditionnement
             if col_masse == "Masse condionnement (g)":
                 nb = last_obj.get("Nbr par conditionnement", 1)
                 try:
                     nb = float(nb) if nb else 1
                     if nb > 0:
                         masse_g /= nb
+                except (ValueError, TypeError):
+                    pass
+            # Cas emballage secondaire : diviser par Nbr par emballage secondaire si renseigné
+            elif col_masse == "Masse emballage unitaire (g)":
+                nb_emb = last_obj.get("Nbr par emballage secondaire", 1)
+                try:
+                    nb_emb = float(nb_emb) if nb_emb else 1
+                    if nb_emb > 0:
+                        masse_g /= nb_emb
                 except (ValueError, TypeError):
                     pass
 

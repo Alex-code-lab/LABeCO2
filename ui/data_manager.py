@@ -42,6 +42,7 @@ class DataManager:
     MATERIAU3_COL     = "Matériau troisième materiaux"
     MASSE_EMBALLAGE_COL = "Masse emballage unitaire (g)"
     MATERIAU_EMBALLAGE_COL = "Matériau emballage"
+    NOMBRE_PAR_EMBALLAGE_COL = "Nbr par emballage secondaire"
     MASSE_CONDITIONNEMENT_COL = "Masse condionnement (g)"
     MATERIAU_CONDITIONNEMENT_COL = "Matériau conditionnement"
     NOMBRE_PAR_COND_COL = "Nbr par conditionnement"

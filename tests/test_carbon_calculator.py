@@ -352,6 +352,67 @@ class TestMassBasedEmissions(unittest.TestCase):
         self.assertEqual(emission, 0.0)
         self.assertEqual(missing, [])
 
+    def test_emballage_secondaire_divisé_par_nbr_unites(self):
+        """Masse d'emballage secondaire / Nbr par emballage secondaire si > 1.
+
+        Cas : sachet plastique de 50 g qui regroupe 50 tubes → 1 g/tube imputé.
+        """
+        df = pd.DataFrame([{
+            'Code NACRES': 'AA01',
+            'Consommable': 'Tube bulk',
+            'Masse unitaire (g)': 6.7,
+            'Matériau consommable': 'Plastique',
+            'Masse unitaire deuxieme materiaux (g)': 0.0,
+            'Matériau deuxieme materiaux': '',
+            'Masse emballage unitaire (g)': 50.0,
+            'Matériau emballage': 'Carton',
+            'Nbr par emballage secondaire': 50,
+            'Masse condionnement (g)': 0.0,
+            'Matériau conditionnement': '',
+            'Nbr par conditionnement': 1,
+        }])
+        dm = _make_dm(
+            data_masse=df,
+            material_map={'Plastique': (2.0, 0.0), 'Carton': (1.0, 0.0)},
+        )
+        dm.NOMBRE_PAR_EMBALLAGE_COL = 'Nbr par emballage secondaire'
+        calc = CarbonCalculator(dm)
+        emission, masse, _, _ = calc._calculate_mass_based_emissions_old(
+            'AA01', 'Tube bulk', quantity=3
+        )
+        # plastique = 3 × 6.7/1000 × 2.0 = 0.0402
+        # carton    = 3 × (50/50)/1000 × 1.0 = 0.003   (1 g par tube)
+        self.assertAlmostEqual(emission, 0.0402 + 0.003)
+        self.assertAlmostEqual(masse, 3 * 6.7 / 1000 + 3 * 1.0 / 1000)
+
+    def test_emballage_secondaire_diviseur_vide_equivaut_un(self):
+        """Diviseur vide ou absent → comportement legacy (masse déjà par unité)."""
+        df = pd.DataFrame([{
+            'Code NACRES': 'AA01',
+            'Consommable': 'Tube wrappé',
+            'Masse unitaire (g)': 6.7,
+            'Matériau consommable': 'Plastique',
+            'Masse unitaire deuxieme materiaux (g)': 0.0,
+            'Matériau deuxieme materiaux': '',
+            'Masse emballage unitaire (g)': 2.0,
+            'Matériau emballage': 'Carton',
+            'Nbr par emballage secondaire': '',  # vide = pas de mutualisation
+            'Masse condionnement (g)': 0.0,
+            'Matériau conditionnement': '',
+            'Nbr par conditionnement': 1,
+        }])
+        dm = _make_dm(
+            data_masse=df,
+            material_map={'Plastique': (2.0, 0.0), 'Carton': (1.0, 0.0)},
+        )
+        dm.NOMBRE_PAR_EMBALLAGE_COL = 'Nbr par emballage secondaire'
+        calc = CarbonCalculator(dm)
+        emission, _, _, _ = calc._calculate_mass_based_emissions_old(
+            'AA01', 'Tube wrappé', quantity=1
+        )
+        # 1 × 6.7/1000 × 2.0 + 1 × 2.0/1000 × 1.0 = 0.0134 + 0.002
+        self.assertAlmostEqual(emission, 0.0134 + 0.002)
+
     def test_conditionnement_choisit_la_bonne_ligne(self):
         """Deux consommables de même nom doivent rester distingués par conditionnement."""
         df = pd.DataFrame([

@@ -27,6 +27,7 @@ COMMERCIAL_PRODUCT_COLUMNS = [
     "Matériau troisième materiaux",
     "Masse emballage unitaire (g)",
     "Matériau emballage",
+    "Nbr par emballage secondaire",
     "Masse condionnement (g)",
     "Matériau conditionnement",
     "Nbr par conditionnement",
@@ -246,6 +247,7 @@ def load_commercial_products(conn: sqlite3.Connection) -> pd.DataFrame:
             pc.product_id,
             pc.component_type,
             pc.mass_g,
+            pc.units_divisor,
             m.name AS material_name
         FROM product_components pc
         LEFT JOIN materials m ON m.id = pc.material_id
@@ -319,6 +321,7 @@ def _fill_component_columns(row: dict[str, Any], components: list[dict[str, Any]
         elif component_type == "secondary_packaging":
             row["Masse emballage unitaire (g)"] = component.get("mass_g")
             row["Matériau emballage"] = _clean(component.get("material_name"))
+            row["Nbr par emballage secondaire"] = component.get("units_divisor")
         elif component_type == "primary_packaging":
             row["Masse condionnement (g)"] = component.get("mass_g")
             row["Matériau conditionnement"] = _clean(component.get("material_name"))

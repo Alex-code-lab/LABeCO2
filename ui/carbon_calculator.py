@@ -327,12 +327,21 @@ class CarbonCalculator:
             # Lecture brute de la masse (g) — NaN doit être traité comme 0
             _raw = row.get(col_masse, 0.0)
             raw_masse = self._safe_float(_raw)
-            # Si on est dans le conditionnement, on divise par le nombre par conditionnement
+            # Si on est dans le conditionnement primaire, on divise par le nombre par conditionnement
             if col_masse == self.dm.MASSE_CONDITIONNEMENT_COL:
                 nombre = self._safe_float(row.get(self.dm.NOMBRE_PAR_COND_COL, 1), default=1.0)
                 if nombre <= 0:
                     continue
                 raw_masse = raw_masse / nombre
+            # Si on est dans l'emballage secondaire, on divise par le nombre partageant l'emballage
+            elif col_masse == self.dm.MASSE_EMBALLAGE_COL:
+                nb_emb = self._safe_float(
+                    row.get(getattr(self.dm, "NOMBRE_PAR_EMBALLAGE_COL", "Nbr par emballage secondaire"), 1),
+                    default=1.0,
+                )
+                if nb_emb <= 0:
+                    nb_emb = 1.0
+                raw_masse = raw_masse / nb_emb
             # On obtient la masse finale du composant
             masse_g = raw_masse
             materiau = row.get(col_mat, "") or ""

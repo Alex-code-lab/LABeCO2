@@ -512,7 +512,12 @@ def replace_product_components(conn: sqlite3.Connection, product_id: str, row: d
         ("product", "Matériau consommable", "Masse unitaire (g)", 1),
         ("product", "Matériau deuxieme materiaux", "Masse unitaire deuxieme materiaux (g)", 1),
         ("product", "Matériau troisième materiaux", "Masse unitaire troisième materiaux (g)", 1),
-        ("secondary_packaging", "Matériau emballage", "Masse emballage unitaire (g)", 1),
+        (
+            "secondary_packaging",
+            "Matériau emballage",
+            "Masse emballage unitaire (g)",
+            int_or_none(row.get("Nbr par emballage secondaire")) or 1,
+        ),
         (
             "primary_packaging",
             "Matériau conditionnement",
