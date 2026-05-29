@@ -70,6 +70,17 @@ MATERIAL_COLUMNS = [
     "uncertainty",
     "Source",
     "Signature",
+    "EoL Facteur CO₂ (kg eCO₂/kg)",
+    "EoL Incertitude",
+    "EoL Nom facteur",
+    "EoL Source",
+]
+
+EOL_FACTOR_COLUMNS = [
+    "Nom",
+    "Facteur CO₂ (kg eCO₂/kg)",
+    "Incertitude",
+    "Source",
 ]
 
 TRANSPORT_COLUMNS = [
@@ -118,6 +129,7 @@ def load_legacy_dataframes(sqlite_path: str | Path) -> dict[str, pd.DataFrame]:
             "data_materials": load_materials(conn),
             "data_liquides": load_liquid_factors(conn),
             "data_transport": load_transport_factors(conn),
+            "data_eol_factors": load_eol_factors(conn),
         }
 
 
@@ -137,16 +149,41 @@ def load_materials(conn: sqlite3.Connection) -> pd.DataFrame:
             ef.co2_factor AS "Equivalent CO₂ (kg eCO₂/kg)",
             ef.uncertainty AS "uncertainty",
             s.title AS "Source",
-            c.name AS "Signature"
+            c.name AS "Signature",
+            ef_eol.co2_factor AS "EoL Facteur CO₂ (kg eCO₂/kg)",
+            ef_eol.uncertainty AS "EoL Incertitude",
+            ef_eol.name AS "EoL Nom facteur",
+            s_eol.title AS "EoL Source"
         FROM materials m
         LEFT JOIN emission_factors ef ON ef.id = m.emission_factor_id
         LEFT JOIN sources s ON s.id = m.source_id
         LEFT JOIN contributors c ON c.id = m.contributor_id
+        LEFT JOIN emission_factors ef_eol ON ef_eol.id = m.eol_emission_factor_id
+        LEFT JOIN sources s_eol ON s_eol.id = ef_eol.source_id
         WHERE m.status != 'deprecated'
         ORDER BY m.rowid
     """
     df = _read_sql(conn, query)
     return df.reindex(columns=MATERIAL_COLUMNS) if not df.empty else _empty_frame(MATERIAL_COLUMNS)
+
+
+def load_eol_factors(conn: sqlite3.Connection) -> pd.DataFrame:
+    """Charge tous les facteurs d'émission de type end_of_life (filières DASRI/DIS,
+    emballages, plastiques BI). Servira au calculateur pour résoudre la filière à
+    partir d'un code NACRES via ui/end_of_life.py."""
+    query = """
+        SELECT
+            ef.name AS "Nom",
+            ef.co2_factor AS "Facteur CO₂ (kg eCO₂/kg)",
+            ef.uncertainty AS "Incertitude",
+            s.title AS "Source"
+        FROM emission_factors ef
+        LEFT JOIN sources s ON s.id = ef.source_id
+        WHERE ef.factor_type = 'end_of_life' AND ef.status != 'deprecated'
+        ORDER BY ef.name
+    """
+    df = _read_sql(conn, query)
+    return df.reindex(columns=EOL_FACTOR_COLUMNS) if not df.empty else _empty_frame(EOL_FACTOR_COLUMNS)
 
 
 def load_liquid_factors(conn: sqlite3.Connection) -> pd.DataFrame:

@@ -34,9 +34,14 @@ def _make_dm(
     data_materials=None,
     material_map=None,     # {nom: (co2_par_kg, incert)} ou None → (None, None)
     liquid_row=None,       # Series ou None
+    eol_material_map=None, # {nom: (co2_eol, incert_eol, factor_name)} pour les emballages
+    filiere_map=None,      # {prefixe_nacres: (co2_filiere, incert, filiere_name)}
 ):
     """
     Retourne un DataManager factice paramétrable.
+
+    Par défaut, les méthodes EoL renvoient des valeurs neutres (pas de contribution
+    fin de vie) pour que les tests historiques continuent de passer sans surprise.
     """
     dm = MagicMock()
 
@@ -96,6 +101,23 @@ def _make_dm(
         dm.get_material_data.side_effect = _get_material
     else:
         dm.get_material_data.return_value = (None, None)
+
+    # EoL — par matériau (emballages / conditionnement)
+    if eol_material_map is not None:
+        def _get_eol(name):
+            return eol_material_map.get(name, (None, None, None))
+        dm.get_material_eol_data.side_effect = _get_eol
+    else:
+        dm.get_material_eol_data.return_value = (None, None, None)
+
+    # EoL — filière par NACRES (consommable contaminé : DASRI / DIS)
+    if filiere_map is not None:
+        def _get_filiere(code):
+            prefix = (code or "")[:2].upper()
+            return filiere_map.get(prefix, (None, None, "DASRI"))
+        dm.get_filiere_factor.side_effect = _get_filiere
+    else:
+        dm.get_filiere_factor.return_value = (None, None, "DASRI")
 
     # Liquides
     dm.get_liquid_data.return_value = liquid_row
@@ -461,6 +483,144 @@ class TestMassBasedEmissions(unittest.TestCase):
         self.assertAlmostEqual(masse, 5.0)
         self.assertAlmostEqual(emission, 10.0)
         self.assertEqual(missing, [])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3-bis. Calcul fin de vie (incinération)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestEndOfLifeEmissions(unittest.TestCase):
+    """Vérifie que la fin de vie est correctement ajoutée au total :
+    - consommable → filière DASRI/DIS uniforme (routage NACRES)
+    - emballage / conditionnement → facteur EoL par matériau
+    - matériaux sans mapping EoL → ignorés silencieusement (métaux)
+    """
+
+    @staticmethod
+    def _make_data_masse(masse_g=10.0, materiau='Polypropylène (PP)',
+                         masse_emb=0.0, mat_emb='', code_nacres='NB11'):
+        return pd.DataFrame([{
+            'Code NACRES': code_nacres,
+            'Consommable': 'Tube',
+            'Masse unitaire (g)': masse_g,
+            'Matériau consommable': materiau,
+            'Masse unitaire deuxieme materiaux (g)': 0.0,
+            'Matériau deuxieme materiaux': '',
+            'Masse emballage unitaire (g)': masse_emb,
+            'Matériau emballage': mat_emb,
+            'Masse condionnement (g)': 0.0,
+            'Matériau conditionnement': '',
+            'Nbr par conditionnement': 1,
+        }])
+
+    def test_consommable_dasri_ajoute_au_total(self):
+        """NACRES NB → filière DASRI : émission EoL = masse × 0.943 ajoutée à la production."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(masse_g=10.0, materiau='PP'),
+            material_map={'PP': (3.0, 0.0)},
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, unc, missing = calc._calculate_mass_based_emissions_old(
+            'NB11', 'Tube', quantity=100,
+        )
+        # 100 × 10/1000 = 1 kg ; production = 1×3.0 = 3.0 ; EoL DASRI = 1×0.943 = 0.943
+        self.assertAlmostEqual(masse, 1.0)
+        self.assertAlmostEqual(emission, 3.0 + 0.943, places=4)
+        self.assertEqual(missing, [])
+
+    def test_consommable_dis_pour_solvant(self):
+        """NACRES NA (chimie) → filière DIS : facteur 0.844 au lieu de DASRI."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(masse_g=10.0, materiau='PP', code_nacres='NA02'),
+            material_map={'PP': (3.0, 0.0)},
+            filiere_map={'NA': (0.844, 0.20, 'DIS')},
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, _, _ = calc._calculate_mass_based_emissions_old(
+            'NA02', 'Tube', quantity=100,
+        )
+        self.assertAlmostEqual(emission, 3.0 + 0.844, places=4)
+        self.assertAlmostEqual(masse, 1.0)
+
+    def test_emballage_route_par_materiau(self):
+        """Emballage carton → facteur EoL carton (0.120), PAS la filière du consommable."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(
+                masse_g=10.0, materiau='PP',
+                masse_emb=5.0, mat_emb='Carton',
+            ),
+            material_map={'PP': (3.0, 0.0), 'Carton': (1.0, 0.0)},
+            eol_material_map={'Carton': (0.120, 0.20, 'Emballages/Carton')},
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, _, _ = calc._calculate_mass_based_emissions_old(
+            'NB11', 'Tube', quantity=100,
+        )
+        # PP : prod 1×3.0 + EoL DASRI 1×0.943 = 3.943
+        # Carton : prod 0.5×1.0 + EoL 0.5×0.120 = 0.560
+        # Total : 4.503
+        self.assertAlmostEqual(masse, 1.5)
+        self.assertAlmostEqual(emission, 3.943 + 0.560, places=4)
+
+    def test_metal_sans_eol_pas_de_contribution(self):
+        """Matériau sans facteur EoL (métal) → contribution EoL ignorée silencieusement."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(
+                masse_g=10.0, materiau='PP',
+                masse_emb=5.0, mat_emb='Aluminium',
+            ),
+            material_map={'PP': (3.0, 0.0), 'Aluminium': (11.0, 0.0)},
+            eol_material_map={
+                # Aluminium volontairement absent : pas de mapping EoL.
+                # On définit seulement PP pour vérifier qu'il n'est pas pris
+                # pour l'emballage Aluminium (qui doit rester sans EoL).
+            },
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, _, missing = calc._calculate_mass_based_emissions_old(
+            'NB11', 'Tube', quantity=100,
+        )
+        # PP : prod 1×3.0 + EoL DASRI 1×0.943 = 3.943
+        # Alu : prod 0.5×11.0 = 5.5 (pas d'EoL)
+        # Total : 9.443
+        self.assertAlmostEqual(masse, 1.5)
+        self.assertAlmostEqual(emission, 3.943 + 5.5, places=4)
+        self.assertEqual(missing, [])
+
+    def test_sans_eol_configure_retrocompatible(self):
+        """Si aucun facteur filière ni EoL matériau n'est dispo → comportement v2 inchangé."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(masse_g=10.0, materiau='PP'),
+            material_map={'PP': (3.0, 0.0)},
+            # Pas de filiere_map ni eol_material_map → None partout
+        )
+        calc = CarbonCalculator(dm)
+        emission, masse, _, _ = calc._calculate_mass_based_emissions_old(
+            'NB11', 'Tube', quantity=100,
+        )
+        # Seule la production compte
+        self.assertAlmostEqual(emission, 3.0, places=4)
+        self.assertAlmostEqual(masse, 1.0)
+
+    def test_incertitude_eol_combinee_en_quadrature(self):
+        """L'incertitude EoL doit s'ajouter à celle de la production en quadrature."""
+        dm = _make_dm(
+            data_masse=self._make_data_masse(masse_g=10.0, materiau='PP'),
+            material_map={'PP': (3.0, 0.10)},   # 10% incert sur prod
+            filiere_map={'NB': (0.943, 0.50, 'DASRI')},  # 50% incert sur EoL
+        )
+        calc = CarbonCalculator(dm)
+        _, _, unc, _ = calc._calculate_mass_based_emissions_old(
+            'NB11', 'Tube', quantity=100,
+        )
+        # prod emission = 3.0, abs unc prod = 3.0 × 0.10 = 0.30
+        # eol  emission = 0.943, abs unc eol = 0.943 × 0.50 = 0.4715
+        # combined = sqrt(0.30² + 0.4715²) = sqrt(0.09 + 0.2223) ≈ 0.5588
+        expected = (0.30**2 + 0.4715**2) ** 0.5
+        self.assertAlmostEqual(unc, expected, places=4)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

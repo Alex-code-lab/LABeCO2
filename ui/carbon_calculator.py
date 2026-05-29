@@ -272,8 +272,17 @@ class CarbonCalculator:
 
     def _calculate_mass_based_emissions_old(self, code_nacres, consommable, quantity, packaging=""):
         """
-        Calcule l'empreinte carbone totale (produit + emballage + conditionnement)
-        à partir des masses unitaires et des matériaux.
+        Calcule l'empreinte carbone totale (production + fin de vie) d'un consommable
+        solide à partir des masses unitaires et des matériaux de ses composants.
+
+        Modèle de fin de vie :
+          - Consommable (produit slots 1/2/3) → filière contaminée DASRI ou DIS,
+            déterminée par le préfixe du code NACRES (cf. ui/end_of_life.py).
+          - Emballage et conditionnement → incinération triée par matériau
+            (cf. materials.eol_emission_factor_id).
+
+        Si la base ne contient pas de facteur EoL pour un matériau (métaux par ex.),
+        sa contribution EoL est ignorée silencieusement (pas considéré comme erreur).
         """
         # 1) Cas où aucun code NACRES valide n'est fourni
         if not code_nacres or code_nacres == 'NA':
@@ -303,25 +312,28 @@ class CarbonCalculator:
             return (0.0, 0.0, 0.0, [])
         row = df_row.iloc[0]
 
-        # 3) Définir les composants à traiter, y compris le second matériau du produit
+        # 3) Définir les composants à traiter, avec leur type (product / packaging).
+        # Le type détermine la filière de fin de vie : product → DASRI/DIS,
+        # packaging → facteur EoL par matériau.
         composants = [
-            # Produit principal : matériau 1 puis matériau 2
-            (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL),
-            (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None)),
-            (getattr(self.dm, "MASSE_G3_COL", None), getattr(self.dm, "MATERIAU3_COL", None)),
-            # Emballage
-            (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL),
-            # Conditionnement
-            (self.dm.MASSE_CONDITIONNEMENT_COL, self.dm.MATERIAU_CONDITIONNEMENT_COL),
+            (self.dm.MASSE_G_COL,  self.dm.MATERIAU_COL, "product"),
+            (getattr(self.dm, "MASSE_G2_COL", None), getattr(self.dm, "MATERIAU2_COL", None), "product"),
+            (getattr(self.dm, "MASSE_G3_COL", None), getattr(self.dm, "MATERIAU3_COL", None), "product"),
+            (self.dm.MASSE_EMBALLAGE_COL, self.dm.MATERIAU_EMBALLAGE_COL, "packaging"),
+            (self.dm.MASSE_CONDITIONNEMENT_COL, self.dm.MATERIAU_CONDITIONNEMENT_COL, "packaging"),
         ]
+
+        # Facteur filière (DASRI/DIS) — uniforme pour tous les composants "product".
+        # Résolu une seule fois, hors boucle.
+        filiere_co2, filiere_unc, _filiere = self.dm.get_filiere_factor(code_nacres)
 
         total_mass_kg = 0.0
         total_emission = 0.0
         total_unc_sq = 0.0
         missing_materials = []
 
-        # 4) Pour chaque composant, calculer sa contribution
-        for col_masse, col_mat in composants:
+        # 4) Pour chaque composant, calculer production + fin de vie
+        for col_masse, col_mat, comp_type in composants:
             if col_masse is None or col_mat is None:
                 continue
             # Lecture brute de la masse (g) — NaN doit être traité comme 0
@@ -350,7 +362,7 @@ class CarbonCalculator:
             if masse_g <= 0 or not materiau:
                 continue
 
-            # Récupérer le facteur CO₂ (kgCO₂/kg) et son incertitude
+            # Récupérer le facteur CO₂ production (kgCO₂/kg) et son incertitude
             # AVANT d’accumuler la masse, pour ne pas compter une masse sans émission
             co2_per_kg, uncert_mat = self.dm.get_material_data(materiau)
             if co2_per_kg is None:
@@ -361,16 +373,32 @@ class CarbonCalculator:
             masse_kg = quantity * masse_g / 1000.0
             total_mass_kg += masse_kg
 
-            # Calcul de l’émission pour ce composant
-            emission = masse_kg * co2_per_kg
-            total_emission += emission
+            # 4a) Production
+            emission_prod = masse_kg * co2_per_kg
+            total_emission += emission_prod
+            total_unc_sq += (emission_prod * uncert_mat) ** 2
 
-            # Accumuler l’incertitude (émission * taux d’incertitude)²
-            total_unc_sq += (emission * uncert_mat) ** 2
+            # 4b) Fin de vie
+            if comp_type == "product":
+                # Filière contaminée : facteur uniforme par NACRES.
+                # Si la base n'a pas de facteur filière, on n'ajoute rien.
+                if filiere_co2 is not None:
+                    emission_eol = masse_kg * filiere_co2
+                    total_emission += emission_eol
+                    if filiere_unc is not None:
+                        total_unc_sq += (emission_eol * filiere_unc) ** 2
+            else:  # packaging / conditionnement
+                co2_eol, unc_eol, _eol_name = self.dm.get_material_eol_data(materiau)
+                if co2_eol is not None:
+                    emission_eol = masse_kg * co2_eol
+                    total_emission += emission_eol
+                    if unc_eol is not None:
+                        total_unc_sq += (emission_eol * unc_eol) ** 2
+                # else : matériau sans EoL (métaux récupérés en mâchefers) → ignoré
 
         total_unc = total_unc_sq ** 0.5
         return (total_emission, total_mass_kg, total_unc, missing_materials)
-    
+
 
     def _calculate_liquid_emissions(self, code_nacres, volume_ml, consommable=None, packaging=""):
         """

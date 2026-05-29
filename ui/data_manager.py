@@ -50,6 +50,12 @@ class DataManager:
     # Spécifique matériaux
     MATERIAU_NAME_COL = "Materiau"
     EQUIV_CO2_COL = "Equivalent CO₂ (kg eCO₂/kg)"
+    EQUIV_CO2_EOL_COL = "EoL Facteur CO₂ (kg eCO₂/kg)"
+    UNCERTAINTY_EOL_COL = "EoL Incertitude"
+    EOL_FACTOR_NAME_COL = "EoL Nom facteur"
+    EOL_LIST_NAME_COL = "Nom"
+    EOL_LIST_FACTOR_COL = "Facteur CO₂ (kg eCO₂/kg)"
+    EOL_LIST_UNCERTAINTY_COL = "Incertitude"
 
     # Colonnes prix consommables. "Prix du conditionnement" est la source de
     # vérité; les anciennes colonnes *_ijm restent lues en fallback pour les
@@ -107,6 +113,10 @@ class DataManager:
         self.data_materials = frames["data_materials"]
         self.data_liquides = frames["data_liquides"]
         self.data_transport = frames["data_transport"]
+        self.data_eol_factors = frames.get("data_eol_factors")
+        if self.data_eol_factors is None:
+            import pandas as pd
+            self.data_eol_factors = pd.DataFrame(columns=["Nom", "Facteur CO₂ (kg eCO₂/kg)", "Incertitude", "Source"])
 
     def reload(self):
         """Recharge les DataFrames depuis la base SQLite active."""
@@ -174,7 +184,81 @@ class DataManager:
         raw_unc = filtered.get(self.UNCERTAINTY_COL, pd.Series([0.0])).iloc[0]
         incert_mat = 0.0 if pd.isna(raw_unc) else float(raw_unc)
         return co2_par_kg, incert_mat
-    
+
+    def get_material_eol_data(self, material_name):
+        """Retourne (co2_par_kg_eol, incert_eol, eol_factor_name) pour un matériau.
+
+        Renvoie (None, None, None) si le matériau n'a pas de mapping EoL (par
+        exemple : métaux récupérés en mâchefers, sans facteur EoL associé).
+        Le calculateur doit alors ignorer la contribution EoL de ce composant.
+        """
+        import pandas as pd
+
+        if pd.isna(material_name) or not isinstance(material_name, str):
+            return None, None, None
+
+        df_mat = self.data_materials
+        if self.EQUIV_CO2_EOL_COL not in df_mat.columns:
+            return None, None, None
+
+        mask = df_mat[self.MATERIAU_NAME_COL].astype(str).str.strip() == material_name.strip()
+        filtered = df_mat[mask]
+        if filtered.empty:
+            return None, None, None
+
+        raw_co2 = filtered[self.EQUIV_CO2_EOL_COL].iloc[0]
+        if pd.isna(raw_co2):
+            return None, None, None
+        co2_eol = float(raw_co2)
+
+        raw_unc = filtered[self.UNCERTAINTY_EOL_COL].iloc[0] if self.UNCERTAINTY_EOL_COL in filtered.columns else None
+        incert_eol = 0.0 if (raw_unc is None or pd.isna(raw_unc)) else float(raw_unc)
+
+        raw_name = filtered[self.EOL_FACTOR_NAME_COL].iloc[0] if self.EOL_FACTOR_NAME_COL in filtered.columns else ""
+        factor_name = "" if pd.isna(raw_name) else str(raw_name).strip()
+
+        return co2_eol, incert_eol, factor_name
+
+    def get_eol_factor_by_name(self, factor_name):
+        """Retourne (co2_par_kg, incertitude) pour un facteur EoL donné par son nom.
+
+        Utilisé par le calculateur pour résoudre les facteurs filière (DASRI / DIS)
+        à partir du nom retourné par ui.end_of_life.factor_name_for_nacres().
+        Renvoie (None, None) si le facteur n'existe pas.
+        """
+        import pandas as pd
+
+        if not factor_name:
+            return None, None
+
+        df = self.data_eol_factors
+        if df is None or df.empty:
+            return None, None
+
+        mask = df[self.EOL_LIST_NAME_COL].astype(str).str.strip() == str(factor_name).strip()
+        filtered = df[mask]
+        if filtered.empty:
+            return None, None
+
+        raw_co2 = filtered[self.EOL_LIST_FACTOR_COL].iloc[0]
+        co2 = 0.0 if pd.isna(raw_co2) else float(raw_co2)
+        raw_unc = filtered[self.EOL_LIST_UNCERTAINTY_COL].iloc[0]
+        unc = 0.0 if pd.isna(raw_unc) else float(raw_unc)
+        return co2, unc
+
+    def get_filiere_factor(self, code_nacres):
+        """Retourne (co2_par_kg, incertitude, filiere) pour le facteur filière (DASRI ou
+        DIS) à appliquer au consommable, déterminé à partir du code NACRES.
+
+        La filière est résolue via ui.end_of_life ; si le facteur correspondant
+        n'est pas trouvé en base, renvoie (None, None, filiere).
+        """
+        from ui.end_of_life import filiere_for_nacres, factor_name_for_nacres
+        filiere = filiere_for_nacres(code_nacres)
+        factor_name = factor_name_for_nacres(code_nacres)
+        co2, unc = self.get_eol_factor_by_name(factor_name)
+        return co2, unc, filiere
+
     def get_data_liquides(self):
         """Retourne la DataFrame des consommables liquides."""
         return self.data_liquides
