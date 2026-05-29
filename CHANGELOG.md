@@ -2,6 +2,88 @@
 
 Toutes les modifications notables du projet seront consignées dans ce fichier avec ré-organisation des fichiers.
 
+## [3.1] – 2026-05-29
+
+### ✨ Calcul de la fin de vie (incinération)
+
+L'empreinte carbone des consommables solides inclut désormais l'**incinération
+en fin de vie**, en plus de la production. Le total affiché dans l'historique
+est `production + fin de vie`, et un panneau « Détail du calcul » sous le
+tableau d'historique décompose contribution par contribution.
+
+- **Modèle d'attribution** (par composant) :
+  - **Consommable** (matériaux principal/secondaire/tertiaire) → filière
+    contaminée **DASRI** ou **DIS**, routée automatiquement par préfixe NACRES
+    (`NA/NL/NM` → DIS chimie, `NB/NC/ND/NE` → DASRI bio, défaut DASRI
+    conservatif). Pas de choix utilisateur.
+  - **Emballage** et **conditionnement** → facteur d'incinération par
+    matériau (filière banale triée).
+
+- **Facteurs ajoutés** (8, tous d'origine ADEME Base Empreinte) :
+  - `DAS/Incinération` = 0,943 kgCO₂e/kg (qualité 1/5, ±50 %, BC v23.10) ;
+  - `DIS/Incinération` = 0,844 kgCO₂e/kg (qualité 3/5, ±20 %, BC v23.10) ;
+  - Plastique générique = 2,27 ; PE/PP/PB/PS = 3,04 ; PVC rigide = 2,25 ;
+    Verre = 0,054 (toutes BI v3.0, qualité 5/5, peer-reviewed thinkstep/GaBi) ;
+  - Carton = 0,120 ; PET pétrosourcé = 2,14 (BC v23.10).
+  - Cross-check par Rizan et al. 2021 (DASRI hôpital UK = 1,074 kgCO₂e/kg) →
+    cohérent à 12 % près avec la fiche ADEME DAS.
+
+- **Mapping matériaux** : 12/14 matériaux de référence reliés à leur facteur
+  EoL (`materials.eol_emission_factor_id`). Métaux (Acier inoxydable,
+  Aluminium) laissés sans EoL — les mâchefers sont récupérés à froid, pas
+  d'émission directe.
+
+### 🎨 UI — Panneau « Détail du calcul »
+
+- Affichage sous l'historique des calculs : sélectionner une ligne pour voir :
+  - Résumé : masse totale, filière retenue, totaux Production / EoL
+    consommable / EoL emballage / **Total** ;
+  - Tableau composant par composant : matériau, masse, kg CO₂e production,
+    kg CO₂e fin de vie, filière ou facteur EoL appliqué ;
+  - Avertissement qualité contextuel : bandeau orange explicite quand la
+    filière DASRI est utilisée (qualité 1/5, ±50 %, cross-check Rizan 2021).
+- L'incertitude affichée combine en quadrature les incertitudes production
+  et fin de vie.
+
+### 🛠 Changements techniques
+
+- **Migration DB v3 (`add_end_of_life_factors`)** dans
+  `tools/migration/migrate_v3_end_of_life_factors.py` : idempotente,
+  backup automatique, applicable à n'importe quelle base via `--db-path`
+  (ex. base utilisateur `private/labeco2.sqlite`).
+- **Colonne `materials.eol_emission_factor_id`** ajoutée par la migration ;
+  ALTER défensif dans `ensure_app_schema` pour les bases antérieures à v3.
+- **Module `ui/end_of_life.py`** : routage NACRES → filière + mapping
+  filière → nom de facteur en base.
+- **API `DataManager`** étendue : `get_material_eol_data`,
+  `get_eol_factor_by_name`, `get_filiere_factor`.
+- **API `CarbonCalculator`** :
+  - `_calculate_mass_based_emissions_old` ajoute désormais la contribution
+    EoL au total `em` et combine les incertitudes en quadrature.
+  - Attribut public `last_breakdown` (dict) repeuplé à chaque appel de
+    `compute_emission_data` — exposé pour la consommation UI.
+- **Test de non-régression** `test_solide_discret_pp_tube_15ml` mis à jour
+  pour refléter le changement intentionnel (em : 0,218755 → 0,281936 ;
+  em_err : 0,020794 → 0,037820).
+- **Tests** : 222 → 225 verts (6 nouveaux tests EoL + 3 sur le breakdown).
+- **Référence justificative complète** : tableau xlsx des 60 fiches ADEME
+  analysées avec valeurs, indicateurs DQR et recommandations LABeCO₂ —
+  archivé hors-repo dans `private/incineration/facteurs_emission_incineration_ademe.xlsx`.
+
+### 🚀 Note
+
+Cette mise à jour est **rétro-compatible**. Les bases utilisateur antérieures
+à v3.1 chargent toujours sans erreur (ALTER défensif), mais l'EoL n'est
+calculé que lorsque la migration v3 a été appliquée — sinon la contribution
+EoL est nulle silencieusement. Pour appliquer la migration sur sa base de
+travail :
+
+```sh
+python tools/migration/migrate_v3_end_of_life_factors.py --db-path private/labeco2.sqlite
+```
+
+---
+
 ## [3.0] – 2026-05-28
 
 ### ✨ Migration vers SQLite et workflow contributeur

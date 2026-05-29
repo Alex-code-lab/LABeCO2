@@ -3,7 +3,7 @@
 Calculateur de bilan carbone pour laboratoires de recherche.
 
 - **Auteur** : Alexandre Souchaud — labeco2.contact@gmail.com
-- **Version actuelle** : V3.0 du 28/05/2026
+- **Version actuelle** : V3.1 du 29/05/2026
 - **DOI** : [10.5281/zenodo.15240634](https://doi.org/10.5281/zenodo.15240634)
 - **Licence** : GNU GPL v3 (ou ultérieure)
 - **Date de création** : 1er octobre 2024
@@ -31,6 +31,13 @@ validation, dépréciation) et un outil d'administration dédié (`lab_admin`).
 ### Calculateur (`main.py`)
 - Sélection par catégorie / sous-catégorie / code NACRES.
 - Calcul d'émissions par **masse**, **prix** ou **code NACRES** selon les données disponibles.
+- **Calcul de la fin de vie (incinération)** intégré au total pour les consommables
+  solides : routage automatique du consommable vers la filière DASRI ou DIS selon
+  son code NACRES, facteurs ADEME par matériau pour les emballages.
+  Voir [Méthodologie fin de vie](#méthodologie-de-la-fin-de-vie).
+- **Panneau « Détail du calcul »** sous l'historique : sélectionner une ligne
+  pour voir la décomposition production / fin de vie par composant, avec
+  avertissement qualité contextuel (DASRI : ±50 %).
 - Gestion des machines personnalisées (puissance × temps × mix électrique).
 - Historique complet des calculs avec modification, suppression, export (JSON / CSV / Excel).
 - Bouton **🌐 fiche fournisseur** pour ouvrir directement la page du produit chez son fournisseur.
@@ -63,6 +70,53 @@ Crawler poli (délai configurable, cache HTML, respect de robots.txt) qui collec
 des références produit chez des fournisseurs publics (Fisher Scientific, VWR, etc.).
 Les observations sont stockées dans une base privée puis importées vers la base
 principale via `lab_admin`.
+
+---
+
+## Méthodologie de la fin de vie
+
+Depuis la v3.1, chaque consommable solide se voit attribuer une contribution
+**incinération en fin de vie**, ajoutée au calcul de production.
+
+| Composant | Filière de fin de vie | Facteur appliqué |
+|---|---|---|
+| Consommable principal/secondaire/tertiaire | DASRI ou DIS selon NACRES | Facteur filière uniforme |
+| Emballage secondaire | Filière triée par matériau | Facteur EoL du matériau |
+| Conditionnement primaire | Filière triée par matériau | Facteur EoL du matériau |
+
+**Routage NACRES** (préfixe 2 caractères) :
+
+| Préfixe | Domaine | Filière | Facteur (kgCO₂e/kg) | Source |
+|---|---|---|---|---|
+| `NA`, `NL`, `NM` | Chimie / solvants / matières premières | DIS | 0,844 (±20 %) | ADEME BC v23.10 |
+| `NB`, `NC`, `ND`, `NE` | Biologie / bio-matériel / maintenance | DASRI | 0,943 (±50 %) | ADEME BC v23.10 |
+| Autres / inconnu | — | DASRI (conservatif) | 0,943 | — |
+
+**Facteurs EoL par matériau** (extraits) — ADEME Base IMPACTS v3.0 (qualité 5/5,
+peer-reviewed thinkstep/GaBi) :
+
+| Matériau | kgCO₂e/kg |
+|---|---|
+| PE, PP, PB, PS | 3,04 |
+| PET | 2,14 |
+| PVC | 2,25 |
+| Plastiques génériques (PC, PMMA, PTFE…) | 2,27 |
+| Carton, Papier | 0,120 |
+| Verre | 0,054 |
+| Acier inoxydable, Aluminium | — (mâchefers récupérés) |
+
+**Cross-check** : Rizan et al. 2021 (J. Cleaner Production) donne 1,074 kgCO₂e/kg
+pour l'incinération haute température de déchets cliniques en milieu hospitalier
+britannique, cohérent à 12 % près avec le facteur ADEME DAS retenu (0,943).
+
+> **À noter sur la qualité ADEME** : les fiches Base Carbone DAS et DIS sont
+> formellement notées 1/5 et 3/5 par l'ADEME (validité expirée en mars 2024).
+> Elles restent la seule référence française officielle. L'application affiche
+> un avertissement contextuel quand la filière DASRI est appliquée.
+
+Pour la table de référence complète des 60 fiches ADEME analysées (valeurs,
+indicateurs DQR, justification du choix retenu pour LABeCO₂), voir
+`private/incineration/facteurs_emission_incineration_ademe.xlsx` (hors-repo).
 
 ---
 
