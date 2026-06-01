@@ -2,6 +2,40 @@
 # LABeCO2 — macOS app spec
 # Compilé avec : pyinstaller LABeCO2_Mac.spec
 
+# ─────────────────────────────────────────────────────────────────────
+# Filtrage des modules Qt inutiles (gain ~500 MB sur le bundle final)
+# ─────────────────────────────────────────────────────────────────────
+# PySide6 6.4+ embarque QtWebEngineCore (Chromium) qui pèse 446 MB à lui
+# seul, plus QtQuick/Qt3D/QtMultimedia etc. LABeCO2 n'utilise que
+# QtCore + QtGui + QtWidgets. Mettre ces modules dans `excludes` ne suffit
+# PAS (Qt charge ses libs en runtime) : il faut filtrer manuellement
+# a.binaries et a.datas après l'Analysis.
+_QT_FRAMEWORKS_TO_EXCLUDE = (
+    # Le gros morceau : 446 MB
+    'QtWebEngine', 'QtWebChannel', 'QtWebSockets', 'QtWebView',
+    # 3D, Quick, QML
+    'Qt3D', 'QtQuick', 'QtQml', 'QtShaderTools',
+    # Multimédia & spatial
+    'QtMultimedia', 'QtSpatialAudio', 'QtTextToSpeech',
+    # Géo
+    'QtPositioning', 'QtLocation',
+    # PDF
+    'QtPdf',
+    # Connectivité périphérique
+    'QtBluetooth', 'QtNfc', 'QtSerialPort', 'QtSerialBus', 'QtSensors',
+    # Visu non-utilisée par LABeCO2 (on fait du matplotlib)
+    'QtDataVisualization', 'QtCharts',
+    # Workflow / état
+    'QtScxml', 'QtStateMachine', 'QtRemoteObjects',
+    # Outillage de dev (Designer, etc.)
+    'QtDesigner', 'QtUiTools',
+)
+
+
+def _exclude_qt(path: str) -> bool:
+    return any(kw in path for kw in _QT_FRAMEWORKS_TO_EXCLUDE)
+
+
 a = Analysis(
     ['main.py'],
     pathex=[],
@@ -39,6 +73,9 @@ a = Analysis(
         # Matplotlib backend Qt
         'matplotlib.backends.backend_qtagg',
         'matplotlib.backends.backend_qt5agg',
+        # adjustText (chevauchement étiquettes graphiques) — import indirect
+        # depuis ui/charts/{bar_chart_proportional,bar_chart_price_mass,pie_chart}.py
+        'adjustText',
     ],
     hookspath=[],
     hooksconfig={},
@@ -55,6 +92,11 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+# ─── Filtrage des binaires & datas Qt inutiles ─────────────────────────
+# Doit être fait APRÈS Analysis. Réduit le bundle de ~500 MB sur macOS.
+a.binaries = [b for b in a.binaries if not _exclude_qt(b[1])]
+a.datas = [d for d in a.datas if not _exclude_qt(d[1])]
 
 pyz = PYZ(a.pure)
 
