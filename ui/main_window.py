@@ -8,7 +8,7 @@
 #
 # Vous pouvez consulter la GPL ici : https://www.gnu.org/licenses/gpl-3.0.fr.html
 #
-# Date de création : 01/10/2024 — Version V3.0 du 28/05/2026
+# Date de création : 01/10/2024 — Version V3.0 du 29/05/2026
 # DOI: 10.5281/zenodo.15240634
 
 

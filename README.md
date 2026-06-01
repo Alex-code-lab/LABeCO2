@@ -3,7 +3,7 @@
 Calculateur de bilan carbone pour laboratoires de recherche.
 
 - **Auteur** : Alexandre Souchaud — labeco2.contact@gmail.com
-- **Version actuelle** : V3.1 du 29/05/2026
+- **Version actuelle** : V3.0 du 29/05/2026
 - **DOI** : [10.5281/zenodo.15240634](https://doi.org/10.5281/zenodo.15240634)
 - **Licence** : GNU GPL v3 (ou ultérieure)
 - **Date de création** : 1er octobre 2024
