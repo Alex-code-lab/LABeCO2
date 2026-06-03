@@ -8,7 +8,7 @@ Calculateur de bilan carbone pour laboratoires de recherche.
 - **Licence** : GNU GPL v3 (ou ultérieure)
 - **Date de création** : 1er octobre 2024
 
-> Copyright © 2024-2026 Alexandre Souchaud. Tous droits réservés.
+> Copyright © 2024-2026 Alexandre Souchaud.
 > Pour toute question concernant le logiciel et ses droits : labeco2.contact@gmail.com
 
 ---
