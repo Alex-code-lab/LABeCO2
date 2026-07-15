@@ -1,9 +1,9 @@
-# tools/capture_screenshots.py
+# tools/migration/capture_screenshots.py
 #
 # Lance LABeCO2 et capture automatiquement tous les états + graphiques.
 #
 # Usage (depuis la racine du projet) :
-#   python tools/capture_screenshots.py
+#   python tools/migration/capture_screenshots.py
 #
 # Résultat : exports/screenshots/*.png
 
@@ -11,9 +11,10 @@ import sys
 import os
 import pandas as pd
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QComboBox
 from PySide6.QtCore import QTimer
 
 from ui.main_window import MainWindow
@@ -21,9 +22,7 @@ from utils.data_loader import resource_path
 
 EXEMPLE_CSV = os.path.join(os.path.dirname(__file__), "exemple.csv")
 
-OUTPUT_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "exports", "screenshots")
-)
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "exports", "screenshots")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -134,7 +133,9 @@ def run(window):
     # ── Étape 9 : popup Sources ───────────────────────────────────────────────
     def step9_sources():
         def capture_and_close():
-            popup = QApplication.activeWindow()
+            # activeModalWidget ne dépend pas du focus OS (contrairement à
+            # activeWindow, qui renvoie None si l'appli n'est pas au premier plan).
+            popup = QApplication.activeModalWidget() or QApplication.activeWindow()
             if popup and popup is not window:
                 save(popup, "05_sources.png")
                 popup.close()
@@ -145,7 +146,7 @@ def run(window):
     # ── Étape 10 : popup Méthodologie ────────────────────────────────────────
     def step10_methodo():
         def capture_and_close():
-            popup = QApplication.activeWindow()
+            popup = QApplication.activeModalWidget() or QApplication.activeWindow()
             if popup and popup is not window:
                 save(popup, "06_methodologie.png")
                 popup.close()
@@ -187,7 +188,7 @@ def run(window):
     # ── Étapes graphiques : on itère sur la liste CHARTS ─────────────────────
     def step_chart(index):
         if index >= len(CHARTS):
-            finish()
+            step24_edit_calcul()
             return
 
         chart_type, filename, delay = CHARTS[index]
@@ -212,6 +213,76 @@ def run(window):
             QTimer.singleShot(400, lambda: step_chart(idx + 1))
 
         open_and_schedule()
+
+    # ── Étape 24 : dialogue "Modifier un calcul" ─────────────────────────────
+    def step24_edit_calcul():
+        def capture_and_close():
+            popup = QApplication.activeModalWidget() or QApplication.activeWindow()
+            if popup is None or popup is window:
+                print("  ✗  24_modifier_calcul.png  (dialogue introuvable)")
+                return
+            # Les combos aux libellés très longs (consommables) imposent une
+            # largeur minimale de ~1900 px au dialogue. On plafonne leur
+            # largeur (prise en compte dans le minimum du layout), puis on
+            # efface le minimum que le layout a déjà figé sur le dialogue.
+            # Le resize doit attendre le tick suivant, le temps que le layout
+            # soit recalculé.
+            for combo in popup.findChildren(QComboBox):
+                if combo.sizeHint().width() > 600:
+                    combo.setMaximumWidth(600)
+
+            def resize_dialog():
+                popup.setMinimumSize(0, 0)
+                popup.resize(900, popup.sizeHint().height())
+
+                def grab_and_close():
+                    save(popup, "24_modifier_calcul.png")
+                    popup.close()
+                QTimer.singleShot(200, grab_and_close)
+            QTimer.singleShot(200, resize_dialog)
+        window.history_list.setCurrentCell(0, 0)
+        QTimer.singleShot(1000, capture_and_close)
+        window.modify_selected_calculation()        # bloquant — timer tourne dedans
+        QTimer.singleShot(300, step25_manip_dialog)
+
+    # ── Étape 25 : dialogue "Créer une manip type" ───────────────────────────
+    def step25_manip_dialog():
+        def capture_and_close():
+            popup = QApplication.activeModalWidget() or QApplication.activeWindow()
+            if popup and popup is not window:
+                save(popup, "25_creer_manip_type.png")
+                popup.close()
+        QTimer.singleShot(1000, capture_and_close)
+        window.define_user_manip_from_history()     # bloquant — timer tourne dedans
+        QTimer.singleShot(300, step26_validation)
+
+    # ── Étape 26 : fenêtre de validation (outil admin) ───────────────────────
+    def step26_validation():
+        import shutil
+        import tempfile
+        from ui.validate_window import ValidateWindow
+
+        try:
+            # Copie de la base de référence : la fenêtre ne doit pas toucher
+            # le fichier suivi par git.
+            src = os.path.join(PROJECT_ROOT, "data", "labeco2_reference.sqlite")
+            tmp_db = os.path.join(tempfile.gettempdir(), "labeco2_capture_validation.sqlite")
+            shutil.copyfile(src, tmp_db)
+            vw = ValidateWindow(tmp_db, parent=window)
+            # La base de référence n'a que des lignes "validated" : le filtre
+            # par défaut ("À valider") afficherait un tableau vide.
+            vw._widget.status_combo.setCurrentIndex(2)
+            vw.show()
+        except Exception as e:
+            print(f"  ✗  26_validation.png  (erreur ouverture : {e})")
+            QTimer.singleShot(200, finish)
+            return
+
+        def capture_and_close():
+            save(vw, "26_validation.png")
+            vw.close()
+            QTimer.singleShot(300, finish)
+        QTimer.singleShot(1200, capture_and_close)
 
     # ── Fin ───────────────────────────────────────────────────────────────────
     def finish():

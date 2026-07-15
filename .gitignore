@@ -24,3 +24,4 @@ private/
 *.fdb_latexmk
 *.synctex.gz
 docs/test_carbon_calculator_annote.py
+docs/Plaquette LABeC02/
