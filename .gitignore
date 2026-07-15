@@ -5,6 +5,7 @@ __pycache__/
 LABeCO2_env/
 LABeCO2_env311/
 LABeCO2_env_test/
+.venv/
 dist/
 build/
 Desktop/

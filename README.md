@@ -151,7 +151,17 @@ avec l'usage, tout en gardant un contrôle qualité centralisé.
 ## Prérequis
 
 - **Python 3.11** ou supérieur
-- Dépendances Python listées dans `requirements.txt` (PySide6, pandas, matplotlib, numpy, …)
+- Dépendances Python listées dans `pyproject.toml` et `requirements.txt` (PySide6, pandas, matplotlib, numpy, …)
+- **Linux (Ubuntu/Debian)** : l'interface graphique nécessite une bibliothèque
+  système supplémentaire, requise par Qt 6.5+ mais absente par défaut
+  (vérifié sur Ubuntu 24.04, voir issue #2) :
+
+  ```bash
+  sudo apt install libxcb-cursor0
+  ```
+
+  Sans elle, `python main.py` échoue au lancement (plugin d'affichage
+  « xcb » impossible à charger).
 
 ---
 
@@ -167,6 +177,24 @@ source venv/bin/activate          # macOS / Linux
 # venv\Scripts\activate           # Windows
 
 pip install -r requirements.txt
+```
+
+Trois fichiers `requirements` coexistent :
+- `requirements.txt` — dépendances de l'application ;
+- `requirements-dev.txt` — outils de développement en plus (pytest, coverage, …) ;
+- `requirements-brew.txt` — environnement de compilation des binaires (PyInstaller).
+
+### Alternative : avec uv
+
+Le fichier `pyproject.toml` à la racine est la « carte d'identité » standard du
+projet (nom, version, Python requis, dépendances). C'est l'équivalent officiel
+et normalisé de `requirements.txt`, que tous les outils Python modernes savent
+lire. Avec [uv](https://docs.astral.sh/uv/), un gestionnaire qui remplace le
+duo `venv` + `pip`, l'installation tient alors en deux commandes :
+
+```bash
+uv sync                  # crée .venv/ et installe les dépendances du pyproject.toml
+uv run python main.py    # lance l'application dans cet environnement
 ```
 
 Au premier lancement, l'application initialise une copie de travail SQLite à partir

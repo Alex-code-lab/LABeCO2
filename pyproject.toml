@@ -1,0 +1,37 @@
+# pyproject.toml — description standard du projet (PEP 621).
+# Permet notamment l'installation en deux commandes avec uv :
+#   uv sync && uv run python main.py
+# Les versions épinglées sont alignées sur requirements.txt et sur les
+# builds PyInstaller (.spec).
+#
+# À TESTER ULTÉRIEUREMENT (retour issue #2, fonctionnel sur Ubuntu 24.04) :
+# Python 3.13, numpy 2.5.1, pandas 3.0.3, matplotlib 3.11.0,
+# adjustText 1.4.0, PySide6 6.11.1. Après validation, mettre à jour ici,
+# dans requirements*.txt et dans les fichiers .spec.
+
+[project]
+name = "labeco2"
+version = "3.0"
+description = "LABeCO₂ — le bilan carbone des expériences de laboratoire, calcul par calcul"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.11"
+dependencies = [
+    "numpy==1.26.4",
+    "pandas==2.2.2",
+    "PySide6",
+    "matplotlib==3.7.1",
+    "adjustText==0.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.2",
+    "coverage==7.14.0",
+    "openpyxl",
+]
+
+[tool.uv]
+# LABeCO2 est une application (lancée via `python main.py`), pas une
+# bibliothèque installable : uv ne doit gérer que les dépendances.
+package = false
